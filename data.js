@@ -19,6 +19,18 @@ window.MDA_DATA = (function () {
     MARAD:{ name: "US MARAD / NAVCENT", tag: "GOV",   color: "#e3b341" },
     UKMTO:{ name: "UKMTO",             tag: "GOV",    color: "#e3b341" },
     LL:   { name: "Lloyd's List Intel", tag: "DATA",  color: "#f0884d" },
+
+    // ---- แหล่งข่าว live จาก cron (api/cron-news.py) ----
+    GCAP: { name: "gCaptain",               tag: "NEWS", color: "#46c976" },
+    S4S:  { name: "Safety4Sea",             tag: "NEWS", color: "#39a3a3" },
+    SPL:  { name: "Splash247",              tag: "NEWS", color: "#5fb0c9" },
+    MAREX:{ name: "The Maritime Executive", tag: "NEWS", color: "#3fae6a" },
+    MLINK:{ name: "MarineLink",             tag: "NEWS", color: "#39a3a3" },
+    NVT:  { name: "Naval Today",            tag: "NAVY", color: "#e3b341" },
+    USNI: { name: "USNI News",              tag: "NAVY", color: "#e3b341" },
+    NAVN: { name: "Naval News",             tag: "NAVY", color: "#e3b341" },
+    AMTI: { name: "CSIS AMTI",              tag: "SAT",  color: "#b07cf0" },
+    GFW:  { name: "Global Fishing Watch",   tag: "DATA", color: "#f0884d" },
   };
 
   // ---- vessels (global) ----

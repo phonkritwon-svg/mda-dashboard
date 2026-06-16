@@ -24,23 +24,36 @@ import urllib.parse
 ITEMS_PER_FEED    = 4    # ดึงกี่ข่าวต่อแหล่ง
 FEED_TIMEOUT      = 6    # วินาที ต่อการดึง 1 feed
 TRANSLATE_TIMEOUT = 4    # วินาที ต่อการแปล 1 ครั้ง
-TRANSLATE_BUDGET  = 4    # งบเวลารวมสำหรับการแปลทั้งหมด (กันเกิน maxDuration)
+TRANSLATE_BUDGET  = 8    # งบเวลารวมสำหรับการแปลทั้งหมด (กันเกิน maxDuration)
+FETCH_WORKERS     = 12   # ดึงทุก feed พร้อมกันในรอบเดียว
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 CRON_SECRET  = os.environ.get("CRON_SECRET", "")
 
 SOURCES = [
-    {"key": "GCAP",  "name": "gCaptain",            "url": "https://gcaptain.com/feed/"},
-    {"key": "S4S",   "name": "Safety4Sea",          "url": "https://safety4sea.com/feed/"},
-    {"key": "SPL",   "name": "Splash247",           "url": "https://splash247.com/feed/"},
-    {"key": "NVT",   "name": "Naval Today",         "url": "https://navaltoday.com/feed/"},
-    {"key": "MAREX", "name": "The Maritime Executive", "url": "https://maritime-executive.com/rss/articles"},
+    # --- ข่าวพาณิชยนาวี / ความมั่นคงทางทะเล ---
+    {"key": "GCAP",  "name": "gCaptain",               "url": "https://gcaptain.com/feed/"},
+    {"key": "SPL",   "name": "Splash247",              "url": "https://splash247.com/feed/"},
+    {"key": "MAREX", "name": "The Maritime Executive", "url": "https://www.maritime-executive.com/articles.rss"},
+    {"key": "MLINK", "name": "MarineLink",             "url": "https://www.marinelink.com/news/rss"},
+    # --- ทหาร / ความขัดแย้งทางทะเล ---
+    {"key": "NVT",   "name": "Naval Today",            "url": "https://navaltoday.com/feed/"},
+    {"key": "USNI",  "name": "USNI News",              "url": "https://news.usni.org/feed"},
+    {"key": "NAVN",  "name": "Naval News",             "url": "https://www.navalnews.com/feed/"},
+    {"key": "AMTI",  "name": "CSIS AMTI",              "url": "https://amti.csis.org/feed/"},
+    # --- ประมงผิดกฎหมาย (IUU) ---
+    {"key": "GFW",   "name": "Global Fishing Watch",   "url": "https://globalfishingwatch.org/feed/"},
 ]
 
 
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+ATOM = "{http://www.w3.org/2005/Atom}"
+
+
 def http_get(url, timeout=12):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (MDA-cron)"})
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
 
@@ -54,8 +67,18 @@ def strip_html(s):
 
 
 def parse_pubdate(s):
-    try:
+    s = (s or "").strip()
+    if not s:
+        return datetime.now(timezone.utc).isoformat()
+    try:                                  # RFC822 (RSS pubDate)
         dt = parsedate_to_datetime(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
+    except Exception:
+        pass
+    try:                                  # ISO8601 (Atom published/updated)
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).isoformat()
@@ -63,22 +86,56 @@ def parse_pubdate(s):
         return datetime.now(timezone.utc).isoformat()
 
 
+def _atom_link(entry):
+    """Atom: เลือก <link rel=alternate href=...> มิฉะนั้นเอา href แรก"""
+    href = ""
+    for ln in entry.findall(ATOM + "link"):
+        if ln.get("rel", "alternate") == "alternate" and ln.get("href"):
+            return ln.get("href").strip()
+        if not href and ln.get("href"):
+            href = ln.get("href").strip()
+    return href
+
+
 def fetch_feed(src):
     out = []
     try:
         root = ET.fromstring(http_get(src["url"], timeout=FEED_TIMEOUT))
-        for it in root.findall(".//item")[:ITEMS_PER_FEED]:
-            title = (it.findtext("title") or "").strip()
-            if not title:
-                continue
-            out.append({
-                "key":       src["key"],
-                "outlet":    src["name"],
-                "title":     title,
-                "link":      (it.findtext("link") or "").strip(),
-                "desc":      strip_html(it.findtext("description") or ""),
-                "published": parse_pubdate(it.findtext("pubDate") or ""),
-            })
+        items = root.findall(".//item")
+        if items:                         # ---- RSS 2.0 ----
+            for it in items[:ITEMS_PER_FEED]:
+                title = (it.findtext("title") or "").strip()
+                if not title:
+                    continue
+                out.append({
+                    "key":       src["key"],
+                    "outlet":    src["name"],
+                    "title":     title,
+                    "link":      (it.findtext("link") or "").strip(),
+                    "desc":      strip_html(it.findtext("description") or ""),
+                    "published": parse_pubdate(it.findtext("pubDate") or ""),
+                })
+        else:                             # ---- Atom (เช่น Maritime Executive) ----
+            for en in root.findall(".//" + ATOM + "entry")[:ITEMS_PER_FEED]:
+                t = en.find(ATOM + "title")
+                title = (t.text or "").strip() if t is not None and t.text else ""
+                if not title:
+                    continue
+                d = en.find(ATOM + "summary")
+                if d is None or not (d.text or "").strip():
+                    d = en.find(ATOM + "content")
+                desc = (d.text or "") if d is not None else ""
+                pub = en.find(ATOM + "published")
+                if pub is None:
+                    pub = en.find(ATOM + "updated")
+                out.append({
+                    "key":       src["key"],
+                    "outlet":    src["name"],
+                    "title":     title,
+                    "link":      _atom_link(en),
+                    "desc":      strip_html(desc),
+                    "published": parse_pubdate(pub.text if pub is not None else ""),
+                })
     except Exception:
         pass
     return out
@@ -159,7 +216,7 @@ def upsert(rows):
 
 def run():
     arts = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as ex:
         for r in ex.map(fetch_feed, SOURCES):
             arts.extend(r)
     if not arts:
