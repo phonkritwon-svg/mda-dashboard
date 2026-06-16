@@ -24,10 +24,17 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const toggleVis = (k) => setVisible(s => ({ ...s, [k]: !s[k] }));
   const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, dark: val, incidents: val });
 
-  const ofInterest = data.vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
+  // หมุดเรือมาจากข่าวจริง (สแกนชื่อเรือ+พื้นที่จากฟีดข่าว) แทนเรือ dummy
+  const { news: liveNews } = window.useNewsUpdater(data.news);
+  const vessels = React.useMemo(
+    () => (window.extractVesselsFromNews ? window.extractVesselsFromNews(liveNews) : []),
+    [liveNews]
+  );
+
+  const ofInterest = vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
   const q = search.trim().toLowerCase();
-  const filteredVessels = data.vessels.filter(v => {
+  const filteredVessels = vessels.filter(v => {
     // สถานะ (แท็บ)
     if (filterType === "watch" && (v.status === "normal" || v.status === "friendly")) return false;
     // ประเภทเรือ (ติ๊กในตัวกรอง)
@@ -43,7 +50,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
 
   const handleExport = () => {
     const hdr = "ID,Name,Flag,Type,Speed_kn,Course,Lat,Lon,Status\n";
-    const rows = data.vessels.map(v =>
+    const rows = vessels.map(v =>
       [v.id, '"' + v.name + '"', v.flag, v.type, v.sp, v.course, v.lat, v.lon, v.status].join(",")
     ).join("\n");
     const blob = new Blob([hdr + rows], { type: "text/csv" });
@@ -51,7 +58,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     const a = document.createElement("a");
     a.href = url; a.download = "mda_vessels.csv"; a.click();
     URL.revokeObjectURL(url);
-    if (showToast) showToast(T("ส่งออกข้อมูลเรือ " + data.vessels.length + " ลำแล้ว", "Exported " + data.vessels.length + " vessels to CSV"), "ok");
+    if (showToast) showToast(T("ส่งออกข้อมูลเรือ " + vessels.length + " ลำแล้ว", "Exported " + vessels.length + " vessels to CSV"), "ok");
   };
 
   const filterTabs = [
@@ -65,7 +72,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     fontSize: "var(--fs-sm)", fontFamily: "var(--font-ui)", outline: "none", width: 230,
   };
 
-  const typeCount = (k) => data.vessels.filter(v => v.type === k).length;
+  const typeCount = (k) => vessels.filter(v => v.type === k).length;
   const hiddenCount = Object.keys(window.VTYPE).filter(k => !visible[k]).length + (visible.incidents ? 0 : 1);
 
   const CheckRow = ({ checked, onChange, color, label, count }) => (
@@ -175,7 +182,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
 
         <span className="topbar-spacer" />
         <span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>
-          {filteredVessels.length} / {data.vessels.length} {T("ลำ", "vessels")}
+          {filteredVessels.length} / {vessels.length} {T("ลำ", "vessels")}
         </span>
       </div>
 

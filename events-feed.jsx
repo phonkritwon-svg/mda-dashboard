@@ -54,6 +54,66 @@ function geocodeText() {
   return null;
 }
 
+/* ============================================================
+   ดึง "หมุดเรือ" จากข่าว — สแกนชื่อเรือ + ประเภท + พื้นที่ในข่าว
+   แล้วปักตำแหน่งโดยประมาณบนแผนที่ (ทดแทนเรือ dummy เดิม)
+   ============================================================ */
+const VESSEL_NAME_RE = /\b(MV|MT|MSC|FV|SS|USS|HMS|RFA|FGS|HNLMS|JS|INS|PNS|KRI|BRP|CCG)\s+([A-Z][A-Za-z0-9'.’\-]+(?:\s+[A-Z0-9][A-Za-z0-9'.’\-]+){0,2})/;
+
+const VESSEL_TYPE_HINTS = [
+  { type: "dark",    re: /shadow fleet|ghost fleet|dark fleet|sanctioned (?:vessel|tanker|ship)|ais (?:gap|off|spoof)/i },
+  { type: "navy",    re: /\b(?:uss|hms|rfa|fgs|warship|frigate|destroyer|corvette|cutter)\b|coast guard|navy|naval|patrol (?:vessel|ship|boat)/i },
+  { type: "fishing", re: /fishing (?:vessel|boat|fleet)|trawler|\bfv\b|seiner|jigger|iuu/i },
+  { type: "tanker",  re: /\btanker|\bmt\b|crude|vlcc|product carrier|lng carrier|lpg|oil (?:tanker|products)/i },
+  { type: "cargo",   re: /container|bulk(?:er| carrier)|cargo ship|freighter|\bmv\b|ro-?ro|general cargo|box ship/i },
+];
+
+function _vesselType(text) {
+  for (let i = 0; i < VESSEL_TYPE_HINTS.length; i++) {
+    if (VESSEL_TYPE_HINTS[i].re.test(text)) return VESSEL_TYPE_HINTS[i].type;
+  }
+  return "cargo";
+}
+
+const VESSEL_MENTION_RE = /\b(vessel|ship|tanker|boat|carrier|bulker|bulk|trawler|warship|frigate|destroyer|fleet|fishing|cargo|container|naval|coast guard|skiff|dhow)\b/i;
+
+// รับรายการข่าว → คืน array ของเรือที่ปักหมุดได้ (มีชื่อ/ประเภท/พิกัด)
+function extractVesselsFromNews(newsArr) {
+  const out = [];
+  let idx = 0;
+  (newsArr || []).forEach(n => {
+    const en  = (n.raw && (n.raw.en || n.raw.th)) || "";
+    const th  = (n.raw && n.raw.th) || "";
+    const sum = (n.ai && (n.ai.en || n.ai.th)) || "";
+    const sth = (n.ai && n.ai.th) || "";
+    const hay = [en, sum, th, sth, n.outlet].join("  ");
+    if (!VESSEL_MENTION_RE.test(hay)) return;          // ข่าวต้องพูดถึงเรือ
+    const geo = geocodeText(en, th, sum, sth, n.outlet);
+    if (!geo) return;                                   // ต้องระบุพื้นที่ได้
+    const m = VESSEL_NAME_RE.exec(en) || VESSEL_NAME_RE.exec(sum);
+    const name = m ? (m[1] + " " + m[2]).trim() : null;
+    const type = _vesselType(hay);
+    // กระจายตำแหน่งรอบจุดศูนย์กลางภูมิภาค ไม่ให้หมุดทับกัน
+    const ang = (idx * 47) % 360, r = 0.5 + (idx % 6) * 0.45;
+    idx++;
+    out.push({
+      id:     "nv_" + (n.id || idx),
+      name:   name || (type === "navy" ? "Naval unit" : "Vessel") + " · " + geo.en,
+      flag:   "??",
+      type:   type,
+      course: 0, sp: 0,
+      lat:    geo.lat + r * Math.cos(ang * Math.PI / 180),
+      lon:    geo.lon + r * Math.sin(ang * Math.PI / 180),
+      status: "watch",
+      fromNews: true,
+      url:    n.url,
+      region: geo,
+      note:   { th: th || en, en: en || th },
+    });
+  });
+  return out;
+}
+
 /* ---- row (DB) <-> object (UI) ---- */
 function eventRowToObj(r) {
   const t = r.published_at || r.created_at;
@@ -359,5 +419,5 @@ function AddEventButton({ addEvent, lang, showToast, className }) {
 Object.assign(window, {
   useEventsUpdater, addEventToSupabase, loadEventsFromSupabase,
   AddEventModal, AddEventButton, REGION_PRESETS,
-  geocodeText, MDA_GEO_REGIONS,
+  geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews,
 });
