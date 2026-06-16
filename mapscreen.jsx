@@ -6,14 +6,30 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
   const [selected, setSelected] = useState(initial && initial.vessel ? initial.vessel : null);
   const [tab, setTab] = useState("events");
   const [filterType, setFilterType] = useState("all");
+  const [search, setSearch] = useState("");
+  const [activeTypes, setActiveTypes] = useState(() => new Set());   // ว่าง = ทุกประเภท
   const [layers, setLayers] = useState({ tracks: true, events: true, labels: false, sweep: true, lanes: true, chokes: true });
   const toggle = (k) => setLayers(l => ({ ...l, [k]: !l[k] }));
+  const toggleType = (k) => setActiveTypes(s => {
+    const n = new Set(s);
+    n.has(k) ? n.delete(k) : n.add(k);
+    return n;
+  });
 
   const ofInterest = data.vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
+  const q = search.trim().toLowerCase();
   const filteredVessels = data.vessels.filter(v => {
-    if (filterType === "watch") return v.status !== "normal" && v.status !== "friendly";
-    if (filterType === "navy")  return v.type === "navy";
+    // สถานะ (แท็บ)
+    if (filterType === "watch" && (v.status === "normal" || v.status === "friendly")) return false;
+    // ประเภทเรือ (ปุ่มกรอง)
+    if (activeTypes.size && !activeTypes.has(v.type)) return false;
+    // ค้นหา ชื่อ/ID/ธง
+    if (q && !(
+      (v.name || "").toLowerCase().includes(q) ||
+      (v.id   || "").toLowerCase().includes(q) ||
+      (v.flag || "").toLowerCase().includes(q)
+    )) return false;
     return true;
   });
 
@@ -40,8 +56,31 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
   const filterTabs = [
     { key: "all",   th: "ทั้งหมด",   en: "All" },
     { key: "watch", th: "เฝ้าระวัง", en: "Of interest" },
-    { key: "navy",  th: "เรือรบ",    en: "Naval" },
   ];
+
+  const inputStyle = {
+    background: "var(--surface)", border: "1px solid var(--border-2)",
+    borderRadius: 7, padding: "7px 10px 7px 30px", color: "var(--text)",
+    fontSize: "var(--fs-sm)", fontFamily: "var(--font-ui)", outline: "none", width: 230,
+  };
+
+  const TypeChip = ({ k, vt }) => {
+    const on = activeTypes.has(k);
+    const count = data.vessels.filter(v => v.type === k).length;
+    return (
+      <button onClick={() => toggleType(k)} className="btn btn-sm"
+        style={{
+          gap: 6, height: 30,
+          border: "1px solid " + (on ? vt.color : "var(--border-2)"),
+          background: on ? "color-mix(in srgb, " + vt.color + " 16%, transparent)" : "transparent",
+          color: on ? vt.color : "var(--text-dim)",
+        }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: vt.color, flex: "none" }} />
+        {tx(vt.label, lang)}
+        <span className="mono" style={{ opacity: 0.7, fontSize: 10 }}>{count}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="screen" style={{ height: "100%", display: "flex", flexDirection: "column", paddingBottom: 16 }}>
@@ -70,6 +109,41 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
             <Icon name="download" size={14} />{T("ส่งออก CSV", "Export CSV")}
           </button>
         </div>
+      </div>
+
+      {/* search + vessel-type filters */}
+      <div className="row" style={{ marginBottom: 12, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ position: "relative" }}>
+          <Icon name="search" size={14}
+            style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none" }} />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder={T("ค้นหาเรือ (ชื่อ / ID / ธง)", "Search vessels (name / ID / flag)")}
+            style={inputStyle} />
+          {search && (
+            <span onClick={() => setSearch("")}
+              style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--text-dim)" }}>
+              <Icon name="minus" size={14} />
+            </span>
+          )}
+        </div>
+
+        <div style={{ width: 1, height: 22, background: "var(--border)" }} />
+
+        <span className="dim up" style={{ fontSize: 10 }}>{T("ประเภทเรือ", "Ship type")}</span>
+        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+          {Object.entries(window.VTYPE).map(([k, vt]) => <TypeChip key={k} k={k} vt={vt} />)}
+          {activeTypes.size > 0 && (
+            <button className="btn btn-ghost btn-sm" style={{ height: 30 }}
+              onClick={() => setActiveTypes(new Set())}>
+              <Icon name="minus" size={13} />{T("ล้างตัวกรอง", "Clear")}
+            </button>
+          )}
+        </div>
+
+        <span className="topbar-spacer" />
+        <span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>
+          {filteredVessels.length} / {data.vessels.length} {T("ลำ", "vessels")}
+        </span>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: "1fr 330px", gap: 12, flex: 1, minHeight: 0 }}>
