@@ -75,25 +75,11 @@ window.MDA_DATA = (function () {
   window.MDA_THREAT_DOMAINS = threatDomains;
   window.classifyThreats   = classifyThreats;
 
-  // ---- vessels (global) ----
-  const vessels = [
-    { id:"V-RS01", name:"MT SEA-LINKED (target)", flag:"LR", type:"tanker", course:340, sp:11.5, lat:14.2, lon:42.6, status:"watch",   note:{th:"เสี่ยงถูกโจมตีในทะเลแดง", en:"At risk of Red Sea attack"} },
-    { id:"V-SC01", name:"MV DEVON BAY",           flag:"SG", type:"dark",   course:0,   sp:0,    lat:15.9, lon:117.7, status:"critical", note:{th:"อับปาง — ปฏิบัติการค้นหา-กู้ภัย", en:"Capsized — SAR ongoing"} },
-    { id:"V-SC02", name:"CCG-3104 (China CG)",    flag:"CN", type:"navy",   course:120, sp:9.0,  lat:15.2, lon:117.9, status:"watch",   note:{th:"เรือยามฝั่งจีนในพื้นที่พิพาท", en:"China CG in disputed area"} },
-    { id:"V-BL01", name:"MV FITBURG",             flag:"??", type:"dark",   course:90,  sp:0,    lat:60.0, lon:24.5, status:"critical", note:{th:"กองเรือเงา — ถูกควบคุมตัว ปมสายเคเบิล", en:"Shadow fleet — detained, cable case"} },
-    { id:"V-BK01", name:"MT (shadow, struck)",    flag:"??", type:"dark",   course:200, sp:6.0,  lat:44.6, lon:37.9, status:"critical", note:{th:"กองเรือเงารัสเซีย — ถูกโจมตี", en:"Russian shadow tanker — struck"} },
-    { id:"V-HZ01", name:"MT GULF TRADER",         flag:"MH", type:"tanker", course:300, sp:10.2, lat:25.3, lon:56.6, status:"watch",   note:{th:"แจ้งสิ่งแปลกปลอมใกล้ฟูไจราห์", en:"Reported projectiles near Fujairah"} },
-    { id:"V-NT01", name:"MV GEO SURVEYOR",        flag:"PA", type:"cargo",  course:75,  sp:4.0,  lat:5.1, lon:109.2, status:"watch",   note:{th:"สำรวจคลื่นไหวสะเทือน ถูกแทรกแซง", en:"Seismic survey, interfered"} },
-    { id:"V-AD01", name:"MV ASIA CARRIER",        flag:"PA", type:"cargo",  course:255, sp:13.0, lat:12.6, lon:48.2, status:"watch",   note:{th:"เรือเล็กเข้าประชิดต้องสงสัย", en:"Suspicious skiff approach"} },
-    { id:"V-GL05", name:"MSC LORETO",             flag:"PA", type:"cargo",  course:210, sp:18.5, lat:36.0, lon:14.5, status:"normal" },
-    { id:"V-GL07", name:"MAERSK HALIFAX",         flag:"DK", type:"cargo",  course:95,  sp:19.0, lat:11.5, lon:55.0, status:"normal" },
-    { id:"V-GL09", name:"MT PACIFIC GLORY",       flag:"MH", type:"tanker", course:30,  sp:12.0, lat:3.5, lon:104.5, status:"normal" },
-    { id:"V-GL11", name:"FV LONG XING 21",        flag:"CN", type:"fishing",course:160, sp:4.5,  lat:-2.0, lon:-82.0, status:"watch", note:{th:"ต้องสงสัยทำประมงผิดกฎหมาย", en:"Suspected IUU fishing"} },
-    { id:"V-GL13", name:"USS THE SULLIVANS",      flag:"US", type:"navy",   course:80,  sp:16.0, lat:13.0, lon:44.5, status:"friendly" },
-    { id:"V-GL15", name:"FGS HESSEN",             flag:"DE", type:"navy",   course:200, sp:14.0, lat:58.0, lon:20.0, status:"friendly" },
-  ];
+  // ---- vessels ----
+  // ลบเรือ dummy ทั้งหมดแล้ว — แผนที่แสดงเฉพาะเหตุการณ์จากฐานข้อมูล (events)
+  // และจุดช่องแคบอ้างอิง (chokepoints) เท่านั้น
+  const vessels = [];
 
-  // ---- events / incidents (global, real-world based) ----
   // ---- events / incidents ----
   // เหตุการณ์ทั้งหมดมาจาก Supabase (cron สร้างอัตโนมัติจากข่าวภัยสูง + ฟอร์มเพิ่มเอง)
   // โหลด/เขียนผ่าน events-feed.jsx — dummy เดิมถูกลบออกแล้ว
