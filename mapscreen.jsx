@@ -7,14 +7,15 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
   const [tab, setTab] = useState("events");
   const [filterType, setFilterType] = useState("all");
   const [search, setSearch] = useState("");
-  const [activeTypes, setActiveTypes] = useState(() => new Set());   // ว่าง = ทุกประเภท
-  const [layers, setLayers] = useState({ tracks: true, events: true, labels: false, sweep: true, lanes: true, chokes: true });
-  const toggle = (k) => setLayers(l => ({ ...l, [k]: !l[k] }));
-  const toggleType = (k) => setActiveTypes(s => {
-    const n = new Set(s);
-    n.has(k) ? n.delete(k) : n.add(k);
-    return n;
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [visible, setVisible] = useState({
+    cargo: true, tanker: true, fishing: true, navy: true, dark: true,
+    incidents: true,   // จุดเหตุการณ์จากข่าวบนแผนที่
   });
+  const [layers, setLayers] = useState({ tracks: true, labels: false, sweep: true, lanes: true, chokes: true });
+  const toggle = (k) => setLayers(l => ({ ...l, [k]: !l[k] }));
+  const toggleVis = (k) => setVisible(s => ({ ...s, [k]: !s[k] }));
+  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, dark: val, incidents: val });
 
   const ofInterest = data.vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
@@ -22,8 +23,8 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
   const filteredVessels = data.vessels.filter(v => {
     // สถานะ (แท็บ)
     if (filterType === "watch" && (v.status === "normal" || v.status === "friendly")) return false;
-    // ประเภทเรือ (ปุ่มกรอง)
-    if (activeTypes.size && !activeTypes.has(v.type)) return false;
+    // ประเภทเรือ (ติ๊กในตัวกรอง)
+    if (!visible[v.type]) return false;
     // ค้นหา ชื่อ/ID/ธง
     if (q && !(
       (v.name || "").toLowerCase().includes(q) ||
@@ -64,23 +65,19 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
     fontSize: "var(--fs-sm)", fontFamily: "var(--font-ui)", outline: "none", width: 230,
   };
 
-  const TypeChip = ({ k, vt }) => {
-    const on = activeTypes.has(k);
-    const count = data.vessels.filter(v => v.type === k).length;
-    return (
-      <button onClick={() => toggleType(k)} className="btn btn-sm"
-        style={{
-          gap: 6, height: 30,
-          border: "1px solid " + (on ? vt.color : "var(--border-2)"),
-          background: on ? "color-mix(in srgb, " + vt.color + " 16%, transparent)" : "transparent",
-          color: on ? vt.color : "var(--text-dim)",
-        }}>
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: vt.color, flex: "none" }} />
-        {tx(vt.label, lang)}
-        <span className="mono" style={{ opacity: 0.7, fontSize: 10 }}>{count}</span>
-      </button>
-    );
-  };
+  const typeCount = (k) => data.vessels.filter(v => v.type === k).length;
+  const hiddenCount = Object.keys(window.VTYPE).filter(k => !visible[k]).length + (visible.incidents ? 0 : 1);
+
+  const CheckRow = ({ k, color, label, count }) => (
+    <label
+      style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", cursor: "pointer", borderRadius: 7, userSelect: "none" }}>
+      <input type="checkbox" checked={!!visible[k]} onChange={() => toggleVis(k)}
+        style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer", flex: "none" }} />
+      {color && <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, flex: "none" }} />}
+      <span style={{ flex: 1, fontSize: "var(--fs-sm)" }}>{label}</span>
+      {count != null && <span className="mono dim" style={{ fontSize: 11 }}>{count}</span>}
+    </label>
+  );
 
   return (
     <div className="screen" style={{ height: "100%", display: "flex", flexDirection: "column", paddingBottom: 16 }}>
@@ -127,16 +124,40 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
           )}
         </div>
 
-        <div style={{ width: 1, height: 22, background: "var(--border)" }} />
+        {/* Filter button → inline modal (checkboxes) */}
+        <div style={{ position: "relative" }}>
+          <button className={"btn btn-sm " + (filterOpen ? "btn-primary" : "btn-ghost")}
+            onClick={() => setFilterOpen(o => !o)}>
+            <Icon name="filter" size={14} />{T("ตัวกรอง", "Filter")}
+            {hiddenCount > 0 && (
+              <span style={{ marginLeft: 4, fontSize: 9, background: "var(--accent)", color: "#000",
+                borderRadius: 8, padding: "1px 6px", fontFamily: "var(--font-mono)" }}>{hiddenCount}</span>
+            )}
+          </button>
 
-        <span className="dim up" style={{ fontSize: 10 }}>{T("ประเภทเรือ", "Ship type")}</span>
-        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-          {Object.entries(window.VTYPE).map(([k, vt]) => <TypeChip key={k} k={k} vt={vt} />)}
-          {activeTypes.size > 0 && (
-            <button className="btn btn-ghost btn-sm" style={{ height: 30 }}
-              onClick={() => setActiveTypes(new Set())}>
-              <Icon name="minus" size={13} />{T("ล้างตัวกรอง", "Clear")}
-            </button>
+          {filterOpen && (
+            <>
+              <div onClick={() => setFilterOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 61, width: 252,
+                background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 11,
+                boxShadow: "var(--shadow)", padding: 8,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 9px 7px" }}>
+                  <span className="dim up" style={{ fontSize: 10 }}>{T("ประเภทเรือ", "Ship types")}</span>
+                  <span style={{ display: "flex", gap: 10 }}>
+                    <span style={{ fontSize: 10, color: "var(--info)", cursor: "pointer" }} onClick={() => setAllVis(true)}>{T("ทั้งหมด", "All")}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-dim)", cursor: "pointer" }} onClick={() => setAllVis(false)}>{T("ล้าง", "None")}</span>
+                  </span>
+                </div>
+                {Object.entries(window.VTYPE).map(([k, vt]) => (
+                  <CheckRow key={k} k={k} color={vt.color} label={tx(vt.label, lang)} count={typeCount(k)} />
+                ))}
+                <div className="divider" style={{ margin: "6px 4px" }} />
+                <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 4px" }}>{T("เหตุการณ์จากข่าว", "Incidents (news)")}</div>
+                <CheckRow k="incidents" color="var(--crit)" label={T("จุดเหตุการณ์บนแผนที่", "Incident dots")} count={data.events.length} />
+              </div>
+            </>
           )}
         </div>
 
@@ -152,7 +173,7 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
           <MapView vessels={filteredVessels} events={data.events} lang={lang}
             selected={selected} onSelect={setSelected}
             onSelectEvent={(e) => onNav("incident", { id: e.id })}
-            showTracks={layers.tracks} showEvents={layers.events}
+            showTracks={layers.tracks} showEvents={visible.incidents}
             showLabels={layers.labels} sweep={layers.sweep} zoomable={true}
             showLanes={layers.lanes} showChokepoints={layers.chokes}
             initialCenter={[20, 10]} initialZoom={2} />
@@ -176,7 +197,6 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
           {/* top-right layer controls */}
           <div className="map-hud map-tools" style={{ width: 168 }}>
             <LayerBtn k="tracks" label={T("เส้นทาง AIS", "AIS tracks")} />
-            <LayerBtn k="events" label={T("เหตุการณ์", "Events")} />
             <LayerBtn k="labels" label={T("ป้ายเรือ", "Labels")} />
             <LayerBtn k="lanes"  label={T("เส้นเดินเรือ", "Ship lanes")} />
             <LayerBtn k="chokes" label={T("ช่องแคบ", "Chokepoints")} />
