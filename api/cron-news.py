@@ -10,7 +10,7 @@ ENV ที่ต้องตั้งใน Vercel:
 """
 
 from http.server import BaseHTTPRequestHandler
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from xml.etree import ElementTree as ET
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
@@ -20,6 +20,10 @@ import re
 import hashlib
 import urllib.request
 import urllib.parse
+
+ITEMS_PER_FEED   = 6     # ดึงกี่ข่าวต่อแหล่ง
+TRANSLATE_TIMEOUT = 5    # วินาที ต่อการแปล 1 ครั้ง
+TRANSLATE_BUDGET  = 8    # งบเวลารวมสำหรับการแปลทั้งหมด (กันเกิน maxDuration)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -62,7 +66,7 @@ def fetch_feed(src):
     out = []
     try:
         root = ET.fromstring(http_get(src["url"]))
-        for it in root.findall(".//item")[:12]:
+        for it in root.findall(".//item")[:ITEMS_PER_FEED]:
             title = (it.findtext("title") or "").strip()
             if not title:
                 continue
@@ -85,16 +89,35 @@ def gtranslate(text, target="th"):
     url = ("https://translate.googleapis.com/translate_a/single"
            "?client=gtx&sl=auto&tl=" + target + "&dt=t&q=" + urllib.parse.quote(text[:500]))
     try:
-        data = json.loads(http_get(url, timeout=8))
+        data = json.loads(http_get(url, timeout=TRANSLATE_TIMEOUT))
         return "".join(p[0] for p in data[0] if p and p[0])
     except Exception:
         return text
 
 
-def translate_item(a):
-    a["title_th"]   = gtranslate(a["title"])
-    a["summary_th"] = gtranslate(a["desc"]) if a["desc"] else ""
-    return a
+def translate_all(arts):
+    """แปลทุกข่าวขนานกัน ภายใต้งบเวลา TRANSLATE_BUDGET วินาที
+    อันไหนแปลไม่ทัน → ปล่อยเป็นอังกฤษ (ไม่ทำให้ฟังก์ชัน timeout)"""
+    ex = ThreadPoolExecutor(max_workers=40)
+    tasks = {}
+    for i, a in enumerate(arts):
+        tasks[ex.submit(gtranslate, a["title"])] = (i, "title_th")
+        if a.get("desc"):
+            tasks[ex.submit(gtranslate, a["desc"])] = (i, "summary_th")
+    try:
+        for fut in as_completed(list(tasks), timeout=TRANSLATE_BUDGET):
+            i, field = tasks[fut]
+            try:
+                arts[i][field] = fut.result()
+            except Exception:
+                pass
+    except Exception:
+        pass  # หมดงบเวลา — ใช้เท่าที่แปลเสร็จ
+    try:
+        ex.shutdown(wait=False, cancel_futures=True)
+    except TypeError:
+        ex.shutdown(wait=False)
+    return arts
 
 
 def to_row(a):
@@ -140,14 +163,17 @@ def run():
             arts.extend(r)
     if not arts:
         return {"ok": False, "reason": "no_articles"}, 502
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        arts = list(ex.map(translate_item, arts))
+    arts = translate_all(arts)
+    translated = sum(1 for a in arts if a.get("title_th"))
     rows = [to_row(a) for a in arts]
     status = upsert(rows)
-    return {"ok": True, "count": len(rows), "upsert_status": status}, 200
+    return {"ok": True, "count": len(rows), "translated": translated, "upsert_status": status}, 200
 
 
 class handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
     def do_GET(self):
         if CRON_SECRET:
             if self.headers.get("Authorization", "") != "Bearer " + CRON_SECRET:
