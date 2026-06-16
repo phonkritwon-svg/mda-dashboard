@@ -78,23 +78,57 @@ function NewsRow({ n, lang, onNav }) {
   );
 }
 
+/* checkbox row ใช้ในโมดัลตัวกรอง (เลือกได้หลายรายการ) */
+function FilterCheck({ checked, onToggle, color, label, count }) {
+  const accent = color || "var(--accent)";
+  return (
+    <div className="pill-tab" role="checkbox" aria-checked={checked} onClick={onToggle}
+      style={{ justifyContent: "space-between", display: "flex", alignItems: "center" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span style={{
+          width: 16, height: 16, borderRadius: 4, flex: "none",
+          border: "1.5px solid " + (checked ? accent : "var(--border-2)"),
+          background: checked ? accent : "transparent",
+          color: "#0a0e15", fontSize: 11, fontWeight: 800, lineHeight: "14px",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>{checked ? "✓" : ""}</span>
+        {color && <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: "inline-block", flex: "none" }}></span>}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      </span>
+      <span className="mono dim" style={{ flex: "none" }}>{count}</span>
+    </div>
+  );
+}
+
 function Osint({ data, lang, onNav }) {
   const T = (th, en) => (lang === "th" ? th : en);
-  const [filter, setFilter] = useState("all");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const pick = (v) => { setFilter(v); setFilterOpen(false); };
+  const [filterOpen, setFilterOpen]   = useState(false);
+  const [domSel, setDomSel]           = useState({});   // ภัยคุกคามที่ติ๊ก (ว่าง = ทุกด้าน)
+  const [srcSel, setSrcSel]           = useState({});   // แหล่งข่าวที่ติ๊ก (ว่าง = ทุกแหล่ง)
+  const [onlyLive, setOnlyLive]       = useState(false);
+  const [onlyLinked, setOnlyLinked]   = useState(false);
+  const toggleDom = (k) => setDomSel(s => ({ ...s, [k]: !s[k] }));
+  const toggleSrc = (k) => setSrcSel(s => ({ ...s, [k]: !s[k] }));
+  const clearAll  = () => { setDomSel({}); setSrcSel({}); setOnlyLive(false); setOnlyLinked(false); };
 
   const { news: allNews, liveCount, fetching, lastFetch, fetchError, doFetch } =
     window.useNewsUpdater(data.news);
 
-  const news = allNews.filter(n =>
-    filter === "all"    ? true :
-    filter === "linked" ? n.linkedInc :
-    filter === "live"   ? n.isLive :
-    filter.startsWith("TD:")
-      ? (window.classifyThreats ? window.classifyThreats(n) : []).includes(filter.slice(3))
-      : n.srcKey === filter
-  );
+  const domKeys = Object.keys(domSel).filter(k => domSel[k]);
+  const srcKeys = Object.keys(srcSel).filter(k => srcSel[k]);
+  const activeCount = domKeys.length + srcKeys.length + (onlyLive ? 1 : 0) + (onlyLinked ? 1 : 0);
+
+  // เลือกหลายด้าน/หลายแหล่ง = OR ในกลุ่มเดียวกัน, AND ข้ามกลุ่ม; ไม่ติ๊ก = ไม่กรอง
+  const news = allNews.filter(n => {
+    if (onlyLive && !n.isLive) return false;
+    if (onlyLinked && !n.linkedInc) return false;
+    if (srcKeys.length && !srcKeys.includes(n.srcKey)) return false;
+    if (domKeys.length) {
+      const nd = window.classifyThreats ? window.classifyThreats(n) : [];
+      if (!domKeys.some(k => nd.includes(k))) return false;
+    }
+    return true;
+  });
 
   const srcCounts = {};
   allNews.forEach(n => { srcCounts[n.srcKey] = (srcCounts[n.srcKey] || 0) + 1; });
@@ -138,8 +172,12 @@ function Osint({ data, lang, onNav }) {
             <button className={"btn btn-sm " + (filterOpen ? "btn-primary" : "btn-ghost")}
               onClick={() => setFilterOpen(o => !o)}>
               <Icon name="filter" size={14} />{T("ตัวกรอง", "Filters")}
-              {filter !== "all" && (
-                <span style={{ marginLeft: 4, width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
+              {activeCount > 0 && (
+                <span className="mono" style={{
+                  marginLeft: 5, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8,
+                  background: "var(--accent)", color: "#0a0e15", fontSize: 10, fontWeight: 700,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}>{activeCount}</span>
               )}
             </button>
 
@@ -151,50 +189,40 @@ function Osint({ data, lang, onNav }) {
                   background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 11,
                   boxShadow: "var(--shadow)", padding: 8, maxHeight: "min(78vh, 560px)", overflowY: "auto",
                 }}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center", padding: "2px 9px 6px" }}>
+                    <span className="dim up" style={{ fontSize: 10 }}>{T("เลือกได้หลายรายการ", "Select one or more")}</span>
+                    {activeCount > 0 && (
+                      <span className="panel-link" style={{ fontSize: 11, cursor: "pointer" }} onClick={clearAll}>
+                        {T("ล้างตัวกรอง", "Clear")}
+                      </span>
+                    )}
+                  </div>
+
                   <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 6px" }}>{T("ภัยคุกคาม 9 ด้าน · ศรชล.", "9 Threat Domains · Thai-MECC")}</div>
                   <div className="col" style={{ gap: 3 }}>
                     {(window.MDA_THREAT_DOMAINS || []).map(d => (
-                      <div key={d.key} className={"pill-tab" + (filter === "TD:" + d.key ? " active" : "")}
-                        style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("TD:" + d.key)}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, display: "inline-block", flex: "none" }}></span>
-                          {T(d.th, d.en)}
-                        </span>
-                        <span className="mono dim">{domCounts[d.key] || 0}</span>
-                      </div>
+                      <FilterCheck key={d.key} checked={!!domSel[d.key]} onToggle={() => toggleDom(d.key)}
+                        color={d.color} label={T(d.th, d.en)} count={domCounts[d.key] || 0} />
                     ))}
                   </div>
+
                   <div className="divider" style={{ margin: "8px 0" }}></div>
                   <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 6px" }}>{T("แหล่งข่าว", "Sources")}</div>
                   <div className="col" style={{ gap: 3 }}>
-                    <div className={"pill-tab" + (filter === "all" ? " active" : "")}
-                      style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("all")}>
-                      <span>{T("ทั้งหมด", "All sources")}</span>
-                      <span className="mono dim">{allNews.length}</span>
-                    </div>
                     {liveCount > 0 && (
-                      <div className={"pill-tab" + (filter === "live" ? " active" : "")}
-                        style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("live")}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ok)", display: "inline-block" }}></span>
-                          {T("ข่าวสด", "Live feeds")}
-                        </span>
-                        <span className="mono dim">{liveCount}</span>
-                      </div>
+                      <FilterCheck checked={onlyLive} onToggle={() => setOnlyLive(v => !v)}
+                        color="var(--ok)" label={T("ข่าวสด", "Live feeds")} count={liveCount} />
                     )}
-                    <div className={"pill-tab" + (filter === "linked" ? " active" : "")}
-                      style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("linked")}>
-                      <span>{T("เชื่อมเหตุการณ์", "Linked to incident")}</span>
-                      <span className="mono dim">{allNews.filter(n => n.linkedInc).length}</span>
-                    </div>
+                    <FilterCheck checked={onlyLinked} onToggle={() => setOnlyLinked(v => !v)}
+                      label={T("เชื่อมเหตุการณ์", "Linked to incident")} count={allNews.filter(n => n.linkedInc).length} />
                     <div className="divider" style={{ margin: "6px 0" }}></div>
-                    {Object.entries(srcCounts).map(([k, c]) => (
-                      <div key={k} className={"pill-tab" + (filter === k ? " active" : "")}
-                        style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick(k)}>
-                        <SrcChip srcKey={k} withName lang={lang} />
-                        <span className="mono dim">{c}</span>
-                      </div>
-                    ))}
+                    {Object.entries(srcCounts).map(([k, c]) => {
+                      const s = window.MDA_DATA.sources[k];
+                      return (
+                        <FilterCheck key={k} checked={!!srcSel[k]} onToggle={() => toggleSrc(k)}
+                          color={s && s.color} label={(s && s.name) || k} count={c} />
+                      );
+                    })}
                   </div>
                 </div>
               </>
