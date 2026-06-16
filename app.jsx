@@ -69,7 +69,24 @@ function Toast({ msg, kind }) {
   );
 }
 
-const DEFAULT_USER = { user: "operator", name: "ผู้ปฏิบัติการ", rank: "น.ต.", role: "Operator", avatar: "ปก" };
+// สร้าง user object สำหรับแอปจาก Supabase session + profile
+async function buildAppUser(session) {
+  const SB = window.MDA_SB;
+  const meta = (session.user && session.user.user_metadata) || {};
+  let prof = null;
+  try {
+    if (SB) {
+      const { data } = await SB.from("profiles").select("*").eq("id", session.user.id).single();
+      prof = data;
+    }
+  } catch (e) { /* profile อาจยังไม่ถูกสร้าง — ใช้ metadata แทน */ }
+  const name     = (prof && prof.full_name) || meta.full_name || meta.username || "ผู้ใช้";
+  const username = (prof && prof.username)  || meta.username  || (session.user.email || "").split("@")[0];
+  const rank     = (prof && prof.rank)      || meta.rank      || "";
+  const role     = (prof && prof.role)      || meta.role      || "Operator";
+  const avatar   = window.initialsOf ? window.initialsOf(name) : name.slice(0, 2);
+  return { user: username, name, rank, role, avatar };
+}
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
@@ -77,7 +94,8 @@ function App() {
   const [notifOpen, setNotifOpen] = useStateA(false);
   const [searchOpen, setSearchOpen] = useStateA(false);
   const [toast, setToast] = useStateA(null);
-  const [currentUser] = useStateA(DEFAULT_USER);
+  const [currentUser, setCurrentUser] = useStateA(null);
+  const [authReady, setAuthReady] = useStateA(false);
   const lang = t.language;
   const T = (th, en) => (lang === "th" ? th : en);
 
@@ -106,6 +124,26 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // ---- Supabase Auth session ----
+  useEffectA(() => {
+    const SB = window.MDA_SB;
+    if (!SB) { setAuthReady(true); return; }   // ไม่มี Supabase → ไปหน้า login (demo ยังใช้ได้)
+    let sub = null;
+    (async () => {
+      try {
+        const { data: { session } } = await SB.auth.getSession();
+        if (session) setCurrentUser(await buildAppUser(session));
+      } catch (e) { /* ignore */ }
+      setAuthReady(true);
+      const res = SB.auth.onAuthStateChange(async (_event, sess) => {
+        if (sess) setCurrentUser(await buildAppUser(sess));
+        else setCurrentUser(null);
+      });
+      sub = res.data.subscription;
+    })();
+    return () => { if (sub) sub.unsubscribe(); };
+  }, []);
+
   const onNav = (screen, payload) => {
     setNotifOpen(false);
     setRoute({ screen, payload: payload || null });
@@ -126,6 +164,26 @@ function App() {
     incident:  <window.Incident   {...screenProps} initial={route.payload} />,
     brief:     <window.DailyBrief {...screenProps} />,
   };
+
+  // ---- Auth gate: ยังไม่ login → แสดงหน้าเข้าสู่ระบบ/สมัคร ----
+  if (!currentUser) {
+    const LS = window.LoginScreen;
+    if (!authReady || !LS) {
+      return <div style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center",
+        background: "var(--bg)", color: "var(--text-dim)", fontFamily: "var(--font-ui)" }}>
+        {T("กำลังโหลด…", "Loading…")}
+      </div>;
+    }
+    return (
+      <window.LangCtx.Provider value={lang}>
+        <LS onLogin={(u) => {
+          setCurrentUser(u);
+          showToast(T("ยินดีต้อนรับ ", "Welcome ") + (u.rank ? u.rank + " " : "") + u.name, "ok");
+        }} />
+        <Toast msg={toast && toast.msg} kind={toast && toast.kind} />
+      </window.LangCtx.Provider>
+    );
+  }
 
   return (
     <window.LangCtx.Provider value={lang}>
@@ -175,7 +233,14 @@ function App() {
               onClick={() => { setSearchOpen(true); setNotifOpen(false); }}>
               <Icon name="search" size={16} />
             </div>
-            <div className="avatar" title={currentUser.rank + " " + currentUser.name + "\n" + currentUser.role}>
+            <div className="avatar" title={currentUser.rank + " " + currentUser.name + "\n" + currentUser.role + "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")"}
+              style={{ cursor: "pointer" }}
+              onClick={async () => {
+                if (window.confirm(T("ออกจากระบบ?", "Sign out?") + " (" + currentUser.name + ")")) {
+                  try { if (window.MDA_SB) await window.MDA_SB.auth.signOut(); } catch (e) { /* ignore */ }
+                  setCurrentUser(null);
+                }
+              }}>
               {currentUser.avatar || currentUser.name.charAt(0)}
             </div>
           </div>
