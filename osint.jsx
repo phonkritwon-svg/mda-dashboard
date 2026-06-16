@@ -67,6 +67,8 @@ function NewsRow({ n, lang, onNav }) {
 function Osint({ data, lang, onNav }) {
   const T = (th, en) => (lang === "th" ? th : en);
   const [filter, setFilter] = useState("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const pick = (v) => { setFilter(v); setFilterOpen(false); };
 
   const { news: allNews, liveCount, fetching, lastFetch, fetchError, doFetch } =
     window.useNewsUpdater(data.news);
@@ -110,57 +112,64 @@ function Osint({ data, lang, onNav }) {
             title={T("รีเฟรชข่าว", "Refresh news")}>
             <Icon name="refresh" size={14} />{T("รีเฟรช", "Refresh")}
           </button>
-          <button className="btn btn-ghost btn-sm"><Icon name="filter" size={14} />{T("ตัวกรอง", "Filters")}</button>
+
+          {/* Filters button → inline modal (news sources) */}
+          <div style={{ position: "relative" }}>
+            <button className={"btn btn-sm " + (filterOpen ? "btn-primary" : "btn-ghost")}
+              onClick={() => setFilterOpen(o => !o)}>
+              <Icon name="filter" size={14} />{T("ตัวกรอง", "Filters")}
+              {filter !== "all" && (
+                <span style={{ marginLeft: 4, width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
+              )}
+            </button>
+
+            {filterOpen && (
+              <>
+                <div onClick={() => setFilterOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 61, width: 240,
+                  background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 11,
+                  boxShadow: "var(--shadow)", padding: 8, maxHeight: "min(72vh, 460px)", overflowY: "auto",
+                }}>
+                  <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 6px" }}>{T("แหล่งข่าว", "Sources")}</div>
+                  <div className="col" style={{ gap: 3 }}>
+                    <div className={"pill-tab" + (filter === "all" ? " active" : "")}
+                      style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("all")}>
+                      <span>{T("ทั้งหมด", "All sources")}</span>
+                      <span className="mono dim">{allNews.length}</span>
+                    </div>
+                    {liveCount > 0 && (
+                      <div className={"pill-tab" + (filter === "live" ? " active" : "")}
+                        style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("live")}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ok)", display: "inline-block" }}></span>
+                          {T("ข่าวสด", "Live feeds")}
+                        </span>
+                        <span className="mono dim">{liveCount}</span>
+                      </div>
+                    )}
+                    <div className={"pill-tab" + (filter === "linked" ? " active" : "")}
+                      style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("linked")}>
+                      <span>{T("เชื่อมเหตุการณ์", "Linked to incident")}</span>
+                      <span className="mono dim">{allNews.filter(n => n.linkedInc).length}</span>
+                    </div>
+                    <div className="divider" style={{ margin: "6px 0" }}></div>
+                    {Object.entries(srcCounts).map(([k, c]) => (
+                      <div key={k} className={"pill-tab" + (filter === k ? " active" : "")}
+                        style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick(k)}>
+                        <SrcChip srcKey={k} withName lang={lang} />
+                        <span className="mono dim">{c}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "210px 1fr 330px", gap: 12, flex: 1, minHeight: 0 }}>
-        {/* left filter rail */}
-        <div className="col" style={{ gap: 12, minHeight: 0, overflow: "auto" }}>
-          <Panel title={T("แหล่งข่าว", "Sources")} icon="layers">
-            <div className="col" style={{ gap: 3 }}>
-              <div className={"pill-tab" + (filter === "all" ? " active" : "")}
-                style={{ justifyContent: "space-between", display: "flex" }}
-                onClick={() => setFilter("all")}>
-                <span>{T("ทั้งหมด", "All sources")}</span>
-                <span className="mono dim">{allNews.length}</span>
-              </div>
-              {liveCount > 0 && (
-                <div className={"pill-tab" + (filter === "live" ? " active" : "")}
-                  style={{ justifyContent: "space-between", display: "flex" }}
-                  onClick={() => setFilter("live")}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ok)", display: "inline-block" }}></span>
-                    {T("ข่าวสด", "Live feeds")}
-                  </span>
-                  <span className="mono dim">{liveCount}</span>
-                </div>
-              )}
-              <div className={"pill-tab" + (filter === "linked" ? " active" : "")}
-                style={{ justifyContent: "space-between", display: "flex" }}
-                onClick={() => setFilter("linked")}>
-                <span>{T("เชื่อมเหตุการณ์", "Linked to incident")}</span>
-                <span className="mono dim">{allNews.filter(n => n.linkedInc).length}</span>
-              </div>
-              <div className="divider" style={{ margin: "6px 0" }}></div>
-              {Object.entries(srcCounts).map(([k, c]) => (
-                <div key={k} className={"pill-tab" + (filter === k ? " active" : "")}
-                  style={{ justifyContent: "space-between", display: "flex" }}
-                  onClick={() => setFilter(k)}>
-                  <SrcChip srcKey={k} withName lang={lang} />
-                  <span className="mono dim">{c}</span>
-                </div>
-              ))}
-            </div>
-          </Panel>
-          <Panel title={T("ตำนานความน่าเชื่อถือ", "Admiralty Code")} icon="shield">
-            <div className="kv" style={{ gridTemplateColumns: "auto 1fr", textAlign: "left" }}>
-              <span className="k mono">A–F</span><span style={{ fontSize: "var(--fs-xs)" }} className="dim">{T("ความน่าเชื่อถือแหล่ง", "Source reliability")}</span>
-              <span className="k mono">1–5</span><span style={{ fontSize: "var(--fs-xs)" }} className="dim">{T("ความน่าเชื่อข้อมูล", "Info credibility")}</span>
-            </div>
-          </Panel>
-        </div>
-
+      <div className="grid" style={{ gridTemplateColumns: "1fr 330px", gap: 12, flex: 1, minHeight: 0 }}>
         {/* center feed */}
         <Panel flush title={T("สตรีมข่าวกรอง", "Intelligence Stream")} icon="feed"
           action={<span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>{news.length} {T("รายการ", "items")}</span>}
@@ -214,6 +223,13 @@ function Osint({ data, lang, onNav }) {
                 <div className="row between"><span className="dim">{T("รอตรวจสอบ", "Pending")}</span><span className="mono" style={{ color: "var(--accent)" }}>1</span></div>
                 <div className="row between"><span className="dim">{T("บริบท", "Context")}</span><span className="mono">1</span></div>
               </div>
+            </div>
+          </Panel>
+
+          <Panel title={T("ตำนานความน่าเชื่อถือ", "Admiralty Code")} icon="shield">
+            <div className="kv" style={{ gridTemplateColumns: "auto 1fr", textAlign: "left" }}>
+              <span className="k mono">A–F</span><span style={{ fontSize: "var(--fs-xs)" }} className="dim">{T("ความน่าเชื่อถือแหล่ง", "Source reliability")}</span>
+              <span className="k mono">1–5</span><span style={{ fontSize: "var(--fs-xs)" }} className="dim">{T("ความน่าเชื่อข้อมูล", "Info credibility")}</span>
             </div>
           </Panel>
         </div>
