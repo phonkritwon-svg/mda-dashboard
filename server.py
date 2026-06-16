@@ -160,11 +160,11 @@ if __name__ == "__main__":
         API_KEY = args.key
 
     mode = f"Claude Haiku ({API_KEY[:12]}...)" if API_KEY else "Google Translate (free)"
-    print(f"✓  AI summaries: {mode}")
+    print(f"[MDA] AI summaries: {mode}")
 
     os.chdir(Path(__file__).parent)
     httpd = http.server.HTTPServer(("", args.port), Handler)
-    print(f"✓  Serving at http://localhost:{args.port}")
+    print(f"[MDA] Serving at http://localhost:{args.port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -26,6 +26,7 @@ if (window.MDA_DATA && window.MDA_DATA.sources) {
 
 const RSS2JSON_BASE = "https://api.rss2json.com/v1/api.json?rss_url=";
 const CACHE_KEY     = "MDA_LIVE_NEWS_v2";
+const LASTFETCH_KEY = "MDA_LAST_FETCH";
 const REFRESH_MS    = 30 * 60 * 1000; // 30 minutes
 
 /* ---- helpers ---- */
@@ -135,7 +136,7 @@ async function fetchAllLiveNews() {
   return aiSummarizeTh(items);
 }
 
-/* ---- localStorage cache ---- */
+/* ---- localStorage cache (offline fallback) ---- */
 function loadNewsCache() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -153,6 +154,75 @@ function mergeWithBase(live, base) {
   return [...live, ...baseFallback];
 }
 
+/* ---- Supabase: shared central news store ---- */
+function rowToItem(r) {
+  return {
+    id:          r.id,
+    srcKey:      r.src_key,
+    outlet:      r.outlet,
+    cat:         r.category,
+    raw:         { th: r.title_th || r.title_en, en: r.title_en },
+    ai:          { th: r.summary_th || r.summary_en, en: r.summary_en },
+    time:        r.published_at,
+    fetchedAt:   r.fetched_at,
+    reliability: r.reliability,
+    credibility: r.credibility,
+    verdict:     r.verdict,
+    url:         r.url,
+    linkedInc:   r.linked_inc,
+    isLive:      r.is_live,
+  };
+}
+
+function itemToRow(n) {
+  return {
+    id:           n.id,
+    src_key:      n.srcKey,
+    outlet:       n.outlet,
+    category:     n.cat,
+    title_en:     n.raw.en,
+    title_th:     n.raw.th !== n.raw.en ? n.raw.th : null,
+    summary_en:   n.ai.en,
+    summary_th:   n.ai.th !== n.ai.en ? n.ai.th : null,
+    url:          n.url,
+    reliability:  n.reliability,
+    credibility:  n.credibility,
+    verdict:      n.verdict,
+    linked_inc:   n.linkedInc || null,
+    is_live:      true,
+    published_at: n.time,
+    fetched_at:   n.fetchedAt || new Date().toISOString(),
+  };
+}
+
+async function loadFromSupabase() {
+  const SB = window.MDA_SB;
+  if (!SB) return [];
+  try {
+    const { data, error } = await SB
+      .from("news").select("*")
+      .order("published_at", { ascending: false })
+      .limit(200);
+    if (error) { console.warn("[MDA] supabase read", error.message); return []; }
+    return (data || []).map(rowToItem);
+  } catch (e) {
+    console.warn("[MDA] supabase read failed", e);
+    return [];
+  }
+}
+
+async function pushToSupabase(items) {
+  const SB = window.MDA_SB;
+  if (!SB || !items.length) return;
+  try {
+    const rows = items.map(itemToRow);
+    const { error } = await SB.from("news").upsert(rows, { onConflict: "id" });
+    if (error) console.warn("[MDA] supabase upsert", error.message);
+  } catch (e) {
+    console.warn("[MDA] supabase upsert failed", e);
+  }
+}
+
 /* ---- React hook ---- */
 function useNewsUpdater(baseNews) {
   const [liveNews, setLiveNews] = React.useState(loadNewsCache);
@@ -160,15 +230,21 @@ function useNewsUpdater(baseNews) {
   const [lastFetch, setLastFetch] = React.useState(null);
   const [fetchError, setFetchError] = React.useState(null);
 
+  // ดึง RSS → แปลไทย → เขียนลง Supabase → อ่านชุดรวมกลับมา
   const doFetch = React.useCallback(async () => {
     setFetching(true);
     setFetchError(null);
     try {
       const items = await fetchAllLiveNews();
-      if (items.length > 0) {
-        saveNewsCache(items);
-        setLiveNews(items);
+      if (items.length > 0) await pushToSupabase(items);
+
+      let shared = await loadFromSupabase();
+      if (!shared.length) shared = items;          // offline fallback
+      if (shared.length) {
+        saveNewsCache(shared);
+        setLiveNews(shared);
       }
+      try { localStorage.setItem(LASTFETCH_KEY, String(Date.now())); } catch {}
       setLastFetch(new Date());
     } catch (err) {
       setFetchError(err.message || "fetch failed");
@@ -178,13 +254,23 @@ function useNewsUpdater(baseNews) {
   }, []);
 
   React.useEffect(() => {
-    const cached = loadNewsCache();
-    const stale = cached.length === 0 ||
-      !cached[0] ||
-      (Date.now() - new Date(cached[0].fetchedAt || 0).getTime() > REFRESH_MS);
-    if (stale) doFetch();
+    let active = true;
+    (async () => {
+      // 1) แสดงข่าวกลางจาก Supabase ทันที (เร็ว)
+      const shared = await loadFromSupabase();
+      if (active && shared.length) {
+        saveNewsCache(shared);
+        setLiveNews(shared);
+      }
+      // 2) ดึง RSS ใหม่เมื่อ "เครื่องนี้" ดึงครั้งล่าสุดเกิน 30 นาที (หรือยังไม่เคยดึง)
+      let last = 0;
+      try { last = Number(localStorage.getItem(LASTFETCH_KEY)) || 0; } catch {}
+      if (active && (Date.now() - last > REFRESH_MS)) {
+        doFetch();
+      }
+    })();
     const id = setInterval(doFetch, REFRESH_MS);
-    return () => clearInterval(id);
+    return () => { active = false; clearInterval(id); };
   }, [doFetch]);
 
   const merged = React.useMemo(
@@ -195,4 +281,7 @@ function useNewsUpdater(baseNews) {
   return { news: merged, liveCount: liveNews.length, fetching, lastFetch, fetchError, doFetch };
 }
 
-Object.assign(window, { useNewsUpdater, mdaTimeAgo, LIVE_SOURCES, fetchAllLiveNews });
+Object.assign(window, {
+  useNewsUpdater, mdaTimeAgo, LIVE_SOURCES, fetchAllLiveNews,
+  loadFromSupabase, pushToSupabase,
+});
