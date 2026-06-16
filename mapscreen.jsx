@@ -47,13 +47,6 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
     if (showToast) showToast(T("ส่งออกข้อมูลเรือ " + data.vessels.length + " ลำแล้ว", "Exported " + data.vessels.length + " vessels to CSV"), "ok");
   };
 
-  const LayerBtn = ({ k, label }) => (
-    <button className={"btn btn-sm" + (layers[k] ? " btn-primary" : " btn-ghost")}
-      onClick={() => toggle(k)} style={{ justifyContent: "flex-start", width: "100%" }}>
-      <Icon name={layers[k] ? "check" : "minus"} size={13} />{label}
-    </button>
-  );
-
   const filterTabs = [
     { key: "all",   th: "ทั้งหมด",   en: "All" },
     { key: "watch", th: "เฝ้าระวัง", en: "Of interest" },
@@ -68,10 +61,10 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
   const typeCount = (k) => data.vessels.filter(v => v.type === k).length;
   const hiddenCount = Object.keys(window.VTYPE).filter(k => !visible[k]).length + (visible.incidents ? 0 : 1);
 
-  const CheckRow = ({ k, color, label, count }) => (
+  const CheckRow = ({ checked, onChange, color, label, count }) => (
     <label
       style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", cursor: "pointer", borderRadius: 7, userSelect: "none" }}>
-      <input type="checkbox" checked={!!visible[k]} onChange={() => toggleVis(k)}
+      <input type="checkbox" checked={!!checked} onChange={onChange}
         style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer", flex: "none" }} />
       {color && <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, flex: "none" }} />}
       <span style={{ flex: 1, fontSize: "var(--fs-sm)" }}>{label}</span>
@@ -142,6 +135,7 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
                 position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 61, width: 252,
                 background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 11,
                 boxShadow: "var(--shadow)", padding: 8,
+                maxHeight: "min(72vh, 520px)", overflowY: "auto",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 9px 7px" }}>
                   <span className="dim up" style={{ fontSize: 10 }}>{T("ประเภทเรือ", "Ship types")}</span>
@@ -151,11 +145,22 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
                   </span>
                 </div>
                 {Object.entries(window.VTYPE).map(([k, vt]) => (
-                  <CheckRow key={k} k={k} color={vt.color} label={tx(vt.label, lang)} count={typeCount(k)} />
+                  <CheckRow key={k} checked={visible[k]} onChange={() => toggleVis(k)}
+                    color={vt.color} label={tx(vt.label, lang)} count={typeCount(k)} />
                 ))}
+
                 <div className="divider" style={{ margin: "6px 4px" }} />
                 <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 4px" }}>{T("เหตุการณ์จากข่าว", "Incidents (news)")}</div>
-                <CheckRow k="incidents" color="var(--crit)" label={T("จุดเหตุการณ์บนแผนที่", "Incident dots")} count={data.events.length} />
+                <CheckRow checked={visible.incidents} onChange={() => toggleVis("incidents")}
+                  color="var(--crit)" label={T("จุดเหตุการณ์บนแผนที่", "Incident dots")} count={data.events.length} />
+
+                <div className="divider" style={{ margin: "6px 4px" }} />
+                <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 4px" }}>{T("ชั้นข้อมูลแผนที่", "Map layers")}</div>
+                <CheckRow checked={layers.tracks} onChange={() => toggle("tracks")} label={T("เส้นทาง AIS", "AIS tracks")} />
+                <CheckRow checked={layers.labels} onChange={() => toggle("labels")} label={T("ป้ายเรือ", "Labels")} />
+                <CheckRow checked={layers.lanes}  onChange={() => toggle("lanes")}  label={T("เส้นเดินเรือ", "Ship lanes")} />
+                <CheckRow checked={layers.chokes} onChange={() => toggle("chokes")} label={T("ช่องแคบ", "Chokepoints")} />
+                <CheckRow checked={layers.sweep}  onChange={() => toggle("sweep")}  label={T("เรดาร์กวาด", "Radar sweep")} />
               </div>
             </>
           )}
@@ -192,15 +197,6 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
               <div className="k">{T("เหตุการณ์สด", "Live")}</div>
               <div className="v" style={{ color: "var(--crit)" }}>{data.events.filter(e => !e.resolved).length}</div>
             </div>
-          </div>
-
-          {/* top-right layer controls */}
-          <div className="map-hud map-tools" style={{ width: 168 }}>
-            <LayerBtn k="tracks" label={T("เส้นทาง AIS", "AIS tracks")} />
-            <LayerBtn k="labels" label={T("ป้ายเรือ", "Labels")} />
-            <LayerBtn k="lanes"  label={T("เส้นเดินเรือ", "Ship lanes")} />
-            <LayerBtn k="chokes" label={T("ช่องแคบ", "Chokepoints")} />
-            <LayerBtn k="sweep"  label={T("เรดาร์กวาด", "Radar sweep")} />
           </div>
 
           {/* legend */}
