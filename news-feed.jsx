@@ -230,16 +230,14 @@ function useNewsUpdater(baseNews) {
   const [lastFetch, setLastFetch] = React.useState(null);
   const [fetchError, setFetchError] = React.useState(null);
 
-  // ดึง RSS → แปลไทย → เขียนลง Supabase → อ่านชุดรวมกลับมา
+  // อ่านข่าวกลางจาก Supabase (ข่าวถูกเขียนโดย cron ฝั่ง server ทุกวัน)
+  // ถ้า DB ว่าง → fallback ดึง RSS มาแสดงชั่วคราว (ไม่เขียนกลับ)
   const doFetch = React.useCallback(async () => {
     setFetching(true);
     setFetchError(null);
     try {
-      const items = await fetchAllLiveNews();
-      if (items.length > 0) await pushToSupabase(items);
-
       let shared = await loadFromSupabase();
-      if (!shared.length) shared = items;          // offline fallback
+      if (!shared.length) shared = await fetchAllLiveNews();   // display-only fallback
       if (shared.length) {
         saveNewsCache(shared);
         setLiveNews(shared);
@@ -256,19 +254,16 @@ function useNewsUpdater(baseNews) {
   React.useEffect(() => {
     let active = true;
     (async () => {
-      // 1) แสดงข่าวกลางจาก Supabase ทันที (เร็ว)
+      // แสดงข่าวกลางจาก Supabase ทันที
       const shared = await loadFromSupabase();
       if (active && shared.length) {
         saveNewsCache(shared);
         setLiveNews(shared);
-      }
-      // 2) ดึง RSS ใหม่เมื่อ "เครื่องนี้" ดึงครั้งล่าสุดเกิน 30 นาที (หรือยังไม่เคยดึง)
-      let last = 0;
-      try { last = Number(localStorage.getItem(LASTFETCH_KEY)) || 0; } catch {}
-      if (active && (Date.now() - last > REFRESH_MS)) {
-        doFetch();
+      } else if (active) {
+        doFetch();   // DB ว่าง → fallback
       }
     })();
+    // อ่านซ้ำเป็นระยะ เพื่อรับข่าวที่ cron อัปเดต
     const id = setInterval(doFetch, REFRESH_MS);
     return () => { active = false; clearInterval(id); };
   }, [doFetch]);

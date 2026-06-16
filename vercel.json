@@ -2,6 +2,15 @@
   "functions": {
     "api/summarize.py": {
       "maxDuration": 30
+    },
+    "api/cron-news.py": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron-news",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
