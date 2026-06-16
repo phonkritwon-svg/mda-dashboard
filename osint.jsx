@@ -13,6 +13,9 @@ function NewsRow({ n, lang, onNav }) {
   const T   = (th, en) => (lang === "th" ? th : en);
   const src = window.MDA_DATA.sources[n.srcKey];
   const vd  = VERDICT[n.verdict] || VERDICT.context;
+  const domMeta = window.MDA_THREAT_DOMAINS || [];
+  const domains = (window.classifyThreats ? window.classifyThreats(n) : [])
+    .map(k => domMeta.find(d => d.key === k)).filter(Boolean);
   const agoStr = n.isLive
     ? window.mdaTimeAgo(n.time, lang)
     : tx(n.ago, lang);
@@ -43,6 +46,17 @@ function NewsRow({ n, lang, onNav }) {
         <span className="mute mono" style={{ fontSize: "var(--fs-xs)" }}>{agoStr}</span>
       </div>
       <div className="ntitle">{tx(n.raw, lang)}</div>
+      {domains.length > 0 && (
+        <div className="row wrap" style={{ gap: 4 }}>
+          {domains.map(d => (
+            <span key={d.key} className="tag" style={{
+              fontSize: 9, color: d.color,
+              background: d.color + "1e",
+              border: "1px solid " + d.color + "55",
+            }}>{T(d.th, d.en)}</span>
+          ))}
+        </div>
+      )}
       {tx(n.ai, lang) && (
         <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "8px 10px",
           borderRadius: 7, background: "rgba(var(--accent-rgb),0.05)",
@@ -77,11 +91,17 @@ function Osint({ data, lang, onNav }) {
     filter === "all"    ? true :
     filter === "linked" ? n.linkedInc :
     filter === "live"   ? n.isLive :
-    n.srcKey === filter
+    filter.startsWith("TD:")
+      ? (window.classifyThreats ? window.classifyThreats(n) : []).includes(filter.slice(3))
+      : n.srcKey === filter
   );
 
   const srcCounts = {};
   allNews.forEach(n => { srcCounts[n.srcKey] = (srcCounts[n.srcKey] || 0) + 1; });
+
+  const domCounts = {};
+  allNews.forEach(n => (window.classifyThreats ? window.classifyThreats(n) : [])
+    .forEach(k => { domCounts[k] = (domCounts[k] || 0) + 1; }));
 
   const lastFetchStr = lastFetch
     ? lastFetch.toLocaleTimeString(lang === "th" ? "th-TH" : "en-GB", { hour: "2-digit", minute: "2-digit" })
@@ -127,10 +147,24 @@ function Osint({ data, lang, onNav }) {
               <>
                 <div onClick={() => setFilterOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
                 <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 61, width: 240,
+                  position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 61, width: 286,
                   background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 11,
-                  boxShadow: "var(--shadow)", padding: 8, maxHeight: "min(72vh, 460px)", overflowY: "auto",
+                  boxShadow: "var(--shadow)", padding: 8, maxHeight: "min(78vh, 560px)", overflowY: "auto",
                 }}>
+                  <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 6px" }}>{T("ภัยคุกคาม 9 ด้าน · ศรชล.", "9 Threat Domains · Thai-MECC")}</div>
+                  <div className="col" style={{ gap: 3 }}>
+                    {(window.MDA_THREAT_DOMAINS || []).map(d => (
+                      <div key={d.key} className={"pill-tab" + (filter === "TD:" + d.key ? " active" : "")}
+                        style={{ justifyContent: "space-between", display: "flex" }} onClick={() => pick("TD:" + d.key)}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, display: "inline-block", flex: "none" }}></span>
+                          {T(d.th, d.en)}
+                        </span>
+                        <span className="mono dim">{domCounts[d.key] || 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="divider" style={{ margin: "8px 0" }}></div>
                   <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 6px" }}>{T("แหล่งข่าว", "Sources")}</div>
                   <div className="col" style={{ gap: 3 }}>
                     <div className={"pill-tab" + (filter === "all" ? " active" : "")}

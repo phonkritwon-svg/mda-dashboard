@@ -33,6 +33,48 @@ window.MDA_DATA = (function () {
     GFW:  { name: "Global Fishing Watch",   tag: "DATA", color: "#f0884d" },
   };
 
+  // ---- ภัยคุกคามทางทะเล 9 ด้าน ของ ศรชล. (Thai-MECC) ----
+  // ใช้จัดหมวดข่าวอัตโนมัติจากคำสำคัญ (ไทย+อังกฤษ) ในหัวข้อ/สรุป
+  const threatDomains = [
+    { key:"SAR",      icon:"life-ring", color:"#46c976",
+      th:"ค้นหา-ช่วยเหลือผู้ประสบภัย (SAR)", en:"Search & Rescue (SAR)",
+      re:/\bsar\b|search and rescue|rescue|distress|mayday|capsiz|sink|sank|sunk|overboard|adrift|lifeboat|missing (?:crew|sailor|fisher|boat|vessel)|ค้นหา|กู้ภัย|ช่วยเหลือผู้ประสบภัย|ผู้ประสบภัย|อับปาง|เรือล่ม|เรือจม|พลิกคว่ำ|สูญหาย|ลอยคอ/i },
+    { key:"IUU",      icon:"fish", color:"#33b8c8",
+      th:"ประมงผิดกฎหมาย (IUU)", en:"IUU Fishing",
+      re:/\biuu\b|illegal,?\s*unreported|illegal fishing|unlicensed fishing|overfish|trawler|fishing vessel|fishing fleet|fishing boat|poach|ประมงผิดกฎหมาย|ทำประมง|เรือประมง|ลอบจับปลา|ลักลอบจับสัตว์น้ำ/i },
+    { key:"HUMAN",    icon:"users", color:"#e0a020",
+      th:"ค้ามนุษย์/ลักลอบเข้าเมือง", en:"Human Trafficking & Smuggling",
+      re:/human traffick|people smuggl|migrant|refugee|stowaway|forced labou?r|rohingya|ค้ามนุษย์|ผู้อพยพ|ผู้ลี้ภัย|ลักลอบเข้าเมือง|แรงงานบังคับ|โรฮิงญา|หลบหนีเข้าเมือง/i },
+    { key:"DRUG",     icon:"alert-triangle", color:"#d9534f",
+      th:"ยาเสพติด/อาวุธ/ของผิดกฎหมาย", en:"Drug, Arms & Contraband",
+      re:/\bdrug|narcotic|cocaine|heroin|methamphetamine|cannabis|contraband|smuggl|arms shipment|weapons? seiz|gun(?:s|-)?running|ยาเสพติด|ลักลอบขน|ของผิดกฎหมาย|อาวุธสงคราม|ของเถื่อน|ยึด(?:ยา|ของกลาง)/i },
+    { key:"ENV",      icon:"leaf", color:"#3aa66a",
+      th:"ทรัพยากร-สิ่งแวดล้อมทางทะเล", en:"Marine Environment",
+      re:/oil spill|pollution|polluted|coral|marine life|ecosystem|dumping|discharge|whale|dolphin|turtle|mangrove|seagrass|สิ่งแวดล้อม|น้ำมันรั่ว|มลพิษ|ปะการัง|ทรัพยากรทางทะเล|ระบบนิเวศ|สัตว์ทะเล|ป่าชายเลน/i },
+    { key:"DISASTER", icon:"cloud", color:"#5fb0c9",
+      th:"ภัยพิบัติทางธรรมชาติ", en:"Natural Disaster",
+      re:/tsunami|typhoon|cyclone|hurricane|storm surge|\bstorm\b|flood|earthquake|severe weather|gale|monsoon|high waves?|ภัยพิบัติ|สึนามิ|พายุ|น้ำท่วม|แผ่นดินไหว|มรสุม|คลื่นสูง|คลื่นลมแรง/i },
+    { key:"PIRACY",   icon:"crosshair", color:"#c9542a",
+      th:"โจรสลัด/ปล้นเรือ", en:"Piracy & Armed Robbery",
+      re:/piracy|pirate|armed robbery|hijack|boarded|boarding|kidnap|ransom|โจรสลัด|ปล้นเรือ|จี้เรือ|ปล้นสะดม|ขึ้นปล้น/i },
+    { key:"TERROR",   icon:"shield", color:"#e0533b",
+      th:"ก่อการร้ายทางทะเล", en:"Maritime Terrorism",
+      re:/terror|militant|insurgent|\bied\b|limpet mine|\bbomb|explosi|houthi|drone (?:attack|strike)|missile (?:attack|strike|hit)|struck by|attack(?:ed)? (?:on |a )?(?:ship|vessel|tanker)|ก่อการร้าย|ผู้ก่อการ|วินาศกรรม|ระเบิด|ฮูตี|โจมตีเรือ|ลอบโจมตี/i },
+    { key:"WMD",      icon:"radiation", color:"#b07cf0",
+      th:"WMD/สินค้าสองวัตถุประสงค์", en:"WMD & Dual-use Goods",
+      re:/\bwmd\b|nuclear|chemical weapon|biological weapon|dual-use|proliferation|sanction(?:s)? (?:evasion|breach|busting)|ballistic|enrichment|centrifuge|อาวุธนิวเคลียร์|อาวุธเคมี|อาวุธชีวภาพ|สองวัตถุประสงค์|ขีปนาวุธ|คว่ำบาตร|อาวุธทำลายล้างสูง/i },
+  ];
+
+  // คืนค่า array ของ key ภัยคุกคามที่ข่าวชิ้นนี้เข้าข่าย (อาจมีหลายด้าน)
+  function _hay(v){ return typeof v === "string" ? v : (v ? ((v.en||"") + " " + (v.th||"")) : ""); }
+  function classifyThreats(n){
+    const text = _hay(n.raw) + "  " + _hay(n.ai) + "  " + (n.outlet || "");
+    return threatDomains.filter(d => d.re.test(text)).map(d => d.key);
+  }
+  // เผยแพร่ให้ทุกสคริปต์เรียกใช้ได้
+  window.MDA_THREAT_DOMAINS = threatDomains;
+  window.classifyThreats   = classifyThreats;
+
   // ---- vessels (global) ----
   const vessels = [
     { id:"V-RS01", name:"MT SEA-LINKED (target)", flag:"LR", type:"tanker", course:340, sp:11.5, lat:14.2, lon:42.6, status:"watch",   note:{th:"เสี่ยงถูกโจมตีในทะเลแดง", en:"At risk of Red Sea attack"} },
@@ -349,5 +391,5 @@ window.MDA_DATA = (function () {
     { th:"ประสานเครือข่ายพันธมิตร/กองเรือเฉพาะกิจในพื้นที่", en:"Coordinate with partner task forces operating in-theatre." },
   ];
 
-  return { sources, vessels, events, news, stats, sourceMix, catMix, activity24h, brief, incTimeline, recommendations };
+  return { sources, vessels, events, news, stats, sourceMix, catMix, activity24h, brief, incTimeline, recommendations, threatDomains };
 })();
