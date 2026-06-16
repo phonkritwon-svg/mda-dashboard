@@ -24,6 +24,36 @@ const REGION_PRESETS = [
   { key: "custom",   th: "กำหนดพิกัดเอง",          en: "Custom coordinates",     lat: 0,    lon: 0 },
 ];
 
+/* จับคู่ข้อความข่าว → พิกัดพื้นที่ทางทะเล (ใช้ปักหมุด "ดูบนแผนที่" จากฟีดข่าว)
+   ตรงกับชุดภูมิภาคในฝั่ง cron (api/cron-news.py) */
+const MDA_GEO_REGIONS = [
+  { re: /red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen/i,        th: "ทะเลแดง / บับเอลมันเดบ",    en: "Red Sea / Bab el-Mandeb", lat: 13.5, lon: 43.3 },
+  { re: /strait of hormuz|hormuz|fujairah|persian gulf/i,      th: "ช่องแคบฮอร์มุซ",            en: "Strait of Hormuz",        lat: 26.5, lon: 56.3 },
+  { re: /gulf of aden|\baden\b/i,                              th: "อ่าวเอเดน",                 en: "Gulf of Aden",            lat: 12.5, lon: 47.0 },
+  { re: /south china sea|scarborough|spratly|paracel|second thomas|taiwan strait/i, th: "ทะเลจีนใต้", en: "South China Sea", lat: 15.0, lon: 117.0 },
+  { re: /strait of malacca|malacca|singapore strait/i,         th: "ช่องแคบมะละกา",             en: "Strait of Malacca",       lat: 2.5,  lon: 101.0 },
+  { re: /gulf of thailand/i,                                   th: "อ่าวไทย",                   en: "Gulf of Thailand",        lat: 9.5,  lon: 101.5 },
+  { re: /andaman/i,                                            th: "ทะเลอันดามัน",              en: "Andaman Sea",             lat: 8.0,  lon: 97.0 },
+  { re: /natuna/i,                                             th: "ทะเลนาตูนาเหนือ",           en: "North Natuna Sea",        lat: 5.0,  lon: 109.2 },
+  { re: /black sea|novorossiysk|odes[as]|crimea/i,            th: "ทะเลดำ",                    en: "Black Sea",               lat: 44.0, lon: 36.0 },
+  { re: /baltic|gulf of finland|kattegat|gotland/i,           th: "ทะเลบอลติก",                en: "Baltic Sea",              lat: 59.0, lon: 21.0 },
+  { re: /gulf of guinea|nigeria|lagos/i,                       th: "อ่าวกินี",                  en: "Gulf of Guinea",          lat: 3.0,  lon: 5.0 },
+  { re: /somali|horn of africa|gulf of oman|arabian sea/i,    th: "ทะเลอาหรับ / จะงอยแอฟริกา", en: "Arabian Sea / Horn",      lat: 12.0, lon: 55.0 },
+  { re: /mediterranean|aegean|libya|gaza/i,                    th: "ทะเลเมดิเตอร์เรเนียน",       en: "Mediterranean Sea",       lat: 34.0, lon: 18.0 },
+  { re: /caribbean|venezuela|panama canal/i,                   th: "ทะเลแคริบเบียน",            en: "Caribbean Sea",           lat: 14.0, lon: -72.0 },
+  { re: /indian ocean/i,                                       th: "มหาสมุทรอินเดีย",           en: "Indian Ocean",            lat: 5.0,  lon: 75.0 },
+];
+
+// รับข้อความหลายชิ้น (หัวข้อ/สรุป ไทย+อังกฤษ) → {lat, lon, th, en} หรือ null
+function geocodeText() {
+  const text = Array.prototype.slice.call(arguments).filter(Boolean).join("  ");
+  for (let i = 0; i < MDA_GEO_REGIONS.length; i++) {
+    const r = MDA_GEO_REGIONS[i];
+    if (r.re.test(text)) return { lat: r.lat, lon: r.lon, th: r.th, en: r.en };
+  }
+  return null;
+}
+
 /* ---- row (DB) <-> object (UI) ---- */
 function eventRowToObj(r) {
   const t = r.published_at || r.created_at;
@@ -329,4 +359,5 @@ function AddEventButton({ addEvent, lang, showToast, className }) {
 Object.assign(window, {
   useEventsUpdater, addEventToSupabase, loadEventsFromSupabase,
   AddEventModal, AddEventButton, REGION_PRESETS,
+  geocodeText, MDA_GEO_REGIONS,
 });

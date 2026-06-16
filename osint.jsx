@@ -16,6 +16,10 @@ function NewsRow({ n, lang, onNav }) {
   const domMeta = window.MDA_THREAT_DOMAINS || [];
   const domains = (window.classifyThreats ? window.classifyThreats(n) : [])
     .map(k => domMeta.find(d => d.key === k)).filter(Boolean);
+  const geo = window.geocodeText
+    ? window.geocodeText(n.raw && n.raw.en, n.raw && n.raw.th,
+        n.ai && n.ai.en, n.ai && n.ai.th, n.outlet)
+    : null;
   const agoStr = n.isLive
     ? window.mdaTimeAgo(n.time, lang)
     : tx(n.ago, lang);
@@ -69,6 +73,20 @@ function NewsRow({ n, lang, onNav }) {
         <span className="row" style={{ gap: 5 }}><Icon name="clock" size={11} />{n.isLive ? new Date(n.time).toLocaleString(lang === "th" ? "th-TH" : "en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : n.time}</span>
         {n.outlet && <span className="row" style={{ gap: 5 }}><Icon name="globe" size={11} />{n.outlet}</span>}
         <span className="topbar-spacer"></span>
+        {geo && (
+          <a className="panel-link" style={{ cursor: "pointer" }}
+            title={lang === "th" ? geo.th : geo.en}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              onNav("map", { focus: {
+                lat: geo.lat, lon: geo.lon,
+                label: lang === "th" ? geo.th : geo.en,
+                title: tx(n.raw, lang),
+              } });
+            }}>
+            <Icon name="pin" size={12} />{T("ดูบนแผนที่", "View on map")}
+          </a>
+        )}
         <a className="panel-link" href={n.url} target="_blank" rel="noopener noreferrer"
           onClick={(ev) => ev.stopPropagation()}>
           {T("เปิดข่าวต้นฉบับ", "Open original")}<Icon name="link" size={12} />

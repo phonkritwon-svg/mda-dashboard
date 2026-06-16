@@ -140,10 +140,18 @@ function eventHtml(sev) {
   </div>`;
 }
 
+function focusHtml() {
+  return `<div style="position:relative;width:22px;height:22px;">
+    <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--accent);animation:pulse-ring 1.8s linear infinite;pointer-events:none;"></div>
+    <div style="position:absolute;inset:0;border-radius:50%;background:var(--accent);opacity:0.25;"></div>
+    <div style="position:absolute;inset:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);"></div>
+  </div>`;
+}
+
 function MapView({
   vessels = [], events = [], selected, onSelect, onSelectEvent, lang,
   showLabels = false, showTracks = true, showEvents = true, sweep = false,
-  showLanes = true, showChokepoints = true,
+  showLanes = true, showChokepoints = true, focus = null,
   zoomable = false, initialCenter = [20, 10], initialZoom = 2,
 }) {
   const containerRef = React.useRef(null);
@@ -309,6 +317,22 @@ function MapView({
         .addTo(el);
     });
   }, [events, showEvents]);
+
+  /* ── focus: บินไปจุดที่ส่งมาจากฟีดข่าว + ปักหมุดเด่น ──────────── */
+  React.useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focus || typeof focus.lat !== "number") return;
+    const icon = L.divIcon({ html: focusHtml(), className: "", iconSize: [22, 22], iconAnchor: [11, 11] });
+    const m = L.marker([focus.lat, focus.lon], { icon, zIndexOffset: 1000 }).addTo(map);
+    if (focus.label || focus.title) {
+      m.bindPopup(
+        '<div style="font-weight:600;margin-bottom:2px">' + (focus.label || "") + "</div>" +
+        '<div style="font-size:11px;opacity:0.8">' + (focus.title || "") + "</div>"
+      ).openPopup();
+    }
+    const t = setTimeout(() => map.flyTo([focus.lat, focus.lon], Math.max(map.getZoom(), 5), { duration: 1.2 }), 250);
+    return () => { clearTimeout(t); map.removeLayer(m); };
+  }, [focus]);
 
   return (
     <div className="map-wrap" style={{ position: "relative", height: "100%", width: "100%" }}>

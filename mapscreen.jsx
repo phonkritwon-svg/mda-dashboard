@@ -4,7 +4,14 @@
 function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const T = (th, en) => lang === "th" ? th : en;
   const [selected, setSelected] = useState(initial && initial.vessel ? initial.vessel : null);
+  const [focus] = useState(initial && initial.focus ? initial.focus : null);
   const [tab, setTab] = useState("events");
+
+  useEffect(() => {
+    if (focus && showToast) {
+      showToast(T("แสดงตำแหน่งจากข่าว", "Showing location from news") + (focus.label ? " · " + focus.label : ""), "info");
+    }
+  }, []);
   const [filterType, setFilterType] = useState("all");
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -176,12 +183,12 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
         {/* MAP */}
         <div className="panel" style={{ padding: 0, position: "relative", overflow: "hidden", isolation: "isolate", borderRadius: 0, border: "none" }}>
           <MapView vessels={filteredVessels} events={data.events} lang={lang}
-            selected={selected} onSelect={setSelected}
+            selected={selected} onSelect={setSelected} focus={focus}
             onSelectEvent={(e) => onNav("incident", { id: e.id })}
             showTracks={layers.tracks} showEvents={visible.incidents}
             showLabels={layers.labels} sweep={layers.sweep} zoomable={true}
             showLanes={layers.lanes} showChokepoints={layers.chokes}
-            initialCenter={[20, 10]} initialZoom={2} />
+            initialCenter={focus ? [focus.lat, focus.lon] : [20, 10]} initialZoom={focus ? 5 : 2} />
 
           {/* top-left stats */}
           <div className="map-hud map-stat">
