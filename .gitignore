@@ -1,0 +1,18 @@
+# secrets — never commit
+.env
+.env.*
+*.key
+
+# old design snapshot — not part of the deployed app
+design_extract/
+
+# local dev server (Vercel uses api/summarize.py instead)
+# server.py kept for local dev but harmless if deployed
+
+# local tooling / IDE
+.claude/
+.vercel/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
