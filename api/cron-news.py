@@ -21,9 +21,10 @@ import hashlib
 import urllib.request
 import urllib.parse
 
-ITEMS_PER_FEED   = 6     # ดึงกี่ข่าวต่อแหล่ง
-TRANSLATE_TIMEOUT = 5    # วินาที ต่อการแปล 1 ครั้ง
-TRANSLATE_BUDGET  = 8    # งบเวลารวมสำหรับการแปลทั้งหมด (กันเกิน maxDuration)
+ITEMS_PER_FEED    = 4    # ดึงกี่ข่าวต่อแหล่ง
+FEED_TIMEOUT      = 6    # วินาที ต่อการดึง 1 feed
+TRANSLATE_TIMEOUT = 4    # วินาที ต่อการแปล 1 ครั้ง
+TRANSLATE_BUDGET  = 4    # งบเวลารวมสำหรับการแปลทั้งหมด (กันเกิน maxDuration)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -65,7 +66,7 @@ def parse_pubdate(s):
 def fetch_feed(src):
     out = []
     try:
-        root = ET.fromstring(http_get(src["url"]))
+        root = ET.fromstring(http_get(src["url"], timeout=FEED_TIMEOUT))
         for it in root.findall(".//item")[:ITEMS_PER_FEED]:
             title = (it.findtext("title") or "").strip()
             if not title:
@@ -175,6 +176,14 @@ class handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        # debug fast-path: ยืนยันว่าฟังก์ชันรัน + env พร้อม (ไม่ทำงานหนัก)
+        if "debug" in self.path:
+            return self._json({
+                "ok": True,
+                "has_url": bool(SUPABASE_URL),
+                "has_key": bool(SERVICE_KEY),
+                "key_prefix": (SERVICE_KEY[:10] + "...") if SERVICE_KEY else None,
+            })
         if CRON_SECRET:
             if self.headers.get("Authorization", "") != "Bearer " + CRON_SECRET:
                 return self._json({"error": "unauthorized"}, 401)
