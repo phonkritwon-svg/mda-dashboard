@@ -1,8 +1,29 @@
 /* ============================================================
    Screen: Incident Detail / Threat Assessment
    ============================================================ */
-function Incident({ data, lang, onNav, initial, showToast }) {
+function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
   const T = (th, en) => lang === "th" ? th : en;
+
+  // ยังไม่มีเหตุการณ์ในฐานข้อมูล → empty state + ปุ่มเพิ่ม
+  if (!data.events || !data.events.length) {
+    return (
+      <div className="screen">
+        <div className="page-head">
+          <div>
+            <div className="eyebrow">{T("เหตุการณ์ / การประเมินภัย", "Incidents / Threat Assessment")}</div>
+            <div className="page-title">{T("ยังไม่มีเหตุการณ์", "No events yet")}</div>
+            <div className="page-sub">{T("เหตุการณ์จะถูกสร้างอัตโนมัติจากข่าวภัยสูง หรือเพิ่มเองด้านล่าง", "Events are auto-generated from high-severity news, or add one below.")}</div>
+          </div>
+          {window.AddEventButton && <window.AddEventButton addEvent={addEvent} lang={lang} showToast={showToast} />}
+        </div>
+        <div className="empty" style={{ marginTop: 40 }}>
+          <Icon name="alert" size={32} style={{ color: "var(--text-mute)", marginBottom: 10 }} />
+          <div>{T("ไม่มีเหตุการณ์ที่ต้องเฝ้าระวังในขณะนี้", "No active incidents at this time")}</div>
+        </div>
+      </div>
+    );
+  }
+
   const id = (initial && initial.id) || data.events[0].id;
   const e = data.events.find(x => x.id === id) || data.events[0];
   const v = e.vessel ? data.vessels.find(x => x.id === e.vessel) : null;

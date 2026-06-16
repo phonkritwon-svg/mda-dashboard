@@ -199,10 +199,10 @@ def to_row(a):
     }
 
 
-def upsert(rows):
+def upsert_table(table, rows):
     body = json.dumps(rows, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
-        SUPABASE_URL.rstrip("/") + "/rest/v1/news",
+        SUPABASE_URL.rstrip("/") + "/rest/v1/" + table,
         data=body, method="POST",
         headers={
             "apikey":        SERVICE_KEY,
@@ -212,6 +212,92 @@ def upsert(rows):
         })
     with urllib.request.urlopen(req, timeout=25) as r:
         return r.status
+
+
+def upsert(rows):
+    return upsert_table("news", rows)
+
+
+# ── สร้าง "เหตุการณ์" จากข่าวภัยสูง ─────────────────────────────
+# เลือกเฉพาะข่าวที่ (1) รุนแรงพอ และ (2) ระบุพื้นที่ทางทะเลได้ → ขึ้นหมุดบนแผนที่
+REGIONS = [
+    (re.compile(r"red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen", re.I),     ("Red Sea / Bab el-Mandeb", "ทะเลแดง / บับเอลมันเดบ", 13.5, 43.3)),
+    (re.compile(r"strait of hormuz|hormuz|fujairah|persian gulf", re.I),   ("Strait of Hormuz",        "ช่องแคบฮอร์มุซ",        26.5, 56.3)),
+    (re.compile(r"gulf of aden|\baden\b", re.I),                           ("Gulf of Aden",            "อ่าวเอเดน",             12.5, 47.0)),
+    (re.compile(r"south china sea|scarborough|spratly|paracel|second thomas|taiwan strait", re.I), ("South China Sea", "ทะเลจีนใต้",  15.0, 117.0)),
+    (re.compile(r"strait of malacca|malacca|singapore strait", re.I),      ("Strait of Malacca",       "ช่องแคบมะละกา",         2.5,  101.0)),
+    (re.compile(r"gulf of thailand", re.I),                                ("Gulf of Thailand",        "อ่าวไทย",               9.5,  101.5)),
+    (re.compile(r"andaman", re.I),                                         ("Andaman Sea",             "ทะเลอันดามัน",          8.0,  97.0)),
+    (re.compile(r"natuna", re.I),                                          ("North Natuna Sea",        "ทะเลนาตูนาเหนือ",       5.0,  109.2)),
+    (re.compile(r"black sea|novorossiysk|odes[as]|crimea", re.I),          ("Black Sea",               "ทะเลดำ",                44.0, 36.0)),
+    (re.compile(r"baltic|gulf of finland|kattegat|gotland", re.I),         ("Baltic Sea",              "ทะเลบอลติก",            59.0, 21.0)),
+    (re.compile(r"gulf of guinea|nigeria|lagos", re.I),                    ("Gulf of Guinea",          "อ่าวกินี",              3.0,  5.0)),
+    (re.compile(r"somali|horn of africa|gulf of oman|arabian sea", re.I),  ("Arabian Sea / Horn",      "ทะเลอาหรับ / จะงอยแอฟริกา", 12.0, 55.0)),
+    (re.compile(r"mediterranean|aegean|libya|gaza", re.I),                 ("Mediterranean Sea",       "ทะเลเมดิเตอร์เรเนียน",   34.0, 18.0)),
+    (re.compile(r"caribbean|venezuela|panama canal", re.I),                ("Caribbean Sea",           "ทะเลแคริบเบียน",        14.0, -72.0)),
+    (re.compile(r"indian ocean", re.I),                                    ("Indian Ocean",            "มหาสมุทรอินเดีย",       5.0,  75.0)),
+]
+
+SEV_CRIT = re.compile(r"\b(attack|attacked|missile|drone strike|explosion|struck|killed|sunk|sinking|hijack|seized|under fire|ballistic)\b", re.I)
+SEV_HIGH = re.compile(r"\b(seiz|detain|collision|capsiz|distress|piracy|pirate|smuggl|illegal fishing|incursion|intercept|boarded|sabotage|cable)\b", re.I)
+
+THREAT_CATS = [
+    ("SEARCH & RESCUE",     re.compile(r"rescue|distress|capsiz|sinking|missing|overboard|search and rescue", re.I)),
+    ("PIRACY",              re.compile(r"piracy|pirate|armed robbery|hijack|kidnap", re.I)),
+    ("IUU FISHING",         re.compile(r"illegal fishing|\biuu\b|trawler|poach", re.I)),
+    ("MARITIME TERRORISM",  re.compile(r"houthi|missile|drone|attack|explosion|struck|militant|terror", re.I)),
+    ("DRUG & ARMS",         re.compile(r"drug|narcotic|smuggl|contraband|weapons? seiz", re.I)),
+    ("SUBSEA / INFRA",      re.compile(r"cable|pipeline|sabotage|infrastructure", re.I)),
+]
+
+
+def _ev_text(a):
+    return " ".join([a.get("title", ""), a.get("desc", ""),
+                     a.get("title_th", "") or "", a.get("summary_th", "") or ""])
+
+
+def to_event_row(a):
+    text = _ev_text(a)
+    # ต้องระบุพื้นที่ทางทะเลได้ (เพื่อขึ้นหมุดบนแผนที่)
+    geo = None
+    for rx, info in REGIONS:
+        if rx.search(text):
+            geo = info
+            break
+    if not geo:
+        return None
+    # ต้องมีสัญญาณภัย: ความรุนแรง หรือ เข้าหมวดภัยคุกคามชัดเจน
+    sev = "critical" if SEV_CRIT.search(text) else ("high" if SEV_HIGH.search(text) else None)
+    cat = None
+    for name, rx in THREAT_CATS:
+        if rx.search(text):
+            cat = name
+            break
+    if not sev and not cat:
+        return None
+    sev = sev or "medium"
+    cat = cat or "MARITIME"
+    region_en, region_th, lat, lon = geo
+    eid = "evt_" + a["key"] + "_" + hashlib.sha1((a["link"] or a["title"]).encode("utf-8")).hexdigest()[:16]
+    return {
+        "id":            eid,
+        "sev":           sev,
+        "cat":           cat,
+        "src_key":       a["key"],
+        "title_en":      a["title"],
+        "title_th":      a.get("title_th") or None,
+        "area_en":       region_en, "area_th": region_th,
+        "region_en":     region_en, "region_th": region_th,
+        "summary_en":    a["desc"], "summary_th": a.get("summary_th") or None,
+        "lat":           lat, "lon": lon,
+        "conf":          3,
+        "tags":          [],
+        "source_outlet": a["outlet"],
+        "source_url":    a["link"] or None,
+        "resolved":      False,
+        "origin":        "cron",
+        "published_at":  a["published"],
+    }
 
 
 def run():
@@ -225,7 +311,19 @@ def run():
     translated = sum(1 for a in arts if a.get("title_th"))
     rows = [to_row(a) for a in arts]
     status = upsert(rows)
-    return {"ok": True, "count": len(rows), "translated": translated, "upsert_status": status}, 200
+
+    # สร้างเหตุการณ์จากข่าวภัยสูงที่ระบุพื้นที่ได้
+    event_rows = [r for r in (to_event_row(a) for a in arts) if r]
+    events_status = None
+    if event_rows:
+        try:
+            events_status = upsert_table("events", event_rows)
+        except Exception as e:
+            events_status = "err:" + str(e)
+
+    return {"ok": True, "count": len(rows), "translated": translated,
+            "upsert_status": status, "events": len(event_rows),
+            "events_status": events_status}, 200
 
 
 class handler(BaseHTTPRequestHandler):

@@ -1,7 +1,7 @@
 /* ============================================================
    Screen: Live Map + Events
    ============================================================ */
-function MapScreen({ data, lang, onNav, initial, showToast }) {
+function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const T = (th, en) => lang === "th" ? th : en;
   const [selected, setSelected] = useState(initial && initial.vessel ? initial.vessel : null);
   const [tab, setTab] = useState("events");
@@ -265,7 +265,7 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
                   <button className="btn btn-primary btn-sm" style={{ flex: 1 }}
                     onClick={() => {
                       const inc = data.events.find(e => e.vessel === selected.id);
-                      onNav("incident", { id: inc ? inc.id : data.events[0].id });
+                      onNav("incident", { id: inc ? inc.id : (data.events[0] && data.events[0].id) });
                     }}>
                     <Icon name="alert" size={13} />{T("เหตุการณ์", "Incident")}
                   </button>
@@ -291,6 +291,14 @@ function MapScreen({ data, lang, onNav, initial, showToast }) {
           <div className="scroll-y" style={{ height: "100%" }}>
             {tab === "events" ? (
               <div className="feed">
+                <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
+                  {window.AddEventButton &&
+                    <window.AddEventButton addEvent={addEvent} lang={lang} showToast={showToast}
+                      className="btn btn-ghost btn-sm" />}
+                </div>
+                {!data.events.length && (
+                  <div className="empty">{T("ยังไม่มีเหตุการณ์บนแผนที่", "No events on the map yet")}</div>
+                )}
                 {data.events.map(e => (
                   <div key={e.id} className="feed-row evt-row"
                     style={{ gridTemplateColumns: "1fr auto" }}

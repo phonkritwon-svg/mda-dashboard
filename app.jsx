@@ -154,8 +154,10 @@ function App() {
     showToast(T("เปิด Tweaks Panel แล้ว", "Tweaks panel opened"), "info");
   };
 
-  const data = window.MDA_DATA;
-  const screenProps = { data, lang, onNav, showToast };
+  // ---- เหตุการณ์จาก Supabase (cron สร้างอัตโนมัติ + ฟอร์มเพิ่มเอง) ----
+  const { events: liveEvents, addEvent } = window.useEventsUpdater();
+  const data = Object.assign({}, window.MDA_DATA, { events: liveEvents });
+  const screenProps = { data, lang, onNav, showToast, addEvent };
 
   const screens = {
     dashboard: <window.Dashboard {...screenProps} />,
