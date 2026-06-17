@@ -1,11 +1,47 @@
 /* ============================================================
    Screen: Live Map + Events
    ============================================================ */
+/* พื้นที่ทางทะเลสำหรับ "เลือกหัวข้อ → บินไปบนแผนที่" (lat, lon, zoom) */
+const MAP_REGIONS = [
+  { gh: "พื้นที่ยุทธศาสตร์ (อาเซียน)", ge: "Strategic areas (ASEAN)", items: [
+    { th: "ทะเลจีนใต้",        en: "South China Sea",     lat: 14.0, lon: 115.0, z: 5 },
+    { th: "อ่าวไทย",          en: "Gulf of Thailand",    lat: 9.5,  lon: 101.5, z: 6 },
+    { th: "ทะเลอันดามัน",      en: "Andaman Sea",         lat: 10.0, lon: 96.0,  z: 6 },
+    { th: "ช่องแคบมะละกา",     en: "Strait of Malacca",   lat: 3.0,  lon: 100.0, z: 6 },
+    { th: "ช่องแคบสิงคโปร์",   en: "Singapore Strait",    lat: 1.2,  lon: 104.0, z: 8 },
+    { th: "ทะเลซูลู",         en: "Sulu Sea",            lat: 8.0,  lon: 120.0, z: 6 },
+    { th: "ทะเลเซเลเบส",      en: "Celebes Sea",         lat: 3.5,  lon: 122.0, z: 6 },
+  ]},
+  { gh: "ช่องแคบ / จุดร้อนโลก", ge: "Global chokepoints", items: [
+    { th: "ทะเลแดง / บับเอลมันเดบ", en: "Red Sea / Bab el-Mandeb", lat: 13.5, lon: 43.3, z: 6 },
+    { th: "ช่องแคบฮอร์มุซ",    en: "Strait of Hormuz",    lat: 26.5, lon: 56.3, z: 7 },
+    { th: "อ่าวเอเดน",        en: "Gulf of Aden",        lat: 12.5, lon: 47.0, z: 6 },
+    { th: "ทะเลดำ",          en: "Black Sea",           lat: 44.0, lon: 36.0, z: 5 },
+    { th: "ทะเลบอลติก",       en: "Baltic Sea",          lat: 59.0, lon: 21.0, z: 5 },
+  ]},
+  { gh: "มหาสมุทร (MDA)", ge: "Oceans (MDA)", items: [
+    { th: "มหาสมุทรแปซิฟิก",   en: "Pacific Ocean",       lat: 0.0,   lon: -160.0, z: 3 },
+    { th: "มหาสมุทรแอตแลนติก", en: "Atlantic Ocean",      lat: 10.0,  lon: -40.0,  z: 3 },
+    { th: "มหาสมุทรอินเดีย",   en: "Indian Ocean",        lat: -10.0, lon: 75.0,   z: 3 },
+    { th: "มหาสมุทรอาร์กติก",  en: "Arctic Ocean",        lat: 80.0,  lon: 0.0,    z: 3 },
+    { th: "มหาสมุทรใต้",      en: "Southern Ocean",      lat: -58.0, lon: 20.0,   z: 3 },
+  ]},
+];
+
 function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const T = (th, en) => lang === "th" ? th : en;
   const [selected, setSelected] = useState(initial && initial.vessel ? initial.vessel : null);
   const [focus] = useState(initial && initial.focus ? initial.focus : null);
   const [tab, setTab] = useState("events");
+  const [mapView, setMapView] = useState(null);     // {lat,lon,zoom} → บินไปพื้นที่ที่เลือก
+  const [regionOpen, setRegionOpen] = useState(false);
+  const [regionLabel, setRegionLabel] = useState(null);
+  const pickRegion = (r) => {
+    setMapView({ lat: r.lat, lon: r.lon, zoom: r.z });
+    setRegionLabel(r === null ? null : (lang === "th" ? r.th : r.en));
+    setRegionOpen(false);
+  };
+  const resetRegion = () => { setMapView({ lat: 20, lon: 10, zoom: 2 }); setRegionLabel(null); setRegionOpen(false); };
 
   useEffect(() => {
     if (focus && showToast) {
@@ -180,6 +216,45 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           )}
         </div>
 
+        {/* Region quick-jump → บินไปพื้นที่ทางทะเล */}
+        <div style={{ position: "relative" }}>
+          <button className={"btn btn-sm " + (regionOpen ? "btn-primary" : "btn-ghost")}
+            onClick={() => setRegionOpen(o => !o)}>
+            <Icon name="globe" size={14} />{regionLabel || T("เลือกพื้นที่", "Region")}
+            <Icon name="chevR" size={12} style={{ transform: "rotate(90deg)", opacity: 0.7 }} />
+          </button>
+
+          {regionOpen && (
+            <>
+              <div onClick={() => setRegionOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 61, width: 252,
+                background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 11,
+                boxShadow: "var(--shadow)", padding: 8, maxHeight: "min(72vh, 520px)", overflowY: "auto",
+              }}>
+                <div className="pill-tab" style={{ justifyContent: "space-between", display: "flex" }} onClick={resetRegion}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Icon name="globe" size={13} />{T("ทั่วโลก (รีเซ็ต)", "Global (reset)")}
+                  </span>
+                </div>
+                {MAP_REGIONS.map((grp, gi) => (
+                  <div key={gi}>
+                    <div className="divider" style={{ margin: "6px 4px" }} />
+                    <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 4px" }}>{T(grp.gh, grp.ge)}</div>
+                    {grp.items.map((r, ri) => (
+                      <div key={ri} className={"pill-tab" + (regionLabel === (lang === "th" ? r.th : r.en) ? " active" : "")}
+                        style={{ display: "flex" }} onClick={() => pickRegion(r)}>
+                        <Icon name="pin" size={12} style={{ marginRight: 6, color: "var(--accent)" }} />
+                        {T(r.th, r.en)}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
         <span className="topbar-spacer" />
         <span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>
           {filteredVessels.length} / {vessels.length} {T("ลำ", "vessels")}
@@ -190,7 +265,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
         {/* MAP */}
         <div className="panel" style={{ padding: 0, position: "relative", overflow: "hidden", isolation: "isolate", borderRadius: 0, border: "none" }}>
           <MapView vessels={filteredVessels} events={data.events} lang={lang}
-            selected={selected} onSelect={setSelected} focus={focus}
+            selected={selected} onSelect={setSelected} focus={focus} view={mapView}
             onSelectEvent={(e) => onNav("incident", { id: e.id })}
             showTracks={layers.tracks} showEvents={visible.incidents}
             showLabels={layers.labels} sweep={layers.sweep} zoomable={true}

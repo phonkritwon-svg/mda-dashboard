@@ -151,7 +151,7 @@ function focusHtml() {
 function MapView({
   vessels = [], events = [], selected, onSelect, onSelectEvent, lang,
   showLabels = false, showTracks = true, showEvents = true, sweep = false,
-  showLanes = true, showChokepoints = true, focus = null,
+  showLanes = true, showChokepoints = true, focus = null, view = null,
   zoomable = false, initialCenter = [20, 10], initialZoom = 2,
 }) {
   const containerRef = React.useRef(null);
@@ -333,6 +333,13 @@ function MapView({
     const t = setTimeout(() => map.flyTo([focus.lat, focus.lon], Math.max(map.getZoom(), 5), { duration: 1.2 }), 250);
     return () => { clearTimeout(t); map.removeLayer(m); };
   }, [focus]);
+
+  /* ── view: บินไปพื้นที่ทางทะเลที่เลือกจากเมนู (ไม่ปักหมุด) ───── */
+  React.useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !view || typeof view.lat !== "number") return;
+    map.flyTo([view.lat, view.lon], view.zoom || 5, { duration: 1.1 });
+  }, [view]);
 
   return (
     <div className="map-wrap" style={{ position: "relative", height: "100%", width: "100%" }}>

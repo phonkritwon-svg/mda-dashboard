@@ -250,8 +250,8 @@ function DailyBrief({ data, lang, onNav, showToast }) {
                       <span className="mute" style={{ fontSize: "var(--fs-xs)" }}>{a.s}</span>
                     </div>
                   </div>
-                  <span className={"badge badge-" + (a.st === "active" ? "ok" : "mute")} dot>
-                    {a.st.toUpperCase()}
+                  <span className={"badge badge-" + (a.st === "active" ? "ok" : "mute")}>
+                    <span className="bdot"></span>{a.st.toUpperCase()}
                   </span>
                 </div>
               ))}
