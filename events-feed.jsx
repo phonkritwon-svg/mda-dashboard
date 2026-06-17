@@ -76,6 +76,8 @@ function _vesselType(text) {
 }
 
 const VESSEL_MENTION_RE = /\b(vessel|ship|tanker|boat|carrier|bulker|bulk|trawler|warship|frigate|destroyer|fleet|fishing|cargo|container|naval|coast guard|skiff|dhow)\b/i;
+// เรือจะ "เฝ้าระวัง" ก็ต่อเมื่อข่าวบ่งชี้เหตุภัยจริง มิฉะนั้นนับเป็นเรือปกติ
+const VESSEL_ALERT_RE = /attack|struck|missile|drone|hijack|seiz|capsiz|sink|sunk|piracy|pirate|illegal|smuggl|detain|collision|distress|sabotage|incursion|shadow fleet|ghost fleet/i;
 
 // รับรายการข่าว → คืน array ของเรือที่ปักหมุดได้ (มีชื่อ/ประเภท/พิกัด)
 function extractVesselsFromNews(newsArr) {
@@ -87,7 +89,8 @@ function extractVesselsFromNews(newsArr) {
     const sum = (n.ai && (n.ai.en || n.ai.th)) || "";
     const sth = (n.ai && n.ai.th) || "";
     const hay = [en, sum, th, sth, n.outlet].join("  ");
-    if (!VESSEL_MENTION_RE.test(hay)) return;          // ข่าวต้องพูดถึงเรือ
+    // ข่าวต้องพูดถึงเรือ หรือมีชื่อเรือชัดเจน (MV/MT/USS…)
+    if (!VESSEL_MENTION_RE.test(hay) && !VESSEL_NAME_RE.test(en) && !VESSEL_NAME_RE.test(sum)) return;
     const geo = geocodeText(en, th, sum, sth, n.outlet);
     if (!geo) return;                                   // ต้องระบุพื้นที่ได้
     const m = VESSEL_NAME_RE.exec(en) || VESSEL_NAME_RE.exec(sum);
@@ -104,7 +107,7 @@ function extractVesselsFromNews(newsArr) {
       course: 0, sp: 0,
       lat:    geo.lat + r * Math.cos(ang * Math.PI / 180),
       lon:    geo.lon + r * Math.sin(ang * Math.PI / 180),
-      status: "watch",
+      status: VESSEL_ALERT_RE.test(hay) ? "watch" : "normal",
       fromNews: true,
       url:    n.url,
       region: geo,

@@ -23,7 +23,7 @@ const NAV = [
   { key: "dashboard", icon: "dashboard", th: "ภาพรวม",   en: "Overview" },
   { key: "map",       icon: "radar",     th: "แผนที่",    en: "Map" },
   { key: "osint",     icon: "feed",      th: "ฟีดข่าว",  en: "OSINT" },
-  { key: "incident",  icon: "alert",     th: "เหตุการณ์", en: "Incidents", badge: 5 },
+  { key: "incident",  icon: "alert",     th: "เหตุการณ์", en: "Incidents" },
   { key: "brief",     icon: "brief",     th: "รายงาน",   en: "Brief" },
 ];
 
@@ -264,7 +264,9 @@ function App() {
               onClick={() => onNav(n.key)}>
               <Icon name={n.icon} size={21} />
               <span className="nav-lbl">{T(n.th, n.en)}</span>
-              {n.badge && <span className="nav-badge">{n.badge}</span>}
+              {n.key === "incident" && data.events.filter(e => !e.resolved).length > 0 && (
+                <span className="nav-badge">{data.events.filter(e => !e.resolved).length}</span>
+              )}
             </div>
           ))}
           <div className="sidebar-grow"></div>
