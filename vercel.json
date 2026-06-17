@@ -3,6 +3,9 @@
     "api/summarize.py": {
       "maxDuration": 30
     },
+    "api/analyze.py": {
+      "maxDuration": 30
+    },
     "api/cron-news.py": {
       "maxDuration": 60
     }

@@ -163,6 +163,7 @@ function App() {
     dashboard: <window.Dashboard {...screenProps} />,
     map:       <window.MapScreen  {...screenProps} initial={route.payload} />,
     osint:     <window.Osint      {...screenProps} />,
+    newsDetail:<window.NewsDetail {...screenProps} item={route.payload && route.payload.item} />,
     incident:  <window.Incident   {...screenProps} initial={route.payload} />,
     brief:     <window.DailyBrief {...screenProps} />,
   };

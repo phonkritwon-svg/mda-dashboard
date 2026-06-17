@@ -24,7 +24,8 @@ function NewsRow({ n, lang, onNav }) {
     ? window.mdaTimeAgo(n.time, lang)
     : tx(n.ago, lang);
   return (
-    <div className="feed-row news-row">
+    <div className="feed-row news-row" style={{ cursor: "pointer" }}
+      onClick={() => onNav("newsDetail", { item: n })}>
       <div className="nhead">
         {src
           ? <SrcChip srcKey={n.srcKey} withName lang={lang} />
@@ -42,7 +43,7 @@ function NewsRow({ n, lang, onNav }) {
         <Badge kind={vd.kind} dot>{T(vd.th, vd.en)}</Badge>
         {n.linkedInc && (
           <span className="tag" style={{ cursor: "pointer", color: "var(--accent)" }}
-            onClick={() => onNav("incident", { id: n.linkedInc })}>
+            onClick={(ev) => { ev.stopPropagation(); onNav("incident", { id: n.linkedInc }); }}>
             <Icon name="link" size={11} />{n.linkedInc}
           </span>
         )}
