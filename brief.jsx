@@ -6,16 +6,86 @@ function DailyBrief({ data, lang, onNav, showToast }) {
   const b = data.brief;
   const [regenerating, setRegenerating] = useState(false);
 
-  const handleRegen = () => {
+  // ---- ข้อมูลจริงจากฟีดข่าว + เหตุการณ์ ----
+  const { news: feedNews, doFetch } = window.useNewsUpdater(data.news);
+  const events = data.events || [];
+  const vessels = window.extractVesselsFromNews ? window.extractVesselsFromNews(feedNews) : [];
+  const watchVessels = vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
+
+  const sevRank = (n) => {
+    const ks = window.classifyThreats ? window.classifyThreats(n) : [];
+    if (ks.some(k => ["TERROR", "PIRACY", "WMD"].includes(k))) return 3;
+    if (ks.some(k => ["DRUG", "HUMAN", "DISASTER", "SAR"].includes(k))) return 2;
+    return ks.length ? 1 : 0;
+  };
+  const sevName = (r) => (r === 3 ? "critical" : r === 2 ? "high" : r === 1 ? "medium" : "low");
+
+  // ประเด็นสำคัญ = ข่าวเด่นจากฟีด (เรียงตามความรุนแรง → ความใหม่)
+  const highlights = feedNews.slice()
+    .sort((a, c) => (sevRank(c) - sevRank(a)) || (new Date(c.time || 0) - new Date(a.time || 0)))
+    .slice(0, 6);
+
+  // ดัชนีภัยคุกคามรายภูมิภาค = นับข่าวต่อพื้นที่ (geocode)
+  const regionCounts = {};
+  feedNews.forEach(n => {
+    const g = window.geocodeText
+      ? window.geocodeText(n.raw && n.raw.en, n.raw && n.raw.th, n.ai && n.ai.en, n.ai && n.ai.th, n.outlet)
+      : null;
+    if (g) { const key = lang === "th" ? g.th : g.en; regionCounts[key] = (regionCounts[key] || 0) + 1; }
+  });
+  const maxRegion = Math.max(1, ...Object.values(regionCounts));
+  const regions = Object.entries(regionCounts)
+    .sort((a, c) => c[1] - a[1]).slice(0, 6)
+    .map(([a, c]) => {
+      const v = Math.round(c / maxRegion * 100);
+      return { a, v, n: c, c: v >= 75 ? "var(--crit)" : v >= 50 ? "var(--accent)" : "var(--info)" };
+    });
+
+  // สถิติจริง
+  const metrics = [
+    { k: { th: "เหตุการณ์", en: "Events" },           v: events.length },
+    { k: { th: "ปิดเหตุแล้ว", en: "Resolved" },        v: events.filter(e => e.resolved).length },
+    { k: { th: "เรือเฝ้าระวัง", en: "Vessels of interest" }, v: watchVessels.length },
+    { k: { th: "ข่าว OSINT ประมวลผล", en: "OSINT items" },   v: feedNews.length },
+  ];
+
+  // วันที่จริง (วันนี้)
+  const todayStr = new Date().toLocaleDateString(lang === "th" ? "th-TH" : "en-GB",
+    { day: "numeric", month: "long", year: "numeric" });
+
+  // BLUF สร้างจากข้อมูลจริง
+  const topRegions = regions.slice(0, 3).map(r => r.a);
+  const blufText = T(
+    "ประมวลผลข่าวกรองเปิด " + feedNews.length + " ชิ้น และติดตามเหตุการณ์ " + events.length +
+    " รายการในรอบล่าสุด จุดร้อนหลัก: " + (topRegions.join(" · ") || "—") +
+    " · ระดับการเฝ้าระวังโดยรวมอยู่ที่ ELEVATED",
+    feedNews.length + " OSINT items processed and " + events.length +
+    " events tracked this cycle. Main hotspots: " + (topRegions.join(" · ") || "—") +
+    ". Overall posture: ELEVATED."
+  );
+
+  // ประเด็นภัยคุกคามเด่นจากฟีด → ใช้ในส่วนคาดการณ์
+  const domCount = {};
+  feedNews.forEach(n => (window.classifyThreats ? window.classifyThreats(n) : []).forEach(k => { domCount[k] = (domCount[k] || 0) + 1; }));
+  const domMeta = window.MDA_THREAT_DOMAINS || [];
+  const topDomains = Object.entries(domCount).sort((a, c) => c[1] - a[1]).slice(0, 3)
+    .map(([k]) => { const d = domMeta.find(x => x.key === k); return d ? (lang === "th" ? d.th : d.en) : k; });
+  const outlookText = T(
+    "คาดว่ากิจกรรมในจุดร้อนหลักยังต่อเนื่อง ประเด็นที่ต้องเฝ้าระวัง: " + (topDomains.join(" · ") || "—") +
+    " · แนะนำคงระดับเฝ้าระวังและตรวจสอบยืนยันข่าวจากหลายแหล่ง",
+    "Hotspot activity is expected to persist. Watch items: " + (topDomains.join(" · ") || "—") +
+    ". Maintain elevated watch and corroborate across sources."
+  );
+
+  const handleRegen = async () => {
     if (regenerating) return;
     setRegenerating(true);
-    setTimeout(() => {
-      setRegenerating(false);
-      if (showToast) showToast(
-        T("AI สร้างรายงานใหม่เรียบร้อย · ข้อมูล ณ เวลาปัจจุบัน",
-          "AI regenerated the brief · data as of now"), "ok"
-      );
-    }, 2200);
+    try { if (doFetch) await doFetch(); } catch (e) { /* ignore */ }
+    setRegenerating(false);
+    if (showToast) showToast(
+      T("ดึงข่าวล่าสุดและสร้างรายงานใหม่แล้ว",
+        "Refreshed feed & rebuilt the brief"), "ok"
+    );
   };
 
   const handleExportPDF = () => {
@@ -33,7 +103,7 @@ function DailyBrief({ data, lang, onNav, showToast }) {
           <div className="eyebrow">DAILY MARITIME INTELLIGENCE BRIEF</div>
           <div className="page-title">{T("รายงานสรุปสถานการณ์ประจำวัน", "Daily Situation Brief")}</div>
           <div className="page-sub row" style={{ gap: 14 }}>
-            <span>{tx(b.date, lang)}</span>
+            <span>{todayStr}</span>
             <span className="badge badge-warn" style={{ textTransform: "none" }}>
               {b.classification}
             </span>
@@ -55,7 +125,7 @@ function DailyBrief({ data, lang, onNav, showToast }) {
 
       {/* metric strip */}
       <div className="grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 12 }}>
-        {b.metrics.map((m, i) => (
+        {metrics.map((m, i) => (
           <div className="stat" key={i}>
             <div className="k">{tx(m.k, lang)}</div>
             <div className="v" style={{
@@ -75,7 +145,7 @@ function DailyBrief({ data, lang, onNav, showToast }) {
               <div className="nsum" style={{ color: "var(--text)", fontSize: "var(--fs-lg)", lineHeight: 1.7 }}>
                 {regenerating
                   ? <span className="dim">{T("กำลังสร้างบทสรุปใหม่...", "Generating new summary...")}</span>
-                  : tx(b.bluf, lang)}
+                  : blufText}
               </div>
             </div>
             <div className="row" style={{ gap: 10, marginTop: 14 }}>
@@ -86,51 +156,60 @@ function DailyBrief({ data, lang, onNav, showToast }) {
             </div>
           </Panel>
 
-          {/* highlights */}
-          <Panel title={T("ประเด็นสำคัญ", "Key Developments")} icon="alert" flush>
+          {/* highlights — ข่าวเด่นจากฟีดจริง */}
+          <Panel title={T("ประเด็นสำคัญ", "Key Developments")} icon="alert" flush
+            action={<a className="panel-link" onClick={() => onNav("osint")}>{T("ดูฟีด", "Open feed")}<Icon name="chevR" size={12} /></a>}>
             <div className="feed">
-              {b.highlights.map((h, i) => (
-                <div className="feed-row" key={i}
-                  style={{ gridTemplateColumns: "auto 1fr auto", cursor: "pointer" }}
-                  onClick={() => onNav("incident", { id: h.inc })}>
-                  <div style={{ width: 3, alignSelf: "stretch", borderRadius: 3,
-                    background: window.SEV[h.sev].color }}></div>
-                  <div>
-                    <div className="evt-title" style={{ fontSize: "var(--fs-base)" }}>
-                      {tx(h, lang)}
+              {highlights.length === 0 && (
+                <div className="empty">{T("ยังไม่มีข่าวในฟีด", "No items in the feed yet")}</div>
+              )}
+              {highlights.map((n) => {
+                const sev = sevName(sevRank(n));
+                const timeStr = n.isLive ? window.mdaTimeAgo(n.time, lang) : (typeof n.ago === "object" ? tx(n.ago, lang) : (n.time || ""));
+                return (
+                  <div className="feed-row" key={n.id}
+                    style={{ gridTemplateColumns: "auto 1fr auto", cursor: "pointer" }}
+                    onClick={() => onNav("newsDetail", { item: n })}>
+                    <div style={{ width: 3, alignSelf: "stretch", borderRadius: 3,
+                      background: window.SEV[sev].color }}></div>
+                    <div>
+                      <div className="evt-title" style={{ fontSize: "var(--fs-base)" }}>
+                        {tx(n.raw, lang)}
+                      </div>
+                      <div className="row" style={{ gap: 8, marginTop: 5, flexWrap: "wrap" }}>
+                        <SevBadge sev={sev} lang={lang} />
+                        {window.MDA_DATA.sources[n.srcKey]
+                          ? <SrcChip srcKey={n.srcKey} withName lang={lang} />
+                          : <span className="tag">{n.outlet || n.srcKey}</span>}
+                        <span className="mute mono" style={{ fontSize: "var(--fs-xs)" }}>{timeStr}</span>
+                      </div>
                     </div>
-                    <div className="row" style={{ gap: 8, marginTop: 5 }}>
-                      <SevBadge sev={h.sev} lang={lang} />
-                      <span className="tag mono">{h.inc}</span>
-                    </div>
+                    <Icon name="chevR" size={15} style={{ color: "var(--text-mute)", alignSelf: "center" }} />
                   </div>
-                  <Icon name="chevR" size={15} style={{ color: "var(--text-mute)", alignSelf: "center" }} />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Panel>
 
           {/* outlook */}
           <Panel title={T("การคาดการณ์ 24 ชั่วโมง", "24-Hour Outlook")} icon="globe">
             <div className="nsum" style={{ color: "var(--text)", lineHeight: 1.7 }}>
-              {tx(b.outlook, lang)}
+              {outlookText}
             </div>
           </Panel>
         </div>
 
         {/* right sidebar */}
         <div className="col" style={{ gap: 12 }}>
-          <Panel title={T("ดัชนีภัยคุกคามรายภูมิภาค", "Threat Index by Region")} icon="shield">
-            {[
-              { a: T("ทะเลแดง / บับเอลมันเดบ", "Red Sea / Bab el-Mandeb"), v: 82, c: "var(--crit)" },
-              { a: T("ทะเลจีนใต้", "South China Sea"),    v: 71, c: "var(--accent)" },
-              { a: T("ทะเลดำ", "Black Sea"),              v: 68, c: "var(--accent)" },
-              { a: T("ทะเลบอลติก", "Baltic Sea"),         v: 54, c: "var(--info)" },
-              { a: T("อ่าวเอเดน / โซมาเลีย", "Gulf of Aden / Somali"), v: 46, c: "var(--info)" },
-            ].map((r, i) => (
+          <Panel title={T("ดัชนีภัยคุกคามรายภูมิภาค", "Threat Index by Region")} icon="shield"
+            action={<span className="dim mono" style={{ fontSize: "var(--fs-xs)" }}>{T("จากฟีดข่าว", "from feed")}</span>}>
+            {regions.length === 0 && (
+              <div className="dim" style={{ fontSize: "var(--fs-sm)" }}>{T("ยังไม่มีข้อมูลพื้นที่จากข่าว", "No regional signals yet")}</div>
+            )}
+            {regions.map((r, i) => (
               <div key={i} style={{ marginBottom: 11 }}>
                 <div className="row between" style={{ fontSize: "var(--fs-sm)", marginBottom: 5 }}>
-                  <span>{r.a}</span>
+                  <span>{r.a} <span className="mute mono" style={{ fontSize: "var(--fs-xs)" }}>· {r.n} {T("ข่าว", "items")}</span></span>
                   <span className="mono" style={{ color: r.c }}>{r.v}</span>
                 </div>
                 <div className="meter-track">
