@@ -159,6 +159,10 @@ function App() {
   const data = Object.assign({}, window.MDA_DATA, { events: liveEvents });
   const screenProps = { data, lang, onNav, showToast, addEvent };
 
+  // ---- การแจ้งเตือนจริง: เด้งเมื่อมีข่าว/เหตุการณ์ใหม่เข้าฟีด ----
+  const { news: feedNews } = window.useNewsUpdater(window.MDA_DATA.news);
+  const { notifications, unread: notifUnread, markAllSeen } = window.useNotifications(feedNews);
+
   const screens = {
     dashboard: <window.Dashboard {...screenProps} />,
     map:       <window.MapScreen  {...screenProps} initial={route.payload} />,
@@ -227,9 +231,11 @@ function App() {
           <div className="row" style={{ gap: 6 }}>
             <div className="icon-btn" style={{ position: "relative" }}
               title={T("ศูนย์แจ้งเตือน", "Alert Center")}
-              onClick={() => { setNotifOpen(o => !o); setSearchOpen(false); }}>
+              onClick={() => { const opening = !notifOpen; setNotifOpen(opening); setSearchOpen(false); if (opening) markAllSeen(); }}>
               <Icon name="bell" size={16} />
-              <span className="nav-badge" style={{ top: -4, right: -4, position: "absolute" }}>3</span>
+              {notifUnread > 0 && (
+                <span className="nav-badge" style={{ top: -4, right: -4, position: "absolute" }}>{notifUnread}</span>
+              )}
             </div>
             <div className="icon-btn"
               title={T("ค้นหา (Ctrl+K)", "Search (Ctrl+K)")}
@@ -286,6 +292,7 @@ function App() {
           onClose={() => setNotifOpen(false)}
           lang={lang}
           onNav={onNav}
+          items={notifications}
         />
 
         {/* SEARCH / COMMAND PALETTE */}
