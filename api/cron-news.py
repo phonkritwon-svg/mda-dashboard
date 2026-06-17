@@ -37,11 +37,15 @@ SOURCES = [
     {"key": "SPL",   "name": "Splash247",              "url": "https://splash247.com/feed/"},
     {"key": "MAREX", "name": "The Maritime Executive", "url": "https://www.maritime-executive.com/articles.rss"},
     {"key": "MLINK", "name": "MarineLink",             "url": "https://www.marinelink.com/news/rss"},
-    # --- ทหาร / ความขัดแย้งทางทะเล ---
+    # --- ทหาร / ความขัดแย้งทางทะเล / เกรย์โซน ---
     {"key": "NVT",   "name": "Naval Today",            "url": "https://navaltoday.com/feed/"},
     {"key": "USNI",  "name": "USNI News",              "url": "https://news.usni.org/feed"},
     {"key": "NAVN",  "name": "Naval News",             "url": "https://www.navalnews.com/feed/"},
     {"key": "AMTI",  "name": "CSIS AMTI",              "url": "https://amti.csis.org/feed/"},
+    # --- ภูมิภาคเอเชีย-แปซิฟิก / ชายแดนทางทะเลอาเซียน (The Diplomat) ---
+    # ใช้ key เดียวกัน → ข่าวเดียวกันจาก 2 ฟีดถูกรวม (dedupe ด้วย hash ของลิงก์)
+    {"key": "DIP",   "name": "The Diplomat",           "url": "https://thediplomat.com/topics/security/feed/"},
+    {"key": "DIP",   "name": "The Diplomat",           "url": "https://thediplomat.com/regions/southeast-asia/feed/"},
     # --- ประมงผิดกฎหมาย (IUU) ---
     {"key": "GFW",   "name": "Global Fishing Watch",   "url": "https://globalfishingwatch.org/feed/"},
 ]
