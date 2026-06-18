@@ -88,24 +88,6 @@ const SHIPPING_LANES = [
   { name: "Australia", pts: [[103.8,1.3],[112,-8],[115,-32],[115,-33.9],[130,-35],[151,-34],[174,-36.9]] },
 ];
 
-/* ── ชายแดนทางทะเลระหว่างประเทศไทยและเพื่อนบ้าน ── */
-const MARITIME_BOUNDARIES = [
-  /* ชายแดนทางน้ำไทย-พม่า (Andaman Sea) */
-  { name: "ไทย-พม่า", color: "#ff4444", pts: [[97.3,6.5],[98,7.5],[99.5,9],[100.5,10.5],[101,11.5]] },
-
-  /* ชายแดนทางน้ำไทย-กัมพูชา (Gulf of Thailand) */
-  { name: "ไทย-กัมพูชา", color: "#ff4444", pts: [[104,8],[104.5,10],[104.8,12],[105,13.5]] },
-
-  /* ชายแดนทางน้ำไทย-เวียดนาม (Gulf of Thailand) */
-  { name: "ไทย-เวียดนาม", color: "#ff4444", pts: [[105,13.5],[106,14],[107.5,15],[108.5,16]] },
-
-  /* ชายแดนทางน้ำไทย-มาเลเซีย (Strait of Malacca / Andaman Sea) */
-  { name: "ไทย-มาเลเซีย", color: "#ff4444", pts: [[99.5,5.5],[100.2,4.5],[101,2.5],[101.5,1.5],[102,0.5]] },
-
-  /* ชายแดนทางน้ำไทย-ลาว (Mekong River - not maritime but included) */
-  { name: "ไทย-ลาว", color: "#ff4444", pts: [[102,19],[103,18],[104,17],[105,16],[106,15],[107,14]] },
-];
-
 /* ── Strategic Chokepoints ── */
 const CHOKEPOINTS = [
   { name: "Bab el-Mandeb", lat: 12.6,  lon: 43.4,  risk: "high" },
@@ -281,17 +263,6 @@ function MapView({
         weight: zoomable ? 1.8 : 1.2,
         dashArray: "6 10",
       }).addTo(lanes);
-    });
-
-    /* เส้นแนวชายแดนทางทะเล (ไทยกับเพื่อนบ้าน) */
-    MARITIME_BOUNDARIES.forEach(boundary => {
-      const latlngs = boundary.pts.map(([lon, lat]) => [lat, lon]);
-      L.polyline(latlngs, {
-        color: boundary.color,
-        weight: zoomable ? 2.2 : 1.5,
-        dashArray: "8 6",
-        opacity: 0.75,
-      }).bindTooltip(boundary.name, { permanent: false, direction: "top" }).addTo(lanes);
     });
   }, [showLanes, zoomable]);
 
