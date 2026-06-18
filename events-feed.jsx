@@ -195,6 +195,25 @@ async function loadEventsFromSupabase() {
   }
 }
 
+// คิวรีคลังเหตุการณ์ย้อนหลังตามช่วงเวลา (เข้าถึงประวัติทั้งหมด ไม่ติด limit 200)
+async function queryEventsArchive(sinceISO, untilISO, limit) {
+  const SB = window.MDA_SB;
+  if (!SB) return [];
+  try {
+    let q = SB.from("events").select("*")
+      .order("published_at", { ascending: false })
+      .limit(limit || 2000);
+    if (sinceISO) q = q.gte("published_at", sinceISO);
+    if (untilISO) q = q.lte("published_at", untilISO);
+    const { data, error } = await q;
+    if (error) { console.warn("[MDA] events archive read", error.message); return []; }
+    return (data || []).map(eventRowToObj);
+  } catch (e) {
+    console.warn("[MDA] events archive read failed", e);
+    return [];
+  }
+}
+
 async function addEventToSupabase(obj) {
   const SB = window.MDA_SB;
   if (!SB) return { error: "no_supabase" };
@@ -233,6 +252,30 @@ function useEventsUpdater() {
     const id = setInterval(reload, EVENTS_REFRESH_MS);
     return () => clearInterval(id);
   }, [reload]);
+
+  // ── Supabase Realtime: เหตุการณ์ใหม่/อัปเดต เด้งเข้าทันที (~1 วินาที) ──
+  React.useEffect(() => {
+    const SB = window.MDA_SB;
+    if (!SB || !SB.channel) return;
+    const applyRow = (row) => {
+      if (!row) return;
+      const obj = eventRowToObj(row);
+      setEvents(prev => {
+        const map = new Map(prev.map(e => [e.id, e]));
+        map.set(obj.id, obj);
+        const arr = Array.from(map.values())
+          .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+        saveEventsCache(arr);
+        return arr;
+      });
+    };
+    // ชื่อ channel ไม่ซ้ำต่อ instance — กันชน topic เดิมเมื่อ hook ถูกเรียกซ้ำ
+    const ch = SB.channel("rt-events-" + Math.random().toString(36).slice(2))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "events" }, (p) => applyRow(p.new))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "events" }, (p) => applyRow(p.new))
+      .subscribe();
+    return () => { try { SB.removeChannel(ch); } catch (e) { /* ignore */ } };
+  }, []);
 
   // เพิ่มเหตุการณ์: แสดงทันที (optimistic) แล้วพยายามบันทึกลง Supabase
   const addEvent = React.useCallback(async (obj) => {
@@ -420,7 +463,7 @@ function AddEventButton({ addEvent, lang, showToast, className }) {
 }
 
 Object.assign(window, {
-  useEventsUpdater, addEventToSupabase, loadEventsFromSupabase,
+  useEventsUpdater, addEventToSupabase, loadEventsFromSupabase, queryEventsArchive,
   AddEventModal, AddEventButton, REGION_PRESETS,
   geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews,
 });

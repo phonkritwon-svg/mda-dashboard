@@ -6,12 +6,24 @@ const projX = (lon) => (lon + 180) / 360 * 1000;
 const projY = (lat) => (90 - lat)  / 180 * 500;
 const projPt = (lon, lat) => [projX(lon), projY(lat)];
 
+/* แผนที่ฐานตามธีม — ธีมสว่างใช้ CARTO Voyager (สีสันสดใส) */
+const CARTO = (style) => "https://{s}.basemaps.cartocdn.com/" + style + "/{z}/{x}/{y}{r}.png";
+const TILE_BY_THEME = {
+  dark:     CARTO("dark_all"),
+  light:    CARTO("light_all"),
+  daylight: CARTO("rastertiles/voyager"),
+  ocean:    CARTO("rastertiles/voyager"),
+  aurora:   CARTO("rastertiles/voyager"),
+};
+const tileForTheme = (theme) => TILE_BY_THEME[theme] || TILE_BY_THEME.dark;
+const currentTheme = () => document.documentElement.getAttribute("data-theme") || "dark";
+
 const MAP_STYLE = `
   @keyframes pulse-ring {
     0%   { transform: scale(0.4); opacity: 0.9; }
     100% { transform: scale(2.2); opacity: 0; }
   }
-  .leaflet-container { background: #050810 !important; font-family: var(--font-ui); }
+  .leaflet-container { background: var(--map-bg, #050810) !important; font-family: var(--font-ui); }
   .leaflet-control-zoom a {
     background: var(--surface-2) !important;
     border-color: var(--border-2) !important;
@@ -156,6 +168,7 @@ function MapView({
 }) {
   const containerRef = React.useRef(null);
   const mapRef       = React.useRef(null);
+  const tileRef      = React.useRef(null);
   const layersRef    = React.useRef({
     vessels: null, events: null, tracks: null, lanes: null, chokes: null,
   });
@@ -183,9 +196,9 @@ function MapView({
       maxBoundsViscosity:   1.0,
     });
 
-    /* primary dark tile layer */
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    /* basemap ตามธีมปัจจุบัน (สลับได้ภายหลังด้วย setUrl) */
+    tileRef.current = L.tileLayer(
+      tileForTheme(currentTheme()),
       { subdomains: "abcd", maxZoom: 19, detectRetina: true }
     ).addTo(map);
 
@@ -210,9 +223,21 @@ function MapView({
     return () => {
       map.remove();
       mapRef.current = null;
+      tileRef.current = null;
       layersRef.current = { vessels: null, events: null, tracks: null, lanes: null, chokes: null };
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── สลับ basemap เมื่อเปลี่ยนธีม (data-theme) ───────────────── */
+  React.useEffect(() => {
+    const el = document.documentElement;
+    const apply = () => {
+      if (tileRef.current) tileRef.current.setUrl(tileForTheme(currentTheme()));
+    };
+    const obs = new MutationObserver(apply);
+    obs.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
 
   /* ── resize observer ──────────────────────────────────────── */
   React.useEffect(() => {

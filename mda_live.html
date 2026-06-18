@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDA · Maritime Intelligence Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#020810;overflow:hidden}</style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const TC = {
+      CRITICAL:{c:"#ff3b3b",bg:"#1a0000"},
+      HIGH:{c:"#ff8c00",bg:"#1a0a00"},
+      MEDIUM:{c:"#ffd700",bg:"#1a1500"},
+      LOW:{c:"#00e5ff",bg:"#001a1f"},
+      INFO:{c:"#7b9ea8",bg:"#0a1318"},
+    };
+
+    const FALLBACK_NEWS = [
+      {id:1,threat:"CRITICAL",region:"South China Sea",title:"3 เรือไม่ทราบสัญชาติแล่นเข้าน่านน้ำไทยบริเวณช่องแคบมะละกา",summary:"พบเรือ 3 ลำปิด AIS สัญญาณเคลื่อนที่เข้าใกล้เขตแดนทางทะเล บริเวณ 6°N, 102°E ความเร็ว 12 นอต ทิศทาง NNW",assessment:"พฤติกรรมสอดคล้องกับรูปแบบของการลักลอบขนส่งหรือการลาดตระเวนโดยไม่ได้รับอนุญาต แนะนำส่งหน่วยเฝ้าระวังตรวจสอบ",source:"AIS Monitor / OSINT",time:"08:42 ICT",coords:"6°12'N 102°44'E",tags:["AIS-dark","Unknown vessel","Intrusion"],url:null},
+      {id:2,threat:"HIGH",region:"Gulf of Thailand",title:"รายงานการปฏิบัติการขุดเจาะน้ำมันผิดกฎหมายในอ่าวไทยตอนใต้",summary:"ดาวเทียม Sentinel-1 ตรวจพบโครงสร้างลอยน้ำขนาดใหญ่ที่ไม่มีในฐานข้อมูล ห่างจากชายฝั่ง 180 กม.",assessment:"โครงสร้างดังกล่าวคาดว่าเป็น Jackup rig ขนาดกลาง ไม่มีการลงทะเบียนกับ PTTEP หรือหน่วยงานที่เกี่ยวข้อง",source:"Sentinel-1 SAR / MarineTraffic",time:"07:15 ICT",coords:"7°30'N 101°22'E",tags:["Illegal drilling","SAR detection","Unregistered"],url:null},
+      {id:3,threat:"HIGH",region:"Andaman Sea",title:"เรือบรรทุกสินค้าต้องสงสัยจากเมียนมาเข้าเทียบท่าโดยไม่แจ้ง",summary:"MV Unknown ทะเบียน Belize ขนาด 2,400 DWT เข้าท่าเรือย่อยในจังหวัดระนอง ไม่มีการแจ้งล่วงหน้าตาม FAL Convention",assessment:"ประวัติเรือลำนี้เคยถูกพบในเส้นทางที่เกี่ยวข้องกับการขนส่งสินค้าต้องห้ามในปี 2023 ควรตรวจสอบสินค้าโดยด่วน",source:"Port Authority Report / Lloyd's",time:"06:30 ICT",coords:"9°58'N 98°38'E",tags:["Suspicious cargo","No-notice arrival","Belize flag"],url:null},
+      {id:4,threat:"MEDIUM",region:"South China Sea",title:"กองทัพเรือจีนซ้อมรบบริเวณสันดอนสการ์โบโร่ วันที่สอง",summary:"PLAN ดำเนินการฝึกซ้อมต่อเนื่องวันที่ 2 มีเรือพิฆาต 2 ลำ เรือฟริเกต 1 ลำ และเรือส่งกำลัง 1 ลำ",assessment:"การซ้อมรบสอดคล้องกับรูปแบบประจำปี แต่มีระยะเวลาและขนาดใกล้เคียงกับการฝึกปี 2022 ที่นำมาซึ่งการเผชิญหน้ากับฟิลิปปินส์",source:"Open Source / JANES",time:"05:00 ICT",coords:"15°07'N 117°44'E",tags:["PLAN exercise","Scarborough Shoal","SCS tension"],url:null},
+      {id:5,threat:"LOW",region:"Strait of Malacca",title:"ปรับปรุงรายงานสภาพอากาศ: คลื่นสูง 2-3 เมตรบริเวณช่องแคบ",summary:"BMKG รายงานสภาวะ Squall ในช่องแคบมะละกาตอนเหนือ คาดกินเวลา 36-48 ชม. เส้นทางเดินเรือบางส่วนได้รับผลกระทบ",assessment:"สภาพอากาศอาจเป็นปัจจัยกระตุ้นให้เรือเลี่ยงเส้นทาง ควรเฝ้าระวังการเปลี่ยนแปลง AIS track อย่างผิดปกติ",source:"BMKG / WMO",time:"04:00 ICT",coords:"5°20'N 100°18'E",tags:["Weather","Malacca Strait","Navigation advisory"],url:null},
+      {id:6,threat:"INFO",region:"Indian Ocean",title:"NATO Maritime Group 2 ผ่านมหาสมุทรอินเดียมุ่งหน้าตะวันออก",summary:"SNMG2 ประกอบด้วยเรือ 4 ลำจาก 3 ประเทศ กำลังเคลื่อนที่ผ่าน SLOC สำคัญ ETA ช่องแคบมะละกา +72 ชม.",assessment:"การเคลื่อนไหวตามปกติ ไม่มีนัยสำคัญด้านความมั่นคงต่อไทย แต่ควรจดบันทึกเพื่อสถานการณ์ภาพรวม",source:"NATO / MarineTraffic",time:"03:00 ICT",coords:"2°N 80°E",tags:["NATO","SNMG2","Routine transit"],url:null},
+    ];
+
+    const RSS_FEEDS = [
+      { url:"https://www.maritimebulletin.net/feed/",     label:"Maritime Bulletin" },
+      { url:"https://maritime-executive.com/rss",         label:"Maritime Executive" },
+      { url:"https://www.hellenicshippingnews.com/feed/", label:"Hellenic Shipping" },
+    ];
+    const RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
+    const REFRESH_MS = 5 * 60 * 1000;
+
+    function scoreThreat(text) {
+      const t = (text||"").toLowerCase();
+      if (/piracy|hijack|attack|explosion|sinking|hostage|armed robbery/.test(t)) return "CRITICAL";
+      if (/illegal|smuggling|suspicious|intrusion|unauthorized|seizure|detain|intercept/.test(t)) return "HIGH";
+      if (/exercise|drill|patrol|navy|deploy|military|tension|dispute|sanction/.test(t)) return "MEDIUM";
+      if (/weather|storm|typhoon|cyclone|advisory|wave|flood/.test(t)) return "LOW";
+      return "INFO";
+    }
+    function detectRegion(text) {
+      const t = (text||"").toLowerCase();
+      if (/south china sea|paracel|spratly|scarborough/.test(t)) return "South China Sea";
+      if (/gulf of thailand/.test(t)) return "Gulf of Thailand";
+      if (/malacca/.test(t)) return "Strait of Malacca";
+      if (/andaman/.test(t)) return "Andaman Sea";
+      if (/red sea|bab al-mandeb/.test(t)) return "Red Sea";
+      if (/arabian sea|gulf of aden/.test(t)) return "Arabian Sea";
+      if (/indian ocean/.test(t)) return "Indian Ocean";
+      return "Indo-Pacific";
+    }
+    function extractTags(text) {
+      const t = (text||"").toLowerCase();
+      const tags = [];
+      if (/piracy|hijack/.test(t)) tags.push("Piracy");
+      if (/navy|warship|frigate|destroyer/.test(t)) tags.push("Naval");
+      if (/smuggling|illegal/.test(t)) tags.push("Illegal activity");
+      if (/weather|storm/.test(t)) tags.push("Weather");
+      if (/exercise|drill/.test(t)) tags.push("Exercise");
+      if (/china/.test(t)) tags.push("China");
+      if (tags.length === 0) tags.push("OSINT");
+      return tags.slice(0,3);
+    }
+    function formatTime(dateStr) {
+      try {
+        return new Date(dateStr).toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",hour12:false}) + " ICT";
+      } catch { return "—"; }
+    }
+    function stripHtml(html) {
+      return (html||"").replace(/<[^>]*>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").trim().slice(0,280);
+    }
+
+    async function fetchFeed(feed) {
+      const res = await fetch(`${RSS2JSON}${encodeURIComponent(feed.url)}&count=10`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.status !== "ok") throw new Error("Feed error");
+      return (json.items||[]).map((item,i) => {
+        const combined = `${item.title} ${item.description}`;
+        return {
+          id:`${feed.label}-${i}-${Date.now()}`,
+          threat: scoreThreat(combined),
+          region: detectRegion(combined),
+          title: item.title||"Untitled",
+          summary: stripHtml(item.description)||item.title,
+          assessment:`แหล่งข่าว: ${feed.label} — ข้อมูล real-time จาก open-source feed`,
+          source: feed.label,
+          time: formatTime(item.pubDate),
+          coords:"—",
+          tags: extractTags(combined),
+          url: item.link||null,
+          pubDate: item.pubDate,
+        };
+      });
+    }
+
+    function useNewsData() {
+      const [news, setNews] = useState(FALLBACK_NEWS);
+      const [status, setStatus] = useState("idle");
+      const [lastUpdated, setLastUpdated] = useState(null);
+      const [usingFallback, setUsingFallback] = useState(true);
+
+      const refresh = useCallback(async () => {
+        setStatus("loading");
+        try {
+          const results = await Promise.allSettled(RSS_FEEDS.map(fetchFeed));
+          const all = results.filter(r=>r.status==="fulfilled").flatMap(r=>r.value);
+          if (all.length > 0) {
+            const order = {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,INFO:4};
+            all.sort((a,b)=>{
+              const d=(order[a.threat]||4)-(order[b.threat]||4);
+              return d!==0?d:new Date(b.pubDate||0)-new Date(a.pubDate||0);
+            });
+            setNews(all.slice(0,30));
+            setUsingFallback(false);
+            setStatus("live");
+          } else { setUsingFallback(true); setStatus("error"); }
+          setLastUpdated(new Date());
+        } catch { setUsingFallback(true); setStatus("error"); setLastUpdated(new Date()); }
+      }, []);
+
+      useEffect(()=>{
+        refresh();
+        const iv=setInterval(refresh,REFRESH_MS);
+        return ()=>clearInterval(iv);
+      },[refresh]);
+
+      return {news,status,lastUpdated,usingFallback,refresh};
+    }
+
+    const VESSELS=[
+      {id:"V001",name:"MV PACIFIC SPIRIT",flag:"🇹🇭",type:"Container",status:"MONITORED",speed:"14.2 kn",hdg:"045°",lat:"6.8",lon:"101.2",risk:"LOW"},
+      {id:"V002",name:"UNKNOWN-7842",flag:"🏴",type:"Unknown",status:"ALERT",speed:"12.0 kn",hdg:"335°",lat:"6.2",lon:"102.7",risk:"CRITICAL"},
+      {id:"V003",name:"MV STELLAR JADE",flag:"🇸🇬",type:"Tanker",status:"NORMAL",speed:"11.5 kn",hdg:"180°",lat:"1.2",lon:"103.8",risk:"LOW"},
+      {id:"V004",name:"MING HUA 7",flag:"🇨🇳",type:"Cargo",status:"MONITORED",speed:"9.8 kn",hdg:"270°",lat:"15.1",lon:"117.4",risk:"MEDIUM"},
+      {id:"V005",name:"MV ANDAMAN WAVE",flag:"🇲🇾",type:"Bulk carrier",status:"NORMAL",speed:"13.1 kn",hdg:"090°",lat:"5.4",lon:"100.3",risk:"LOW"},
+    ];
+
+    function Badge({level}){
+      const t=TC[level]||TC.INFO;
+      return <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.09em",padding:"2px 7px",borderRadius:3,color:t.c,background:t.bg,border:`1px solid ${t.c}40`,fontFamily:"monospace"}}>{level}</span>;
+    }
+    function Tag({label}){
+      return <span style={{fontSize:9,padding:"2px 5px",borderRadius:3,background:"#0d1f2d",color:"#3a7090",border:"1px solid #1a3344",fontFamily:"monospace"}}>{label}</span>;
+    }
+
+    function NewsDetail({item}){
+      const [aiStatus,setAiStatus]=useState("idle");
+      const [aiText,setAiText]=useState("");
+      const t=TC[item.threat]||TC.INFO;
+      const runAI=async()=>{
+        setAiStatus("loading"); setAiText("");
+        try {
+          const res=await fetch("https://api.anthropic.com/v1/messages",{
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:`คุณคือนักวิเคราะห์ข่าวกรองทางทะเลของกองทัพเรือไทย\n\nเหตุการณ์: ${item.title}\nภูมิภาค: ${item.region} | ภัยคุกคาม: ${item.threat}\nสถานการณ์: ${item.summary}\nแหล่งข่าว: ${item.source}\n\nวิเคราะห์เชิงลึกภาษาไทย:\n1. สรุปสถานการณ์ด้านความมั่นคงทางทะเล\n2. ผลกระทบต่อไทยและภูมิภาค\n3. ข้อเสนอแนะการตอบสนอง`}]})
+          });
+          const data=await res.json();
+          setAiText(data.content?.map(c=>c.text||"").join("")||"ไม่สามารถวิเคราะห์ได้");
+          setAiStatus("done");
+        } catch { setAiStatus("error"); }
+      };
+      return (
+        <div style={{padding:"18px 20px",animation:"fadeIn .2s ease"}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
+            <Badge level={item.threat}/>
+            <span style={{fontSize:9,color:"#3a5566",fontFamily:"monospace"}}>{item.source}</span>
+            <span style={{fontSize:9,color:"#3a5566",fontFamily:"monospace",marginLeft:"auto"}}>{item.time}</span>
+          </div>
+          <h2 style={{fontSize:14,fontWeight:700,color:"#d4eaf5",marginBottom:12,lineHeight:1.5}}>{item.title}</h2>
+          {item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",fontSize:8,color:"#3a7090",fontFamily:"monospace",marginBottom:10,textDecoration:"none",border:"1px solid #1a3344",borderRadius:3,padding:"2px 7px"}}>↗ OPEN SOURCE LINK</a>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+            <div style={{background:"#0a1822",border:"1px solid #1a3344",borderRadius:5,padding:"8px 10px"}}>
+              <div style={{fontSize:8,color:"#3a5566",letterSpacing:".07em",marginBottom:2}}>REGION</div>
+              <div style={{fontSize:11,color:"#7fbcd4",fontFamily:"monospace"}}>{item.region}</div>
+            </div>
+            <div style={{background:"#0a1822",border:"1px solid #1a3344",borderRadius:5,padding:"8px 10px"}}>
+              <div style={{fontSize:8,color:"#3a5566",letterSpacing:".07em",marginBottom:2}}>COORDINATES</div>
+              <div style={{fontSize:11,color:"#7fbcd4",fontFamily:"monospace"}}>{item.coords}</div>
+            </div>
+          </div>
+          <div style={{marginBottom:13}}>
+            <div style={{fontSize:9,color:"#3a8fa0",letterSpacing:".08em",marginBottom:4}}>// SITUATION REPORT</div>
+            <div style={{fontSize:12,color:"#a8c8d8",lineHeight:1.7,background:"#060d13",padding:"10px 12px",borderRadius:5,borderLeft:"2px solid #1a4455"}}>{item.summary}</div>
+          </div>
+          <div style={{marginBottom:13}}>
+            <div style={{fontSize:9,color:"#3a8fa0",letterSpacing:".08em",marginBottom:4}}>// INITIAL ASSESSMENT</div>
+            <div style={{fontSize:12,color:"#a8c8d8",lineHeight:1.7,background:"#060d13",padding:"10px 12px",borderRadius:5,borderLeft:`2px solid ${t.c}60`}}>{item.assessment}</div>
+          </div>
+          <div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:18}}>{item.tags.map(tg=><Tag key={tg} label={tg}/>)}</div>
+          <button onClick={runAI} disabled={aiStatus==="loading"||aiStatus==="done"} style={{display:"block",width:"100%",padding:"13px 0",background:aiStatus==="done"?"#001a0a":aiStatus==="loading"?"#0a1a22":"#0a2d3f",border:`1px solid ${aiStatus==="done"?"#00d97e40":aiStatus==="loading"?"#1a3344":"#1a6a8a"}`,borderRadius:6,color:aiStatus==="done"?"#00d97e":aiStatus==="loading"?"#3a5566":"#4ad4ff",fontFamily:"monospace",fontSize:12,fontWeight:700,letterSpacing:".1em",cursor:aiStatus==="loading"||aiStatus==="done"?"default":"pointer",transition:"all .15s"}}>
+            {aiStatus==="loading"&&"⟳  AI ANALYSIS IN PROGRESS..."}{aiStatus==="done"&&"✓  ANALYSIS COMPLETE"}{aiStatus==="error"&&"↺  RETRY ANALYSIS"}{aiStatus==="idle"&&"▶   RUN AI INTELLIGENCE ANALYSIS"}
+          </button>
+          {(aiStatus==="loading"||aiStatus==="done"||aiStatus==="error")&&(
+            <div style={{marginTop:14,background:"#040c14",border:"1px solid #1a3344",borderRadius:7,overflow:"hidden"}}>
+              <div style={{background:"#0a1e2d",padding:"7px 12px",borderBottom:"1px solid #1a3344",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:9,color:aiStatus==="error"?"#ff5555":"#00b8d4",fontWeight:700,letterSpacing:".07em"}}>◉ AI INTELLIGENCE ENGINE</span>
+                <span style={{fontSize:8,color:"#1f3550",marginLeft:"auto"}}>claude-sonnet · classified</span>
+              </div>
+              <div style={{padding:"12px 14px",fontSize:12,color:aiStatus==="error"?"#ff5555":"#a8c8d8",lineHeight:1.8,whiteSpace:"pre-wrap",fontFamily:"sans-serif"}}>
+                {aiStatus==="loading"&&<span style={{color:"#3a5566",fontFamily:"monospace"}}>กำลังประมวลผล intelligence analysis...</span>}
+                {aiStatus==="done"&&aiText}
+                {aiStatus==="error"&&"เกิดข้อผิดพลาดในการเชื่อมต่อ AI Engine"}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function FeedPage({label,news,feedStatus,lastUpdated,usingFallback,onRefresh}){
+      const [filter,setFilter]=useState("ALL");
+      const [selId,setSelId]=useState(null);
+      const items=filter==="ALL"?news:news.filter(n=>n.threat===filter);
+      const selItem=news.find(n=>n.id===selId);
+      return (
+        <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+          <div style={{width:340,flexShrink:0,borderRight:"1px solid #0d1f2a",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"12px 12px 10px",borderBottom:"1px solid #0d1f2a",background:"#040b14",flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em"}}>{label}</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  {feedStatus==="loading"&&<span style={{fontSize:8,color:"#ffd700",fontFamily:"monospace"}}>⟳ FETCHING...</span>}
+                  {feedStatus==="live"&&!usingFallback&&<span style={{fontSize:8,color:"#00d97e",fontFamily:"monospace"}}>◉ LIVE</span>}
+                  {feedStatus==="error"&&<span style={{fontSize:8,color:"#ff5555",fontFamily:"monospace"}}>⚠ OFFLINE</span>}
+                  {usingFallback&&feedStatus!=="loading"&&<span style={{fontSize:8,color:"#ff8c00",fontFamily:"monospace"}}>STATIC</span>}
+                  <button onClick={onRefresh} style={{background:"transparent",border:"1px solid #1a3344",borderRadius:3,color:"#3a5566",fontSize:9,cursor:"pointer",padding:"1px 5px",fontFamily:"monospace"}}>↺</button>
+                </div>
+              </div>
+              {lastUpdated&&<div style={{fontSize:7,color:"#1f3550",fontFamily:"monospace",marginBottom:6}}>LAST UPDATE: {lastUpdated.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})} ICT{usingFallback?" · FALLBACK DATA":` · ${news.length} ITEMS`}</div>}
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {["ALL","CRITICAL","HIGH","MEDIUM","LOW"].map(f=>(
+                  <button key={f} onClick={()=>setFilter(f)} style={{padding:"2px 7px",fontSize:9,fontFamily:"monospace",borderRadius:3,cursor:"pointer",border:`1px solid ${filter===f?"#1a5a7a":"#0d1f2a"}`,background:filter===f?"#0d2030":"transparent",color:filter===f?"#4ad4ff":"#2d4455",transition:"all .12s"}}>{f}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:7}}>
+              {items.map(item=>{
+                const t=TC[item.threat]||TC.INFO;
+                return (
+                  <div key={item.id} onClick={()=>setSelId(item.id)} style={{cursor:"pointer",background:selId===item.id?"#0c1d2c":"#080f16",padding:"11px 12px",marginBottom:6,borderRadius:"0 5px 5px 0",border:"1px solid #0f1f2a",borderLeft:`3px solid ${t.c}`,transition:"background .12s"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                      <Badge level={item.threat}/>
+                      <span style={{fontSize:9,color:"#3a5566",fontFamily:"monospace"}}>{item.time}</span>
+                    </div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#c8dde8",marginBottom:4,lineHeight:1.4}}>{item.title}</div>
+                    <div style={{fontSize:9,color:"#3a5566",marginBottom:5}}>📍 {item.region}</div>
+                    <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>{item.tags.map(tg=><Tag key={tg} label={tg}/>)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{flex:1,overflowY:"auto",background:"#050c14"}}>
+            {selItem?<NewsDetail key={selItem.id} item={selItem}/>:(
+              <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#1a3344",textAlign:"center",padding:30}}>
+                <div style={{fontSize:34,marginBottom:12,opacity:.3}}>◈</div>
+                <div style={{fontSize:10,letterSpacing:".1em",marginBottom:6}}>SELECT AN INTEL ITEM</div>
+                <div style={{fontSize:9,color:"#0d1f2a"}}>คลิกรายการทางซ้ายเพื่อดูรายละเอียด</div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function Dashboard({news}){
+      return (
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em",marginBottom:4}}>// MARITIME DOMAIN AWARENESS</div>
+            <div style={{fontSize:17,fontWeight:700,color:"#d4eaf5"}}>ศูนย์บัญชาการข่าวกรองทางทะเล</div>
+            <div style={{fontSize:8,color:"#2d4455",marginTop:3}}>SITUATION AS OF: {new Date().toLocaleString("th-TH",{dateStyle:"long",timeStyle:"short"})}</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+            {[
+              {i:"⬡",v:"1,247",l:"เรือในพื้นที่ AOR",d:"+12",up:true},
+              {i:"⚠",v:String(news.filter(n=>n.threat==="CRITICAL"||n.threat==="HIGH").length),l:"การแจ้งเตือนใหม่",d:"LIVE",up:true},
+              {i:"◈",v:"14",l:"AIS-Dark Events",d:"-2",up:false},
+              {i:"◉",v:String(news.length),l:"รายงาน OSINT",d:"LIVE",up:true},
+            ].map(m=>(
+              <div key={m.l} style={{background:"#080f16",border:"1px solid #0f1f2a",borderRadius:7,padding:"12px 13px"}}>
+                <div style={{fontSize:16,marginBottom:4}}>{m.i}</div>
+                <div style={{fontSize:22,fontWeight:700,color:"#d4eaf5",lineHeight:1}}>{m.v}</div>
+                <div style={{fontSize:9,color:"#3a5566",marginTop:3}}>{m.l}</div>
+                <div style={{fontSize:9,color:m.up?"#00d97e":"#ff5555",fontFamily:"monospace",marginTop:2}}>{m.up?"▲":"▼"} {m.d}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em",marginBottom:8}}>// THREAT DISTRIBUTION</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,marginBottom:16}}>
+            {Object.entries(TC).map(([k,t])=>{
+              const cnt=news.filter(n=>n.threat===k).length;
+              return <div key={k} style={{background:t.bg,border:`1px solid ${t.c}30`,borderRadius:5,padding:"9px 8px",textAlign:"center"}}>
+                <div style={{fontSize:19,fontWeight:700,color:t.c,fontFamily:"monospace",lineHeight:1}}>{cnt}</div>
+                <div style={{fontSize:8,color:t.c,fontFamily:"monospace",marginTop:2,opacity:.7}}>{k}</div>
+              </div>;
+            })}
+          </div>
+          <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em",marginBottom:8}}>// RECENT ACTIVITY LOG</div>
+          <div style={{background:"#060d13",border:"1px solid #0f1f2a",borderRadius:7,overflow:"hidden",marginBottom:16}}>
+            {news.slice(0,4).map((item,i)=>(
+              <div key={item.id} style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:9,borderBottom:i<3?"1px solid #0a1520":"none"}}>
+                <Badge level={item.threat}/>
+                <span style={{fontSize:11,color:"#8baab8",flex:1}}>{item.title}</span>
+                <span style={{fontSize:9,color:"#1f3550",flexShrink:0}}>{item.time}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em",marginBottom:8}}>// MARITIME SITUATION MAP (SCHEMATIC)</div>
+          <div style={{background:"#030a10",border:"1px solid #0f1f2a",borderRadius:7,padding:12}}>
+            <div style={{fontSize:8,color:"#1a3344",fontFamily:"monospace",marginBottom:7}}>REGION: SOUTHEAST ASIA · AOR · INDO-PACIFIC COMMAND</div>
+            <div style={{position:"relative",height:150}}>
+              {[{x:"20%",y:"55%",l:"Andaman Sea"},{x:"46%",y:"63%",l:"Gulf of Thailand"},{x:"67%",y:"40%",l:"South China Sea"},{x:"34%",y:"80%",l:"Malacca Strait"}].map(r=>(
+                <div key={r.l} style={{position:"absolute",left:r.x,top:r.y,fontSize:8,color:"#2a4a5a",transform:"translate(-50%,-50%)",textAlign:"center"}}>{r.l}</div>
+              ))}
+              {[{x:"47%",y:"51%",c:"#ff3b3b",s:10},{x:"43%",y:"65%",c:"#ff8c00",s:9},{x:"21%",y:"54%",c:"#ff8c00",s:9},{x:"65%",y:"37%",c:"#ffd700",s:8},{x:"36%",y:"81%",c:"#00e5ff",s:7}].map((d,i)=>(
+                <div key={i} style={{position:"absolute",left:d.x,top:d.y,width:d.s,height:d.s,borderRadius:"50%",background:d.c,boxShadow:`0 0 8px ${d.c}`,transform:"translate(-50%,-50%)"}}/>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function VesselsPage(){
+      const RC={CRITICAL:"#ff3b3b",HIGH:"#ff8c00",MEDIUM:"#ffd700",LOW:"#00d97e"};
+      const SC={ALERT:{bg:"#1a0000",c:"#ff3b3b"},MONITORED:{bg:"#1a0900",c:"#ff8c00"},NORMAL:{bg:"#001515",c:"#00e5ff"}};
+      return (
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+          <div style={{marginBottom:13}}>
+            <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em",marginBottom:4}}>// VESSEL TRACKING DATABASE</div>
+            <div style={{fontSize:15,fontWeight:700,color:"#d4eaf5"}}>ฐานข้อมูลเรือเฝ้าระวัง</div>
+          </div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:"monospace"}}>
+              <thead><tr>{["ID","VESSEL","FLAG","TYPE","SPEED","HDG","POSITION","RISK","STATUS"].map(h=>(
+                <th key={h} style={{padding:"7px 9px",textAlign:"left",fontSize:8,color:"#3a5566",letterSpacing:".07em",fontWeight:600,borderBottom:"1px solid #1a3344"}}>{h}</th>
+              ))}</tr></thead>
+              <tbody>{VESSELS.map((v,i)=>{
+                const s=SC[v.status]||SC.NORMAL;
+                return <tr key={v.id}>
+                  {[v.id,v.name,v.flag,v.type,v.speed,v.hdg,`${v.lat}°N ${v.lon}°E`].map((val,j)=>(
+                    <td key={j} style={{padding:"8px 9px",borderBottom:"1px solid #0a1520",background:i%2===0?"#060d13":"#080f16",color:j===1?"#c8dde8":"#8baab8"}}>{val}</td>
+                  ))}
+                  <td style={{padding:"8px 9px",borderBottom:"1px solid #0a1520",background:i%2===0?"#060d13":"#080f16",color:RC[v.risk]||"#fff",fontWeight:700}}>{v.risk}</td>
+                  <td style={{padding:"8px 9px",borderBottom:"1px solid #0a1520",background:i%2===0?"#060d13":"#080f16"}}>
+                    <span style={{fontSize:8,padding:"2px 7px",borderRadius:3,background:s.bg,color:s.c,border:`1px solid ${s.c}40`}}>{v.status}</span>
+                  </td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function AlertsPage({news}){
+      return (
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+          <div style={{marginBottom:13}}>
+            <div style={{fontSize:9,color:"#3a7a8a",letterSpacing:".08em",marginBottom:4}}>// PRIORITY ALERTS</div>
+            <div style={{fontSize:15,fontWeight:700,color:"#d4eaf5"}}>การแจ้งเตือนระดับสูง</div>
+          </div>
+          {news.filter(n=>n.threat==="CRITICAL"||n.threat==="HIGH").map(item=>{
+            const t=TC[item.threat];
+            return <div key={item.id} style={{marginBottom:12,padding:15,background:t.bg,border:`1px solid ${t.c}50`,borderLeft:`4px solid ${t.c}`,borderRadius:"0 7px 7px 0"}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}><Badge level={item.threat}/><span style={{fontSize:9,color:t.c,opacity:.7,fontFamily:"monospace"}}>{item.time}</span></div>
+              <div style={{fontSize:13,fontWeight:700,color:"#d4eaf5",marginBottom:5}}>{item.title}</div>
+              <div style={{fontSize:11,color:"#8baab8",lineHeight:1.6,marginBottom:7}}>{item.summary}</div>
+              <div style={{fontSize:11,color:t.c,background:"#00000040",padding:"7px 10px",borderRadius:4,lineHeight:1.6}}>▶ {item.assessment}</div>
+            </div>;
+          })}
+        </div>
+      );
+    }
+
+    function App(){
+      const [page,setPage]=useState("dashboard");
+      const [time,setTime]=useState("");
+      const {news,status:feedStatus,lastUpdated,usingFallback,refresh}=useNewsData();
+
+      useEffect(()=>{
+        const tick=()=>setTime(new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}));
+        tick(); const iv=setInterval(tick,1000); return()=>clearInterval(iv);
+      },[]);
+
+      const NAV=[{id:"dashboard",icon:"▦",label:"DASHBOARD"},{id:"feed",icon:"◈",label:"INTEL FEED"},{id:"analysis",icon:"◉",label:"ANALYSIS"},{id:"vessels",icon:"⬡",label:"VESSELS"},{id:"alerts",icon:"⚠",label:"ALERTS"}];
+
+      return (
+        <div style={{height:"100vh",background:"#020810",color:"#c8dde8",fontFamily:"'IBM Plex Mono',monospace",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <style>{`
+            *{box-sizing:border-box}
+            @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+            @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.6)}}
+            ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#040b12}::-webkit-scrollbar-thumb{background:#1a3344;border-radius:3px}
+          `}</style>
+          <div style={{background:"#030c17",borderBottom:"1px solid #0d2030",padding:"9px 16px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+            <div style={{width:28,height:28,borderRadius:"50%",background:"#0a3d5a",border:"1px solid #1a6080",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>⚓</div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#7fbcd4",letterSpacing:".06em"}}>MARITIME INTELLIGENCE CENTER</div>
+              <div style={{fontSize:8,color:"#1f3d52",letterSpacing:".1em"}}>กองทัพเรือไทย · RTNS · CLASSIFICATION: CONFIDENTIAL</div>
+            </div>
+            <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:16}}>
+              <div style={{textAlign:"right"}}>
+                {feedStatus==="live"&&!usingFallback&&<div style={{fontSize:8,color:"#00d97e",fontFamily:"monospace",letterSpacing:".08em"}}>◉ LIVE FEED ACTIVE</div>}
+                {feedStatus==="loading"&&<div style={{fontSize:8,color:"#ffd700",fontFamily:"monospace",letterSpacing:".08em"}}>⟳ FETCHING FEED...</div>}
+                {(feedStatus==="error"||usingFallback)&&feedStatus!=="loading"&&<div style={{fontSize:8,color:"#ff8c00",fontFamily:"monospace",letterSpacing:".08em"}}>⚠ STATIC DATA MODE</div>}
+                {lastUpdated&&<div style={{fontSize:7,color:"#1f3d52",fontFamily:"monospace"}}>UPDATED {lastUpdated.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",hour12:false})}</div>}
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#00c8e0",letterSpacing:".1em",fontFamily:"monospace"}}>{time}</div>
+                <div style={{fontSize:8,color:"#1f3d52"}}>ICT UTC+7</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                <div style={{width:7,height:7,borderRadius:"50%",background:"#00d97e",animation:"pulse 2s infinite"}}/>
+                <span style={{fontSize:8,color:"#00d97e",letterSpacing:".1em"}}>ONLINE</span>
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+            <div style={{width:158,background:"#030a11",borderRight:"1px solid #0d1f2a",display:"flex",flexDirection:"column",flexShrink:0}}>
+              {NAV.map(n=>(
+                <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 12px",background:page===n.id?"#0a1e2d":"transparent",border:"none",borderLeft:`2px solid ${page===n.id?"#00b8d4":"transparent"}`,color:page===n.id?"#7fd4f0":"#2d4455",fontSize:10,fontFamily:"monospace",letterSpacing:".07em",cursor:"pointer",fontWeight:page===n.id?700:400,textAlign:"left"}}>
+                  <span style={{fontSize:12,opacity:.8}}>{n.icon}</span>{n.label}
+                </button>
+              ))}
+              <div style={{margin:"14px 10px 0",borderTop:"1px solid #0a1822",paddingTop:10}}>
+                <div style={{fontSize:8,color:"#1a3344",letterSpacing:".1em",marginBottom:7}}>DATA SOURCES</div>
+                {[
+                  (feedStatus==="live"&&!usingFallback)?"🟢 Maritime Bulletin":"🔴 Maritime Bulletin",
+                  (feedStatus==="live"&&!usingFallback)?"🟢 Maritime Executive":"🔴 Maritime Executive",
+                  (feedStatus==="live"&&!usingFallback)?"🟢 Hellenic Shipping":"🔴 Hellenic Shipping",
+                  "🟢 AIS Monitor","🟡 JANES Open","🟢 BMKG"
+                ].map(s=><div key={s} style={{fontSize:8,color:"#1f3d52",marginBottom:5}}>{s}</div>)}
+              </div>
+            </div>
+            <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+              {page==="dashboard"&&<Dashboard news={news}/>}
+              {(page==="feed"||page==="analysis")&&<FeedPage label={page==="analysis"?"// ANALYSIS QUEUE":"// OSINT INTELLIGENCE FEED"} news={news} feedStatus={feedStatus} lastUpdated={lastUpdated} usingFallback={usingFallback} onRefresh={refresh}/>}
+              {page==="vessels"&&<VesselsPage/>}
+              {page==="alerts"&&<AlertsPage news={news}/>}
+            </div>
+          </div>
+          <div style={{background:"#020810",borderTop:"1px solid #0a1822",padding:"4px 16px",display:"flex",justifyContent:"space-between",flexShrink:0}}>
+            <span style={{fontSize:7,color:"#1a3344",fontFamily:"monospace"}}>MDA PLATFORM v2.5 · THAI ROYAL NAVY</span>
+            <span style={{fontSize:7,color:"#1a3344",fontFamily:"monospace"}}>{usingFallback?"STATIC DEMO DATA · ":"LIVE FEED · "}POWERED BY CLAUDE AI · AUTO-REFRESH 5MIN</span>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

@@ -133,12 +133,50 @@ function Osint({ data, lang, onNav }) {
   const { news: allNews, liveCount, fetching, lastFetch, fetchError, doFetch } =
     window.useNewsUpdater(data.news);
 
+  // ── เน้นเพื่อนบ้าน (กัมพูชา/พม่า/มาเลเซีย) — ดันขึ้นก่อน แต่ยังเห็นทั่วโลก ──
+  const [focusOn, setFocusOn] = useState(true);
+
+  // ── ช่วงเวลาที่สนใจ (time scope) ──────────────────────────────
+  const [scope, setScope]             = useState({ key: "all", from: "", to: "" });
+  const [archiveNews, setArchiveNews] = useState(null);   // ข่าวย้อนหลังจากคลัง
+  const [scopeLoading, setScopeLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (scope.key === "all") { setArchiveNews(null); setScopeLoading(false); return; }
+    const w = window.timeWindow(scope);
+    if (scope.key === "custom" && !w.since && !w.until) { setArchiveNews(null); return; }
+    setScopeLoading(true);
+    Promise.resolve(window.queryNewsArchive
+        ? window.queryNewsArchive(w.since && w.since.toISOString(), w.until && w.until.toISOString(), 2000)
+        : [])
+      .then(items => { if (active) { setArchiveNews(items); setScopeLoading(false); } })
+      .catch(() => { if (active) { setArchiveNews(null); setScopeLoading(false); } });
+    return () => { active = false; };
+  }, [scope.key, scope.from, scope.to]);
+
+  // รวมฟีดสด + คลังย้อนหลัง (dedupe by id) แล้วกรองตามช่วงเวลา
+  const scopedNews = useMemo(() => {
+    const w = window.timeWindow(scope);
+    let pool = allNews;
+    if (scope.key !== "all" && archiveNews) {
+      const m = new Map();
+      archiveNews.forEach(n => m.set(n.id, n));
+      allNews.forEach(n => m.set(n.id, n));   // live ทับ archived
+      pool = Array.from(m.values());
+    }
+    const filtered = scope.key === "all"
+      ? pool
+      : pool.filter(n => window.inTimeWindow(n.time, w.since, w.until));
+    return filtered.slice().sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+  }, [allNews, archiveNews, scope]);
+
   const domKeys = Object.keys(domSel).filter(k => domSel[k]);
   const srcKeys = Object.keys(srcSel).filter(k => srcSel[k]);
   const activeCount = domKeys.length + srcKeys.length + (onlyLive ? 1 : 0) + (onlyLinked ? 1 : 0);
 
   // เลือกหลายด้าน/หลายแหล่ง = OR ในกลุ่มเดียวกัน, AND ข้ามกลุ่ม; ไม่ติ๊ก = ไม่กรอง
-  const news = allNews.filter(n => {
+  const news = scopedNews.filter(n => {
     if (onlyLive && !n.isLive) return false;
     if (onlyLinked && !n.linkedInc) return false;
     if (srcKeys.length && !srcKeys.includes(n.srcKey)) return false;
@@ -150,11 +188,16 @@ function Osint({ data, lang, onNav }) {
   });
 
   const srcCounts = {};
-  allNews.forEach(n => { srcCounts[n.srcKey] = (srcCounts[n.srcKey] || 0) + 1; });
+  scopedNews.forEach(n => { srcCounts[n.srcKey] = (srcCounts[n.srcKey] || 0) + 1; });
 
   const domCounts = {};
-  allNews.forEach(n => (window.classifyThreats ? window.classifyThreats(n) : [])
+  scopedNews.forEach(n => (window.classifyThreats ? window.classifyThreats(n) : [])
     .forEach(k => { domCounts[k] = (domCounts[k] || 0) + 1; }));
+
+  // จัดกลุ่ม: ข่าวเพื่อนบ้านขึ้นก่อน แล้วตามด้วยทั่วโลก
+  const newsHay = (n) => [n.raw && n.raw.th, n.raw && n.raw.en,
+    n.ai && n.ai.th, n.ai && n.ai.en, n.outlet].filter(Boolean).join(" ");
+  const grouped = window.focusPartition(news, newsHay, focusOn);
 
   const lastFetchStr = lastFetch
     ? lastFetch.toLocaleTimeString(lang === "th" ? "th-TH" : "en-GB", { hour: "2-digit", minute: "2-digit" })
@@ -233,7 +276,7 @@ function Osint({ data, lang, onNav }) {
                         color="var(--ok)" label={T("ข่าวสด", "Live feeds")} count={liveCount} />
                     )}
                     <FilterCheck checked={onlyLinked} onToggle={() => setOnlyLinked(v => !v)}
-                      label={T("เชื่อมเหตุการณ์", "Linked to incident")} count={allNews.filter(n => n.linkedInc).length} />
+                      label={T("เชื่อมเหตุการณ์", "Linked to incident")} count={scopedNews.filter(n => n.linkedInc).length} />
                     <div className="divider" style={{ margin: "6px 0" }}></div>
                     {Object.entries(srcCounts).map(([k, c]) => {
                       const s = window.MDA_DATA.sources[k];
@@ -250,15 +293,29 @@ function Osint({ data, lang, onNav }) {
         </div>
       </div>
 
+      {/* time-period scope + neighbors focus */}
+      <div className="row" style={{ marginBottom: 10, justifyContent: "space-between",
+        alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <window.TimeScopeBar scope={scope} onChange={setScope} lang={lang}
+          loading={scopeLoading} count={news.length} />
+        <window.FocusToggle on={focusOn} onChange={setFocusOn} lang={lang} />
+      </div>
+
       <div className="grid" style={{ gridTemplateColumns: "1fr 330px", gap: 12, flex: 1, minHeight: 0 }}>
         {/* center feed */}
         <Panel flush title={T("สตรีมข่าวกรอง", "Intelligence Stream")} icon="feed"
           action={<span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>{news.length} {T("รายการ", "items")}</span>}
           style={{ minHeight: 0 }}>
           <div className="feed scroll-y" style={{ height: "100%" }}>
-            {news.length
-              ? news.map(n => <NewsRow key={n.id} n={n} lang={lang} onNav={onNav} />)
-              : <div className="empty">{T("ไม่มีรายการในตัวกรองนี้", "No items for this filter")}</div>}
+            {!news.length && <div className="empty">{T("ไม่มีรายการในตัวกรองนี้", "No items for this filter")}</div>}
+            {focusOn && grouped.focus.length > 0 && (
+              <window.FocusGroupLabel kind="focus" lang={lang} count={grouped.focus.length} />
+            )}
+            {grouped.focus.map(n => <NewsRow key={n.id} n={n} lang={lang} onNav={onNav} />)}
+            {focusOn && grouped.focus.length > 0 && grouped.rest.length > 0 && (
+              <window.FocusGroupLabel kind="rest" lang={lang} count={grouped.rest.length} />
+            )}
+            {grouped.rest.map(n => <NewsRow key={n.id} n={n} lang={lang} onNav={onNav} />)}
           </div>
         </Panel>
 

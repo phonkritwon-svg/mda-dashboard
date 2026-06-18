@@ -4,6 +4,14 @@
 const { useState: useStateA, useEffect: useEffectA, useCallback: useCallbackA } = React;
 
 const ACCENTS = { amber: "#e3b341", blue: "#4d9bf0", green: "#46c976", cyan: "#33d6c8" };
+// ธีม + สีพื้นหลังตัวอย่าง (swatch) สำหรับสลับเร็วบนแถบบน + ตัวเลือกใน Tweaks
+const THEMES = [
+  { value: "dark",     th: "มืด",     en: "Dark",     sw: "#070a0f" },
+  { value: "light",    th: "สว่าง",   en: "Light",    sw: "#eef1f5" },
+  { value: "daylight", th: "กลางวัน", en: "Daylight", sw: "#eaf2fd" },
+  { value: "ocean",    th: "ทะเล",    en: "Ocean",    sw: "#e0f3f2" },
+  { value: "aurora",   th: "ออโรรา",  en: "Aurora",   sw: "#f0edfe" },
+];
 const FONTS = {
   "IBM Plex Sans Thai": '"IBM Plex Sans Thai","IBM Plex Sans",system-ui,sans-serif',
   "Noto Sans Thai":     '"Noto Sans Thai",system-ui,sans-serif',
@@ -86,6 +94,57 @@ async function buildAppUser(session) {
   const role     = (prof && prof.role)      || meta.role      || "Operator";
   const avatar   = window.initialsOf ? window.initialsOf(name) : name.slice(0, 2);
   return { user: username, name, rank, role, avatar };
+}
+
+// สลับธีมเร็วจากแถบบน — เมนูเล็กพร้อมตัวอย่างสีพื้นหลัง
+function ThemeToggle({ lang, theme, setTheme }) {
+  const [open, setOpen] = useStateA(false);
+  const T = (th, en) => (lang === "th" ? th : en);
+  const cur = THEMES.find(x => x.value === theme) || THEMES[0];
+  return (
+    <div style={{ position: "relative" }}>
+      <button className="theme-toggle-btn"
+        title={T("เปลี่ยนธีม / สีพื้นหลัง & แผนที่", "Change theme / background & map")}
+        onClick={() => setOpen(o => !o)}>
+        <Icon name="contrast" size={15} />
+        <span className="tt-label">{T("ธีม", "Theme")}: {T(cur.th, cur.en)}</span>
+        <Icon name="chevR" size={12} style={{ transform: "rotate(90deg)", opacity: 0.6 }} />
+      </button>
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 150 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 151,
+            background: "var(--surface-2)", border: "1px solid var(--border-2)",
+            borderRadius: 10, boxShadow: "var(--shadow)", padding: 5, minWidth: 172,
+          }}>
+            <div style={{ padding: "5px 10px 6px", fontSize: 10, textTransform: "uppercase",
+              letterSpacing: "0.1em", color: "var(--text-mute)", fontFamily: "var(--font-mono)" }}>
+              {T("ธีม", "Theme")}
+            </div>
+            {THEMES.map(x => {
+              const active = x.value === theme;
+              return (
+                <div key={x.value}
+                  onClick={() => { setTheme(x.value); setOpen(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 10px",
+                    borderRadius: 7, cursor: "pointer", fontSize: "var(--fs-sm)",
+                    background: active ? "var(--surface-3)" : "transparent",
+                    color: active ? "var(--accent)" : "var(--text)", fontWeight: active ? 600 : 400 }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--surface-3)"; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                  <span style={{ width: 14, height: 14, borderRadius: "50%", flex: "none",
+                    background: x.sw, border: "1px solid var(--border-2)" }} />
+                  <span style={{ flex: 1 }}>{T(x.th, x.en)}</span>
+                  {active && <Icon name="check" size={14} style={{ color: "var(--accent)" }} />}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function App() {
@@ -221,14 +280,17 @@ function App() {
             </span>
           </div>
 
-          <div className="threatcon tc-elevated" title="Maritime Threat Condition">
-            <div className="lvl">III</div>
-            <div className="lbl">ELEVATED</div>
-          </div>
+          <img className="topbar-logo" src="logo.jpg?v=2"
+            alt={T("กรมการสื่อสารและเทคโนโลยีสารสนเทศทหารเรือ",
+                   "Naval Communications and Information Technology Department")}
+            title={T("กรมการสื่อสารและเทคโนโลยีสารสนเทศทหารเรือ",
+                     "Naval Communications and Information Technology Department")}
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
 
           <Clock lang={lang} />
 
           <div className="row" style={{ gap: 6 }}>
+            <ThemeToggle lang={lang} theme={t.theme} setTheme={(v) => setTweak("theme", v)} />
             <div className="icon-btn" style={{ position: "relative" }}
               title={T("ศูนย์แจ้งเตือน", "Alert Center")}
               onClick={() => { const opening = !notifOpen; setNotifOpen(opening); setSearchOpen(false); if (opening) markAllSeen(); }}>
@@ -311,8 +373,9 @@ function App() {
           <TweakSection label={T("ภาษา & ธีม", "Language & Theme")} />
           <TweakRadio label={T("ภาษา", "Language")} value={lang}
             options={["th", "en"]} onChange={(v) => setTweak("language", v)} />
-          <TweakRadio label={T("โหมดสี", "Mode")} value={t.theme}
-            options={["dark", "light"]} onChange={(v) => setTweak("theme", v)} />
+          <TweakRadio label={T("ธีม", "Theme")} value={t.theme}
+            options={THEMES.map(x => ({ value: x.value, label: T(x.th, x.en) }))}
+            onChange={(v) => setTweak("theme", v)} />
           <TweakColor label={T("สีเน้น", "Accent")} value={ACCENTS[t.accent]}
             options={Object.values(ACCENTS)}
             onChange={(hex) => setTweak("accent",

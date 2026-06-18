@@ -165,9 +165,19 @@ function LoginScreen({ onLogin }) {
         boxShadow: "var(--shadow), 0 0 80px rgba(var(--accent-rgb),0.08)",
         overflow: "hidden", maxHeight: "92vh", overflowY: "auto",
       }}>
+        {/* department logo banner */}
+        <div style={{ padding: "20px 24px 4px", display: "flex", justifyContent: "center" }}>
+          <div className="login-logo-plate">
+            <img src="logo.jpg?v=2"
+              alt={T("กรมการสื่อสารและเทคโนโลยีสารสนเทศทหารเรือ",
+                     "Naval Communications and Information Technology Department")}
+              onError={(e) => { e.currentTarget.closest(".login-logo-plate").style.display = "none"; }} />
+          </div>
+        </div>
+
         {/* header */}
         <div style={{
-          padding: "22px 24px 16px", borderBottom: "1px solid var(--border)",
+          padding: "16px 24px 16px", borderBottom: "1px solid var(--border)",
           background: "linear-gradient(135deg, rgba(var(--accent-rgb),0.06) 0%, transparent 100%)",
         }}>
           <div className="row" style={{ gap: 13, marginBottom: 14 }}>

@@ -69,6 +69,64 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
 
   const ofInterest = vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
+  // ── ช่วงเวลาที่สนใจ (time scope) สำหรับรายการเหตุการณ์ + หมุดบนแผนที่ ──
+  const [evScope, setEvScope]           = useState({ key: "all", from: "", to: "" });
+  const [evArchive, setEvArchive]       = useState(null);
+  const [evScopeLoading, setEvScopeLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (evScope.key === "all") { setEvArchive(null); setEvScopeLoading(false); return; }
+    const w = window.timeWindow(evScope);
+    if (evScope.key === "custom" && !w.since && !w.until) { setEvArchive(null); return; }
+    setEvScopeLoading(true);
+    Promise.resolve(window.queryEventsArchive
+        ? window.queryEventsArchive(w.since && w.since.toISOString(), w.until && w.until.toISOString(), 2000)
+        : [])
+      .then(items => { if (active) { setEvArchive(items); setEvScopeLoading(false); } })
+      .catch(() => { if (active) { setEvArchive(null); setEvScopeLoading(false); } });
+    return () => { active = false; };
+  }, [evScope.key, evScope.from, evScope.to]);
+
+  const scopedEvents = React.useMemo(() => {
+    const w = window.timeWindow(evScope);
+    let pool = data.events;
+    if (evScope.key !== "all" && evArchive) {
+      const m = new Map();
+      evArchive.forEach(e => m.set(e.id, e));
+      data.events.forEach(e => m.set(e.id, e));   // live ทับ archived
+      pool = Array.from(m.values());
+    }
+    const filtered = evScope.key === "all"
+      ? pool
+      : pool.filter(e => window.inTimeWindow(e.publishedAt, w.since, w.until));
+    return filtered.slice().sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+  }, [data.events, evArchive, evScope]);
+
+  // เน้นเพื่อนบ้าน (กัมพูชา/พม่า/มาเลเซีย): ดันเหตุการณ์ขึ้นก่อน แต่ยังเห็นทั่วโลก
+  const [evFocusOn, setEvFocusOn] = useState(true);
+  const evHay = (e) => [tx(e.title, "th"), tx(e.title, "en"), tx(e.region, "th"), tx(e.region, "en"),
+    tx(e.area, "th"), tx(e.area, "en"), tx(e.summary, "th"), tx(e.summary, "en"),
+    e.cat, e.source && e.source.outlet].filter(Boolean).join(" ");
+  const evGroups = window.focusPartition(scopedEvents, evHay, evFocusOn);
+  const renderEvtRow = (e) => (
+    <div key={e.id} className="feed-row evt-row" style={{ gridTemplateColumns: "1fr auto" }}
+      onClick={() => onNav("incident", { id: e.id })}>
+      <div className="evt-main">
+        <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+          <SevBadge sev={e.sev} lang={lang} />
+          <span className="mono mute" style={{ fontSize: "var(--fs-xs)" }}>{e.time}</span>
+        </div>
+        <div className="evt-title" style={{ fontSize: "var(--fs-sm)" }}>{tx(e.title, lang)}</div>
+        <div className="evt-meta">
+          <SrcChip srcKey={e.srcKey} />
+          <span>{e.cat}</span>
+        </div>
+      </div>
+      <Icon name="chevR" size={15} style={{ color: "var(--text-mute)", alignSelf: "center" }} />
+    </div>
+  );
+
   const q = search.trim().toLowerCase();
   const filteredVessels = vessels.filter(v => {
     // สถานะ (แท็บ)
@@ -264,7 +322,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
       <div className="grid" style={{ gridTemplateColumns: "1fr 330px", gap: 12, flex: 1, minHeight: 0 }}>
         {/* MAP */}
         <div className="panel" style={{ padding: 0, position: "relative", overflow: "hidden", isolation: "isolate", borderRadius: 0, border: "none" }}>
-          <MapView vessels={filteredVessels} events={data.events} lang={lang}
+          <MapView vessels={filteredVessels} events={scopedEvents} lang={lang}
             selected={selected} onSelect={setSelected} focus={focus} view={mapView}
             onSelectEvent={(e) => onNav("incident", { id: e.id })}
             showTracks={layers.tracks} showEvents={visible.incidents}
@@ -380,34 +438,28 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           <div className="scroll-y" style={{ height: "100%" }}>
             {tab === "events" ? (
               <div className="feed">
-                <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
+                <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)",
+                  display: "flex", flexDirection: "column", gap: 8 }}>
                   {window.AddEventButton &&
                     <window.AddEventButton addEvent={addEvent} lang={lang} showToast={showToast}
                       className="btn btn-ghost btn-sm" />}
+                  <window.TimeScopeBar scope={evScope} onChange={setEvScope} lang={lang}
+                    loading={evScopeLoading} count={scopedEvents.length} />
+                  <window.FocusToggle on={evFocusOn} onChange={setEvFocusOn} lang={lang} />
                 </div>
-                {!data.events.length && (
-                  <div className="empty">{T("ยังไม่มีเหตุการณ์บนแผนที่", "No events on the map yet")}</div>
+                {!scopedEvents.length && (
+                  <div className="empty">{evScope.key === "all"
+                    ? T("ยังไม่มีเหตุการณ์บนแผนที่", "No events on the map yet")
+                    : T("ไม่มีเหตุการณ์ในช่วงเวลานี้", "No events in this period")}</div>
                 )}
-                {data.events.map(e => (
-                  <div key={e.id} className="feed-row evt-row"
-                    style={{ gridTemplateColumns: "1fr auto" }}
-                    onClick={() => onNav("incident", { id: e.id })}>
-                    <div className="evt-main">
-                      <div className="row" style={{ gap: 8, marginBottom: 4 }}>
-                        <SevBadge sev={e.sev} lang={lang} />
-                        <span className="mono mute" style={{ fontSize: "var(--fs-xs)" }}>{e.time}</span>
-                      </div>
-                      <div className="evt-title" style={{ fontSize: "var(--fs-sm)" }}>
-                        {tx(e.title, lang)}
-                      </div>
-                      <div className="evt-meta">
-                        <SrcChip srcKey={e.srcKey} />
-                        <span>{e.cat}</span>
-                      </div>
-                    </div>
-                    <Icon name="chevR" size={15} style={{ color: "var(--text-mute)", alignSelf: "center" }} />
-                  </div>
-                ))}
+                {evFocusOn && evGroups.focus.length > 0 && (
+                  <window.FocusGroupLabel kind="focus" lang={lang} count={evGroups.focus.length} />
+                )}
+                {evGroups.focus.map(renderEvtRow)}
+                {evFocusOn && evGroups.focus.length > 0 && evGroups.rest.length > 0 && (
+                  <window.FocusGroupLabel kind="rest" lang={lang} count={evGroups.rest.length} />
+                )}
+                {evGroups.rest.map(renderEvtRow)}
               </div>
             ) : (
               <table className="tbl">

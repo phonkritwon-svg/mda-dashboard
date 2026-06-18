@@ -89,16 +89,57 @@ async function fetchOneFeed(src) {
   }
 }
 
+// ── การแปลเป็นไทย: เก็บแคช + แปลทั้งหมด ──
+const TRANSLATION_CACHE_KEY = "MDA_TRANSLATIONS_v1";
+
+function loadTranslationCache() {
+  try {
+    const raw = localStorage.getItem(TRANSLATION_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveTranslationCache(cache) {
+  try { localStorage.setItem(TRANSLATION_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+// hash = simple id for caching by content
+function contentHash(text) {
+  let h = 0;
+  for (let i = 0; i < Math.min(text.length, 100); i++) {
+    h = ((h << 5) - h) + text.charCodeAt(i);
+    h = h & h; // Convert to 32bit integer
+  }
+  return String(Math.abs(h));
+}
+
 async function aiSummarizeTh(items) {
-  // Only items that don't yet have a Thai summary
-  const needSummary = items.filter(n => n.isLive && n.raw.en === n.raw.th);
-  if (!needSummary.length) return items;
+  const cache = loadTranslationCache();
+  const needTranslate = items.filter(n => {
+    const hash = contentHash(n.raw.en || "");
+    return !cache[hash];
+  });
+
+  if (!needTranslate.length) {
+    // apply cached translations
+    return items.map(n => {
+      const hash = contentHash(n.raw.en || "");
+      const cached = cache[hash];
+      if (!cached) return n;
+      return {
+        ...n,
+        raw: { th: cached.th_title || n.raw.en, en: n.raw.en },
+        ai:  { th: cached.th_summary || n.ai.en, en: n.ai.en },
+      };
+    });
+  }
+
   try {
     const res = await fetch("/api/summarize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        items: needSummary.map((n, i) => ({
+        items: needTranslate.map((n, i) => ({
           index: i,
           id: n.id,
           title: n.raw.en,
@@ -109,13 +150,22 @@ async function aiSummarizeTh(items) {
     });
     const data = await res.json();
     if (!data.summaries || data.error) return items;
-    const byId = {};
+
+    // บันทึกลง cache
+    const newCache = { ...cache };
     data.summaries.forEach((s, i) => {
-      const orig = needSummary[s.index !== undefined ? s.index : i];
-      if (orig) byId[orig.id] = s;
+      const orig = needTranslate[s.index !== undefined ? s.index : i];
+      if (orig) {
+        const hash = contentHash(orig.raw.en || "");
+        newCache[hash] = s;
+      }
     });
+    saveTranslationCache(newCache);
+
+    // apply to all items
     return items.map(n => {
-      const s = byId[n.id];
+      const hash = contentHash(n.raw.en || "");
+      const s = newCache[hash];
       if (!s) return n;
       return {
         ...n,
@@ -211,6 +261,27 @@ async function loadFromSupabase() {
   }
 }
 
+// คิวรีคลังข่าวย้อนหลังตามช่วงเวลา (ทะลุ limit 200 ของฟีดสด → เข้าถึงประวัติทั้งหมด) + แปลไทย
+async function queryNewsArchive(sinceISO, untilISO, limit) {
+  const SB = window.MDA_SB;
+  if (!SB) return [];
+  try {
+    let q = SB.from("news").select("*")
+      .order("published_at", { ascending: false })
+      .limit(limit || 2000);
+    if (sinceISO) q = q.gte("published_at", sinceISO);
+    if (untilISO) q = q.lte("published_at", untilISO);
+    const { data, error } = await q;
+    if (error) { console.warn("[MDA] news archive read", error.message); return []; }
+    let items = (data || []).map(rowToItem);
+    items = await aiSummarizeTh(items);
+    return items;
+  } catch (e) {
+    console.warn("[MDA] news archive read failed", e);
+    return [];
+  }
+}
+
 async function pushToSupabase(items) {
   const SB = window.MDA_SB;
   if (!SB || !items.length) return;
@@ -254,9 +325,10 @@ function useNewsUpdater(baseNews) {
   React.useEffect(() => {
     let active = true;
     (async () => {
-      // แสดงข่าวกลางจาก Supabase ทันที
-      const shared = await loadFromSupabase();
+      // แสดงข่าวกลางจาก Supabase ทันที + แปลเป็นไทย
+      let shared = await loadFromSupabase();
       if (active && shared.length) {
+        shared = await aiSummarizeTh(shared);
         saveNewsCache(shared);
         setLiveNews(shared);
       } else if (active) {
@@ -268,6 +340,32 @@ function useNewsUpdater(baseNews) {
     return () => { active = false; clearInterval(id); };
   }, [doFetch]);
 
+  // ── Supabase Realtime: ข่าวใหม่/อัปเดต เด้งเข้าทันที (~1 วินาที) + แปลไทย ──
+  React.useEffect(() => {
+    const SB = window.MDA_SB;
+    if (!SB || !SB.channel) return;
+    const applyRow = async (row) => {
+      if (!row) return;
+      let item = rowToItem(row);
+      item = (await aiSummarizeTh([item]))[0];
+      setLiveNews(prev => {
+        const map = new Map(prev.map(n => [n.id, n]));
+        map.set(item.id, item);
+        const arr = Array.from(map.values())
+          .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+        saveNewsCache(arr);
+        return arr;
+      });
+      setLastFetch(new Date());
+    };
+    // ชื่อ channel ไม่ซ้ำต่อ instance (hook ถูกเรียกหลายจอ) — กันชน topic เดิม
+    const ch = SB.channel("rt-news-" + Math.random().toString(36).slice(2))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "news" }, (p) => applyRow(p.new))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "news" }, (p) => applyRow(p.new))
+      .subscribe();
+    return () => { try { SB.removeChannel(ch); } catch (e) { /* ignore */ } };
+  }, []);
+
   const merged = React.useMemo(
     () => mergeWithBase(liveNews, baseNews),
     [liveNews, baseNews]
@@ -278,5 +376,6 @@ function useNewsUpdater(baseNews) {
 
 Object.assign(window, {
   useNewsUpdater, mdaTimeAgo, LIVE_SOURCES, fetchAllLiveNews,
-  loadFromSupabase, pushToSupabase,
+  loadFromSupabase, pushToSupabase, queryNewsArchive, aiSummarizeTh,
+  loadTranslationCache, saveTranslationCache,
 });

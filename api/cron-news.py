@@ -228,6 +228,13 @@ REGIONS = [
     (re.compile(r"red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen", re.I),     ("Red Sea / Bab el-Mandeb", "ทะเลแดง / บับเอลมันเดบ", 13.5, 43.3)),
     (re.compile(r"strait of hormuz|hormuz|fujairah|persian gulf", re.I),   ("Strait of Hormuz",        "ช่องแคบฮอร์มุซ",        26.5, 56.3)),
     (re.compile(r"gulf of aden|\baden\b", re.I),                           ("Gulf of Aden",            "อ่าวเอเดน",             12.5, 47.0)),
+    # --- พื้นที่เน้น: เพื่อนบ้านของไทย (กัมพูชา / เมียนมา / มาเลเซีย) — มาก่อนภูมิภาคกว้าง ---
+    (re.compile(r"cambodia|cambodian|khmer|sihanoukville|sihanouk|koh ?kong|kampong som|\bream\b|kampot", re.I),
+                                                                           ("Cambodia Coast / Gulf of Thailand", "ชายฝั่งกัมพูชา / อ่าวไทย", 10.6, 103.5)),
+    (re.compile(r"myanmar|burma|burmese|rakhine|arakan|sittwe|kyauk ?phyu|kyaukpyu|coco island|great coco|mergui|myeik|tanintharyi|yangon|naypyidaw|irrawaddy|rohingya", re.I),
+                                                                           ("Myanmar Coast / Andaman–Bay of Bengal", "ชายฝั่งเมียนมา / อันดามัน–เบงกอล", 15.5, 94.5)),
+    (re.compile(r"malaysia|malaysian|melaka|johor|sabah|sarawak|kota kinabalu|labuan|lumut|langkawi|penang|port klang|kuala lumpur|putrajaya", re.I),
+                                                                           ("Malaysia / Malacca–Borneo", "มาเลเซีย / มะละกา–บอร์เนียว", 4.0, 109.5)),
     (re.compile(r"south china sea|scarborough|spratly|paracel|second thomas|taiwan strait", re.I), ("South China Sea", "ทะเลจีนใต้",  15.0, 117.0)),
     (re.compile(r"strait of malacca|malacca|singapore strait", re.I),      ("Strait of Malacca",       "ช่องแคบมะละกา",         2.5,  101.0)),
     (re.compile(r"gulf of thailand", re.I),                                ("Gulf of Thailand",        "อ่าวไทย",               9.5,  101.5)),

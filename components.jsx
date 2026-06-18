@@ -50,6 +50,7 @@ const ICON_PATHS = {
   cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>',
   wave: '<path d="M2 8c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 14c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
 };
 function Icon({ name, size = 24, style, className, strokeWidth = 1.8 }) {
   return (
@@ -201,7 +202,150 @@ const VTYPE = {
   dark:    { color:"#f6553f", label:{th:"เรือปิดสัญญาณ",en:"Dark / Unknown"} },
 };
 
+/* ============================================================
+   Time-period scope — shared by OSINT feed + Map events list
+   scope = { key: '24h'|'7d'|'30d'|'all'|'custom', from:'YYYY-MM-DD', to:'YYYY-MM-DD' }
+   ============================================================ */
+const TIME_PRESETS = [
+  { key: "24h", th: "24 ชม.",  en: "24h" },
+  { key: "7d",  th: "7 วัน",   en: "7d" },
+  { key: "30d", th: "30 วัน",  en: "30d" },
+  { key: "all", th: "ทั้งหมด", en: "All" },
+];
+
+// แปลง scope → ช่วงเวลา {since, until} (Date | null)
+function timeWindow(scope) {
+  const now = new Date();
+  const back = (days) => new Date(now.getTime() - days * 86400000);
+  switch (scope && scope.key) {
+    case "24h": return { since: back(1),  until: null };
+    case "7d":  return { since: back(7),  until: null };
+    case "30d": return { since: back(30), until: null };
+    case "custom": return {
+      since: scope.from ? new Date(scope.from + "T00:00:00") : null,
+      until: scope.to   ? new Date(scope.to   + "T23:59:59") : null,
+    };
+    default: return { since: null, until: null }; // all
+  }
+}
+
+function inTimeWindow(iso, since, until) {
+  if (!since && !until) return true;
+  const t = iso ? new Date(iso).getTime() : NaN;
+  if (isNaN(t)) return false;
+  if (since && t < since.getTime()) return false;
+  if (until && t > until.getTime()) return false;
+  return true;
+}
+
+function TimeScopeBar({ scope, onChange, lang, loading, count }) {
+  const T = (th, en) => (lang === "th" ? th : en);
+  const set = (patch) => onChange(Object.assign({ key: "all", from: "", to: "" }, scope, patch));
+  const isCustom = scope.key === "custom";
+  const dateStyle = {
+    height: 26, padding: "0 7px", fontSize: 11, borderRadius: 6,
+    background: "var(--surface-2)", border: "1px solid var(--border-2)",
+    color: "var(--text)", fontFamily: "var(--font-mono)", colorScheme: "light dark",
+  };
+  return (
+    <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <Icon name="clock" size={14} style={{ color: "var(--text-dim)", flex: "none" }} />
+      <div className="row" style={{ gap: 4 }}>
+        {TIME_PRESETS.map(p => (
+          <button key={p.key}
+            className={"btn btn-sm " + (scope.key === p.key ? "btn-primary" : "btn-ghost")}
+            style={{ padding: "3px 10px" }}
+            onClick={() => set({ key: p.key })}>{T(p.th, p.en)}</button>
+        ))}
+        <button
+          className={"btn btn-sm " + (isCustom ? "btn-primary" : "btn-ghost")}
+          style={{ padding: "3px 10px" }}
+          title={T("กำหนดช่วงเวลาเอง", "Custom date range")}
+          onClick={() => set({ key: "custom" })}>
+          {T("กำหนดเอง", "Custom")}
+        </button>
+      </div>
+      {isCustom && (
+        <div className="row" style={{ gap: 5, alignItems: "center" }}>
+          <input type="date" value={scope.from || ""} max={scope.to || undefined}
+            onChange={e => set({ key: "custom", from: e.target.value })} style={dateStyle} />
+          <span className="dim" style={{ fontSize: 12 }}>–</span>
+          <input type="date" value={scope.to || ""} min={scope.from || undefined}
+            onChange={e => set({ key: "custom", to: e.target.value })} style={dateStyle} />
+        </div>
+      )}
+      {loading && <span className="dim" style={{ fontSize: "var(--fs-xs)" }}>
+        <span className="flash"></span> {T("กำลังค้นคลังข้อมูล…", "Querying archive…")}</span>}
+      {count != null && !loading && (
+        <span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>{count} {T("รายการ", "items")}</span>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Focus countries — concentrate on Cambodia, Burma (Myanmar), Malaysia
+   "prioritize but keep global": matching items float to the top,
+   the rest of the world is still shown below.
+   ============================================================ */
+const FOCUS_COUNTRIES = [
+  { key: "KH", th: "กัมพูชา", en: "Cambodia",
+    rx: /cambodia|cambodian|khmer|sihanoukville|sihanouk|koh ?kong|kampong som|\bream\b|kampot|กัมพูชา|เขมร|สีหนุ|เกาะกง|เรียม|กัมปอต/i },
+  { key: "MM", th: "เมียนมา (พม่า)", en: "Myanmar (Burma)",
+    rx: /myanmar|burma|burmese|rakhine|arakan|sittwe|kyauk ?phyu|kyaukpyu|coco island|great coco|mergui|myeik|tanintharyi|yangon|naypyidaw|irrawaddy|rohingya|เมียนมา|พม่า|ยะไข่|มะริด|ย่างกุ้ง|โรฮิงญา|อิระวดี/i },
+  { key: "MY", th: "มาเลเซีย", en: "Malaysia",
+    rx: /malaysia|malaysian|\bmalacca\b|melaka|johor|sabah|sarawak|kota kinabalu|labuan|lumut|langkawi|penang|port klang|kuala lumpur|putrajaya|มาเลเซีย|มะละกา|ซาบาห์|ซาราวัก|ยะโฮร์|ปีนัง|กัวลาลัมเปอร์/i },
+];
+const FOCUS_RE = new RegExp(FOCUS_COUNTRIES.map(c => c.rx.source).join("|"), "i");
+
+// คืนประเทศโฟกัสที่ข้อความนี้ตรง (null = ไม่ตรง)
+function focusCountryOf(text) {
+  if (!text) return null;
+  for (const c of FOCUS_COUNTRIES) if (c.rx.test(text)) return c;
+  return null;
+}
+
+// แยกรายการเป็น {focus, rest} โดยรักษาลำดับเดิมในแต่ละกลุ่ม
+function focusPartition(list, hayFn, on) {
+  if (!on) return { focus: [], rest: list };
+  const focus = [], rest = [];
+  for (const it of list) (FOCUS_RE.test(hayFn(it) || "") ? focus : rest).push(it);
+  return { focus, rest };
+}
+
+// ปุ่มสลับ "เน้นเพื่อนบ้าน"
+function FocusToggle({ on, onChange, lang }) {
+  const T = (th, en) => (lang === "th" ? th : en);
+  return (
+    <button className={"btn btn-sm " + (on ? "btn-primary" : "btn-ghost")}
+      onClick={() => onChange(!on)}
+      title={T("ดันข่าว/เหตุการณ์ของกัมพูชา พม่า มาเลเซีย ขึ้นก่อน (ยังเห็นทั่วโลก)",
+               "Float Cambodia / Myanmar / Malaysia to the top (global still shown)")}>
+      <Icon name="pin" size={13} />{T("เน้นเพื่อนบ้าน", "Neighbors")}
+    </button>
+  );
+}
+
+// แถบหัวข้อกลุ่มในรายการ (เน้นเพื่อนบ้าน / อื่น ๆ)
+function FocusGroupLabel({ kind, lang, count }) {
+  const T = (th, en) => (lang === "th" ? th : en);
+  const isFocus = kind === "focus";
+  return (
+    <div style={{ padding: "7px 12px 4px", fontSize: 10, letterSpacing: "0.08em",
+      textTransform: "uppercase", fontFamily: "var(--font-mono)",
+      color: isFocus ? "var(--accent)" : "var(--text-mute)",
+      display: "flex", alignItems: "center", gap: 7 }}>
+      {isFocus && <Icon name="pin" size={11} style={{ color: "var(--accent)" }} />}
+      {isFocus ? T("พื้นที่เน้น · เพื่อนบ้าน (เขมร · พม่า · มาเลย์)", "Focus · Neighbors (KH · MM · MY)")
+               : T("อื่น ๆ ทั่วโลก", "Other · Global")}
+      {count != null && <span style={{ marginLeft: "auto", color: "var(--text-mute)" }}>{count}</span>}
+    </div>
+  );
+}
+
 Object.assign(window, {
   LangCtx, useLang, tx, Icon, ICON_PATHS, SEV, SevBadge, Badge, SrcChip,
   Sparkline, MiniBars, ThreatMeter, Confidence, Gauge, Panel, VTYPE,
+  TimeScopeBar, timeWindow, inTimeWindow,
+  FOCUS_COUNTRIES, FOCUS_RE, focusCountryOf, focusPartition, FocusToggle, FocusGroupLabel,
 });
