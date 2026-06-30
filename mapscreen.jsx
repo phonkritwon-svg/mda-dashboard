@@ -11,6 +11,8 @@ const MAP_REGIONS = [
     { th: "ช่องแคบสิงคโปร์",   en: "Singapore Strait",    lat: 1.2,  lon: 104.0, z: 8 },
     { th: "ทะเลซูลู",         en: "Sulu Sea",            lat: 8.0,  lon: 120.0, z: 6 },
     { th: "ทะเลเซเลเบส",      en: "Celebes Sea",         lat: 3.5,  lon: 122.0, z: 6 },
+    { th: "เกาะกูด–เกาะกง (ไทย–กัมพูชา)", en: "Ko Kut–Koh Kong (TH–KH)", lat: 11.6, lon: 102.8, z: 9 },
+    { th: "พื้นที่อ้างสิทธิทับซ้อน (OCA)", en: "Overlapping Claims Area (OCA)", lat: 8.0, lon: 102.5, z: 7 },
   ]},
   { gh: "ช่องแคบ / จุดร้อนโลก", ge: "Global chokepoints", items: [
     { th: "ทะเลแดง / บับเอลมันเดบ", en: "Red Sea / Bab el-Mandeb", lat: 13.5, lon: 43.3, z: 6 },

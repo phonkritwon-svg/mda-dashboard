@@ -31,6 +31,7 @@ window.MDA_DATA = (function () {
     NAVN: { name: "Naval News",             tag: "NAVY", color: "#e3b341" },
     AMTI: { name: "CSIS AMTI",              tag: "SAT",  color: "#b07cf0" },
     GFW:  { name: "Global Fishing Watch",   tag: "DATA", color: "#f0884d" },
+    GNEWS:{ name: "ภูมิภาค (Google News)",  tag: "NEWS", color: "#e0a020" },
   };
 
   // ---- ภัยคุกคามทางทะเล 9 ด้าน ของ ศรชล. (Thai-MECC) ----
@@ -40,8 +41,8 @@ window.MDA_DATA = (function () {
       th:"ค้นหา-ช่วยเหลือผู้ประสบภัย (SAR)", en:"Search & Rescue (SAR)",
       re:/\bsar\b|search and rescue|rescue|distress|mayday|capsiz|sink|sank|sunk|overboard|adrift|lifeboat|missing (?:crew|sailor|fisher|boat|vessel)|ค้นหา|กู้ภัย|ช่วยเหลือผู้ประสบภัย|ผู้ประสบภัย|อับปาง|เรือล่ม|เรือจม|พลิกคว่ำ|สูญหาย|ลอยคอ/i },
     { key:"IUU",      icon:"fish", color:"#33b8c8",
-      th:"ประมงผิดกฎหมาย (IUU)", en:"IUU Fishing",
-      re:/\biuu\b|illegal,?\s*unreported|illegal fishing|unlicensed fishing|overfish|trawler|fishing vessel|fishing fleet|fishing boat|poach|ประมงผิดกฎหมาย|ทำประมง|เรือประมง|ลอบจับปลา|ลักลอบจับสัตว์น้ำ/i },
+      th:"ประมงผิดกฎหมาย / รุกล้ำเขตแดน (IUU)", en:"IUU Fishing / Border",
+      re:/\biuu\b|illegal,?\s*unreported|illegal fishing|unlicensed fishing|overfish|trawler|fishing vessel|fishing fleet|fishing boat|poach|incursion|encroach|territorial waters|maritime (?:boundary|border)|overlapping claims|ประมงผิดกฎหมาย|ทำประมง|เรือประมง|ลอบจับปลา|ลักลอบจับสัตว์น้ำ|รุกล้ำ|น่านน้ำ|เขตแดนทางทะเล|พื้นที่ทับซ้อน|พื้นที่อ้างสิทธิ/i },
     { key:"HUMAN",    icon:"users", color:"#e0a020",
       th:"ค้ามนุษย์/ลักลอบเข้าเมือง", en:"Human Trafficking & Smuggling",
       re:/human traffick|people smuggl|migrant|refugee|stowaway|forced labou?r|rohingya|ค้ามนุษย์|ผู้อพยพ|ผู้ลี้ภัย|ลักลอบเข้าเมือง|แรงงานบังคับ|โรฮิงญา|หลบหนีเข้าเมือง/i },

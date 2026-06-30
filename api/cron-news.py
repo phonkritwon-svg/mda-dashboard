@@ -31,6 +31,13 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 CRON_SECRET  = os.environ.get("CRON_SECRET", "")
 
+
+def _gnews(q, hl="en-US", gl="US", ceid="US:en"):
+    """สร้าง Google News RSS แบบ query — ค้นทั่วโลกแต่เจาะหัวข้อ/ภูมิภาคที่เลือก"""
+    return ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q) +
+            "&hl=" + hl + "&gl=" + gl + "&ceid=" + ceid)
+
+
 SOURCES = [
     # --- ข่าวพาณิชยนาวี / ความมั่นคงทางทะเล ---
     {"key": "GCAP",  "name": "gCaptain",               "url": "https://gcaptain.com/feed/"},
@@ -48,6 +55,16 @@ SOURCES = [
     {"key": "DIP",   "name": "The Diplomat",           "url": "https://thediplomat.com/regions/southeast-asia/feed/"},
     # --- ประมงผิดกฎหมาย (IUU) ---
     {"key": "GFW",   "name": "Global Fishing Watch",   "url": "https://globalfishingwatch.org/feed/"},
+    # --- ภูมิภาคไทย/อาเซียน (Google News query — ค้นทั่วโลก โฟกัสภูมิภาค) ---
+    # key เดียวกัน → ข่าวซ้ำจากหลาย query ถูกรวม (dedupe ด้วย hash ของลิงก์)
+    {"key": "GNEWS", "name": "ภูมิภาค (Google News)",
+     "url": _gnews('("Gulf of Thailand" OR "South China Sea" OR "Andaman Sea" OR Malacca OR '
+                   '("Thailand" "Cambodia")) (maritime OR "fishing vessel" OR navy OR '
+                   '"illegal fishing" OR smuggling OR incursion) when:30d')},
+    {"key": "GNEWS", "name": "ภูมิภาค (Google News)",
+     "url": _gnews("(น่านน้ำ OR ทะเล OR ประมง OR อ่าวไทย) "
+                   "(กัมพูชา OR รุกล้ำ OR ผิดกฎหมาย OR เกาะกูด OR ลักลอบ) when:60d",
+                   hl="th", gl="TH", ceid="TH:th")},
 ]
 
 
@@ -237,7 +254,12 @@ REGIONS = [
                                                                            ("Malaysia / Malacca–Borneo", "มาเลเซีย / มะละกา–บอร์เนียว", 4.0, 109.5)),
     (re.compile(r"south china sea|scarborough|spratly|paracel|second thomas|taiwan strait", re.I), ("South China Sea", "ทะเลจีนใต้",  15.0, 117.0)),
     (re.compile(r"strait of malacca|malacca|singapore strait", re.I),      ("Strait of Malacca",       "ช่องแคบมะละกา",         2.5,  101.0)),
-    (re.compile(r"gulf of thailand", re.I),                                ("Gulf of Thailand",        "อ่าวไทย",               9.5,  101.5)),
+    # --- ชายแดนทะเลไทย–กัมพูชา (ตรวจก่อน "อ่าวไทย" กว้าง ๆ) ---
+    (re.compile(r"ko ?kut|koh ?kood|เกาะกูด", re.I),                        ("Ko Kut",                  "เกาะกูด",               11.65, 102.58)),
+    (re.compile(r"koh ?kong|เกาะกง", re.I),                                ("Koh Kong",                "เกาะกง",                11.6,  103.0)),
+    (re.compile(r"\btrat\b|ตราด", re.I),                                    ("Trat",                    "ตราด",                  12.0,  102.5)),
+    (re.compile(r"overlapping claims|\boca\b|พื้นที่อ้างสิทธิทับซ้อน|พื้นที่ทับซ้อน", re.I), ("Gulf of Thailand OCA", "พื้นที่อ้างสิทธิทับซ้อน (อ่าวไทย)", 8.0, 102.5)),
+    (re.compile(r"gulf of thailand|อ่าวไทย", re.I),                        ("Gulf of Thailand",        "อ่าวไทย",               9.5,  101.5)),
     (re.compile(r"andaman", re.I),                                         ("Andaman Sea",             "ทะเลอันดามัน",          8.0,  97.0)),
     (re.compile(r"natuna", re.I),                                          ("North Natuna Sea",        "ทะเลนาตูนาเหนือ",       5.0,  109.2)),
     (re.compile(r"black sea|novorossiysk|odes[as]|crimea", re.I),          ("Black Sea",               "ทะเลดำ",                44.0, 36.0)),

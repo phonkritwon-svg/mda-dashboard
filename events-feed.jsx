@@ -32,6 +32,11 @@ const MDA_GEO_REGIONS = [
   { re: /gulf of aden|\baden\b|อ่าวเอเดน/i,                              th: "อ่าวเอเดน",                 en: "Gulf of Aden",            lat: 12.5, lon: 47.0 },
   { re: /south china sea|scarborough|spratly|paracel|second thomas|taiwan strait|ทะเลจีนใต้|สการ์โบโรห์|พารา?เซล|สปร(?:าต|ตลี)|ทะเลจีน/i, th: "ทะเลจีนใต้", en: "South China Sea", lat: 15.0, lon: 117.0 },
   { re: /strait of malacca|malacca|singapore strait|ช่องแคบมะละกา|มะละกา|สิงค์โปร์|singapor/i,         th: "ช่องแคบมะละกา",             en: "Strait of Malacca",       lat: 2.5,  lon: 101.0 },
+  /* ── ชายแดนทะเลไทย–กัมพูชา (ต้องตรวจก่อน "อ่าวไทย" ที่กว้างกว่า) ── */
+  { re: /ko ?kut|koh ?kood|เกาะกูด/i,                          th: "เกาะกูด",                   en: "Ko Kut",                  lat: 11.65, lon: 102.58 },
+  { re: /koh ?kong|เกาะกง/i,                                  th: "เกาะกง",                    en: "Koh Kong",                lat: 11.6,  lon: 103.0 },
+  { re: /\btrat\b|ตราด/i,                                      th: "ตราด",                      en: "Trat",                    lat: 12.0,  lon: 102.5 },
+  { re: /overlapping claims|\boca\b|พื้นที่อ้างสิทธิทับซ้อน|พื้นที่ทับซ้อน/i, th: "พื้นที่อ้างสิทธิทับซ้อน (อ่าวไทย)", en: "Gulf of Thailand OCA", lat: 8.0, lon: 102.5 },
   { re: /gulf of thailand|อ่าวไทย|ท้องอ่าว/i,                                   th: "อ่าวไทย",                   en: "Gulf of Thailand",        lat: 9.5,  lon: 101.5 },
   { re: /andaman|ทะเลอันดามัน|อนุดามัน/i,                                            th: "ทะเลอันดามัน",              en: "Andaman Sea",             lat: 8.0,  lon: 97.0 },
   { re: /natuna|นาตูนา/i,                                             th: "ทะเลนาตูนาเหนือ",           en: "North Natuna Sea",        lat: 5.0,  lon: 109.2 },
