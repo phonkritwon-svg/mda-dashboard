@@ -2,6 +2,8 @@
 .env
 .env.*
 *.key
+# ยกเว้นไฟล์ตัวอย่าง (ไม่มีคีย์จริง) — ต้อง commit เพื่อให้รู้ว่าต้องตั้งค่าอะไรบ้าง
+!.env.example
 
 # old design snapshot — not part of the deployed app
 design_extract/
