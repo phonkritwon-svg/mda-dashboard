@@ -6,6 +6,9 @@
     "api/analyze.py": {
       "maxDuration": 30
     },
+    "api/chat.py": {
+      "maxDuration": 30
+    },
     "api/cron-news.py": {
       "maxDuration": 60
     }

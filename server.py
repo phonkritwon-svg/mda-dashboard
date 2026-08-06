@@ -3,6 +3,8 @@ MDA Dev Server
   - Serves static files on port 7432
   - POST /api/summarize  → แปลข่าวเป็นไทยด้วย Google Translate (ไม่ต้อง key)
                            ถ้ามี ANTHROPIC_API_KEY จะใช้ Claude สรุปให้ละเอียดกว่า
+  - POST /api/analyze    → บทวิเคราะห์ข่าวเชิงลึก (ใช้โค้ดชุดเดียวกับ api/analyze.py
+                           ที่รันบน Vercel เพื่อให้ผลลัพธ์บนเครื่องกับบนเว็บตรงกัน)
 """
 
 import http.server
@@ -17,7 +19,48 @@ import time
 from pathlib import Path
 
 PORT = 7432
+
+# คอนโซล Windows ใช้ cp1252 → print ข้อความไทยแล้วจะ crash ทั้งเซิร์ฟเวอร์
+# บังคับ stdout/stderr เป็น UTF-8 ก่อนเสมอ
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+def load_dotenv():
+    """อ่านไฟล์ .env ข้าง ๆ server.py (ถ้ามี) → ใส่เข้า os.environ
+    ไฟล์นี้ถูก .gitignore ไว้แล้ว จึงไม่หลุดขึ้น git
+    รูปแบบ:  ANTHROPIC_API_KEY=sk-ant-...   (บรรทัดขึ้นต้นด้วย # คือคอมเมนต์)"""
+    path = Path(__file__).parent / ".env"
+    if not path.exists():
+        return
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and v and k not in os.environ:
+                os.environ[k] = v
+    except Exception as e:
+        print("[MDA] อ่าน .env ไม่สำเร็จ:", e)
+
+
+load_dotenv()
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+# ใช้โมดูลชุดเดียวกับฝั่ง production (api/) — ไม่เขียนซ้ำ
+sys.path.insert(0, str(Path(__file__).parent / "api"))
+import analyze as analyze_mod   # noqa: E402
+import chat as chat_mod         # noqa: E402
+
+# ais.py อยู่ที่ root ไม่ใช่ใน api/ เพราะไม่ใช่ serverless function — มันเปิด
+# WebSocket ค้างไว้ ซึ่ง serverless ทำไม่ได้ · ถ้าวางใน api/ Vercel จะพยายาม
+# build เป็นฟังก์ชันแล้วพังเพราะไม่มี handler
+import ais as ais_mod           # noqa: E402
 
 
 # ── Google Translate (free, no key) ─────────────────────────────────────────
@@ -100,6 +143,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    def do_GET(self):
+        if self.path.split("?")[0] == "/api/vessels":
+            self._json(ais_mod.snapshot())
+            return
+        return http.server.SimpleHTTPRequestHandler.do_GET(self)
+
     def do_OPTIONS(self):
         self.send_response(200)
         self._cors()
@@ -108,12 +157,48 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/summarize":
             self._handle_summarize()
+        elif self.path == "/api/analyze":
+            self._handle_analyze()
+        elif self.path == "/api/chat":
+            self._handle_chat()
         else:
             self.send_error(404)
 
+    def _handle_chat(self):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            d = json.loads(self.rfile.read(length) or "{}")
+        except Exception:
+            d = {}
+        chat_mod.API_KEY = API_KEY
+        try:
+            self._json(chat_mod.handle_chat(d))
+        except Exception as e:
+            print("[MDA] chat error:", e)
+            self._json({"ok": False, "engine": "error", "text": str(e)}, 500)
+
+    def _handle_analyze(self):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            d = json.loads(self.rfile.read(length) or "{}")
+        except Exception:
+            d = {}
+        lang = d.get("lang", "th")
+
+        analyze_mod.API_KEY = API_KEY          # ให้โมดูลใช้ key เดียวกับเซิร์ฟเวอร์
+        if API_KEY:
+            try:
+                self._json({"ok": True, "engine": "claude",
+                            "text": analyze_mod.analyze_with_claude(d, lang)})
+                return
+            except Exception as e:
+                print("[MDA] Claude analyze failed → offline:", e)
+        self._json({"ok": True, "engine": "offline",
+                    "text": analyze_mod.analyze_offline(d, lang)})
+
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def _handle_summarize(self):
@@ -159,11 +244,27 @@ if __name__ == "__main__":
     if args.key:
         API_KEY = args.key
 
-    mode = f"Claude Haiku ({API_KEY[:12]}...)" if API_KEY else "Google Translate (free)"
-    print(f"[MDA] AI summaries: {mode}")
+    if API_KEY:
+        # แสดงแค่ 8 ตัวแรก + 4 ตัวท้าย พอให้ยืนยันว่าโหลดคีย์ถูกใบ ไม่เผยคีย์เต็ม
+        masked = API_KEY[:8] + "…" + API_KEY[-4:] if len(API_KEY) > 14 else "…"
+        print(f"[MDA] AI: Claude ({masked})  · สรุปข่าว + วิเคราะห์เชิงลึกใช้ LLM")
+    else:
+        print("[MDA] AI: Google Translate (ฟรี) · วิเคราะห์เชิงลึกใช้โหมด offline")
+        print("[MDA] ต้องการใช้ Claude → สร้างไฟล์ .env แล้วใส่  ANTHROPIC_API_KEY=sk-ant-...")
+
+    # ── AIS สด: เปิด WebSocket ค้างไว้ในเธรดพื้นหลัง ──
+    if ais_mod.start():
+        print("[MDA] AIS: กำลังเชื่อมต่อ AISStream — ตำแหน่งเรือจริงจะทยอยเข้ามา")
+    else:
+        print("[MDA] AIS: ปิดอยู่ (" + str(ais_mod._state.get("error")) + ")")
+        print("[MDA] ต้องการเรือจริง → ขอคีย์ฟรีที่ https://aisstream.io/authenticate")
+        print("[MDA] แล้วใส่ในไฟล์ .env:  AISSTREAM_API_KEY=...")
 
     os.chdir(Path(__file__).parent)
-    httpd = http.server.HTTPServer(("", args.port), Handler)
+    # ThreadingHTTPServer: จำเป็น เพราะเบราว์เซอร์เปิด keep-alive ค้างไว้
+    # ถ้าใช้ HTTPServer ธรรมดา คำขอ /api/analyze (ซึ่งอาจใช้เวลาถึง 30 วิ) จะทำให้ทั้งเว็บค้าง
+    httpd = http.server.ThreadingHTTPServer(("", args.port), Handler)
+    httpd.daemon_threads = True
     print(f"[MDA] Serving at http://localhost:{args.port}")
     try:
         httpd.serve_forever()

@@ -31,6 +31,7 @@ const NAV = [
   { key: "dashboard", icon: "dashboard", th: "ภาพรวม",   en: "Overview" },
   { key: "map",       icon: "radar",     th: "แผนที่",    en: "Map" },
   { key: "osint",     icon: "feed",      th: "ฟีดข่าว",  en: "OSINT" },
+  { key: "chat",      icon: "spark",     th: "ถาม-ตอบ",  en: "Ask AI" },
   { key: "incident",  icon: "alert",     th: "เหตุการณ์", en: "Incidents" },
   { key: "brief",     icon: "brief",     th: "รายงาน",   en: "Brief" },
 ];
@@ -227,6 +228,7 @@ function App() {
     map:       <window.MapScreen  {...screenProps} initial={route.payload} />,
     osint:     <window.Osint      {...screenProps} />,
     newsDetail:<window.NewsDetail {...screenProps} item={route.payload && route.payload.item} />,
+    chat:      <window.ChatScreen {...screenProps} />,
     incident:  <window.Incident   {...screenProps} initial={route.payload} />,
     brief:     <window.DailyBrief {...screenProps} />,
   };
