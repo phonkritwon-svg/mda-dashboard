@@ -3,7 +3,9 @@
    ============================================================ */
 function DailyBrief({ data, lang, onNav, showToast }) {
   const T = (th, en) => lang === "th" ? th : en;
-  const b = data.brief;
+  // ป้ายชั้นการใช้งานของรายงาน (คงที่ ไม่ใช่ข้อมูลสมมติ)
+  // เนื้อหารายงานทั้งฉบับคำนวณจากฟีดข่าวจริงด้านล่าง — บทความที่เขียนไว้ล่วงหน้าถูกลบออกแล้ว
+  const CLASSIFICATION = "OFFICIAL USE — OSINT";
   const [regenerating, setRegenerating] = useState(false);
 
   // ---- ข้อมูลจริงจากฟีดข่าว + เหตุการณ์ ----
@@ -105,7 +107,7 @@ function DailyBrief({ data, lang, onNav, showToast }) {
           <div className="page-sub row" style={{ gap: 14 }}>
             <span>{todayStr}</span>
             <span className="badge badge-warn" style={{ textTransform: "none" }}>
-              {b.classification}
+              {CLASSIFICATION}
             </span>
           </div>
         </div>

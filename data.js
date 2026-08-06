@@ -89,164 +89,100 @@ window.MDA_DATA = (function () {
   const news = [
     {
       id:"N-3301", srcKey:"GC", outlet:"gCaptain", time:"08:55", ago:{th:"45 นาที",en:"45 min"},
-      reliability:"A", credibility:4, linkedInc:"INC-3041",
+      reliability:"A", credibility:4,
       url:"https://gcaptain.com/houthis-signal-renewed-red-sea-shipping-attacks-after-u-s-israeli-strikes-on-iran/",
       raw:{ th:"กลุ่มฮูตีส่งสัญญาณกลับมาโจมตีเรือในทะเลแดง หลังการโจมตีอิหร่านของสหรัฐฯ-อิสราเอล",
             en:"Houthis signal renewed Red Sea shipping attacks after U.S.–Israeli strikes on Iran" },
-      ai:{ th:"ปิดฉากช่วงสงบราว 3 เดือนครึ่ง · UKMTO ออกประกาศเตือน · BIMCO ชี้เรือเชื่อมโยงสหรัฐฯ/อิสราเอลเสี่ยงสูง เบี้ยประกันภัยสงครามจ่อพุ่ง — สอดคล้องเหตุ INC-3041",
-           en:"Ends ~3.5-month lull · UKMTO advisory issued · BIMCO flags US/Israel-linked ships as high-risk, war-risk premiums set to spike — supports INC-3041." },
+      ai:{ th:"ปิดฉากช่วงสงบราว 3 เดือนครึ่ง · UKMTO ออกประกาศเตือน · BIMCO ชี้เรือเชื่อมโยงสหรัฐฯ/อิสราเอลเสี่ยงสูง เบี้ยประกันภัยสงครามจ่อพุ่ง",
+           en:"Ends ~3.5-month lull · UKMTO advisory issued · BIMCO flags US/Israel-linked ships as high-risk, war-risk premiums set to spike" },
       verdict:"confirmed",
     },
     {
       id:"N-3298", srcKey:"ME", outlet:"The Maritime Executive", time:"07:30", ago:{th:"2 ชม.",en:"2 h"},
-      reliability:"A", credibility:5, linkedInc:"INC-3038",
+      reliability:"A", credibility:5,
       url:"https://maritime-executive.com/article/china-and-philippines-rush-to-save-seafarers-after-k-line-bulker-sinks",
       raw:{ th:"จีนและฟิลิปปินส์เร่งช่วยลูกเรือหลังเรือเทกองธงสิงคโปร์อับปางในทะเลจีนใต้",
             en:"China and Philippines rush to save seafarers after Singapore bulker sinks" },
-      ai:{ th:"Devon Bay พลิกคว่ำใกล้สการ์โบโรห์ · เสียชีวิต 2 กู้ได้ 17 สูญหาย 4 · ทั้งสองชาติส่งเรือ-อากาศยานในพื้นที่พิพาทอ่อนไหว — ตรง INC-3038",
-           en:"Devon Bay capsized near Scarborough · 2 dead, 17 rescued, 4 missing · both states sent assets in sensitive disputed waters — matches INC-3038." },
+      ai:{ th:"Devon Bay พลิกคว่ำใกล้สการ์โบโรห์ · เสียชีวิต 2 กู้ได้ 17 สูญหาย 4 · ทั้งสองชาติส่งเรือ-อากาศยานในพื้นที่พิพาทอ่อนไหว",
+           en:"Devon Bay capsized near Scarborough · 2 dead, 17 rescued, 4 missing · both states sent assets in sensitive disputed waters" },
       verdict:"confirmed",
     },
     {
       id:"N-3294", srcKey:"ST", outlet:"Seatrade Maritime", time:"06:10", ago:{th:"3 ชม.",en:"3 h"},
-      reliability:"A", credibility:4, linkedInc:"INC-3035",
+      reliability:"A", credibility:4,
       url:"https://www.seatrade-maritime.com/security/shadow-fleet-attacks-widen-maritime-risks-around-russia",
       raw:{ th:"การโจมตีกองเรือเงาขยายความเสี่ยงทางทะเลรอบรัสเซีย — ทะเลดำและบอลติก",
             en:"Shadow fleet attacks widen maritime risks around Russia — Black & Baltic Seas" },
-      ai:{ th:"ยูเครนโจมตีเรือบรรทุกน้ำมันใกล้โนโวรอสซีสค์ · เพิ่มความเสี่ยงทั่วโลกพร้อมฮอร์มุซและอ่าวเอเดน — เชื่อมโยง INC-3035 / INC-3026 / INC-3014",
-           en:"Ukraine struck tankers near Novorossiysk · compounds global risk with Hormuz and Gulf of Aden — links INC-3035 / INC-3026 / INC-3014." },
+      ai:{ th:"ยูเครนโจมตีเรือบรรทุกน้ำมันใกล้โนโวรอสซีสค์ · เพิ่มความเสี่ยงทั่วโลกพร้อมฮอร์มุซและอ่าวเอเดน",
+           en:"Ukraine struck tankers near Novorossiysk · compounds global risk with Hormuz and Gulf of Aden" },
       verdict:"corroborating",
     },
     {
       id:"N-3290", srcKey:"BAS", outlet:"Bulletin of the Atomic Scientists", time:"Feb 13", ago:{th:"คดีดำเนินอยู่",en:"ongoing"},
-      reliability:"B", credibility:4, linkedInc:"INC-3030",
+      reliability:"B", credibility:4,
       url:"https://thebulletin.org/2026/02/seabed-zero-baltic-sabotage-and-the-global-risks-to-undersea-infrastructure/",
       raw:{ th:"การก่อวินาศกรรมใต้ทะเลบอลติกและความเสี่ยงต่อโครงสร้างพื้นฐานใต้ทะเลทั่วโลก",
             en:"Baltic seabed sabotage and the global risks to undersea infrastructure" },
-      ai:{ th:"ฟินแลนด์ควบคุมเรือ Fitburg ปมสายเคเบิล · ชุดเหตุการณ์เชื่อมโยงกองเรือเงา การพิสูจน์ผู้กระทำผิดยาก — บริบทของ INC-3030",
-           en:"Finland seized the Fitburg over a cable break · part of a ghost-fleet-linked series, attribution hard — context for INC-3030." },
+      ai:{ th:"ฟินแลนด์ควบคุมเรือ Fitburg ปมสายเคเบิล · ชุดเหตุการณ์เชื่อมโยงกองเรือเงา การพิสูจน์ผู้กระทำผิดยาก",
+           en:"Finland seized the Fitburg over a cable break · part of a ghost-fleet-linked series, attribution hard" },
       verdict:"corroborating",
     },
     {
       id:"N-3286", srcKey:"DIP", outlet:"The Diplomat", time:"Feb 20", ago:{th:"บทวิเคราะห์",en:"analysis"},
-      reliability:"B", credibility:4, linkedInc:"INC-3019",
+      reliability:"B", credibility:4,
       url:"https://thediplomat.com/2026/02/red-lines-and-the-reshaping-of-asias-maritime-order",
       raw:{ th:"เส้นแดงและการจัดระเบียบทางทะเลของเอเชียใหม่ — นาตูนา, ญี่ปุ่นเพิ่มลาดตระเวน",
             en:"Red lines and the reshaping of Asia's maritime order — Natuna, Japan patrols" },
-      ai:{ th:"บาคัมลาขับไล่เรือยามฝั่งจีนปมการสำรวจ · ญี่ปุ่นขยายเฝ้าระวังทางอากาศ 24 ชม. — สนับสนุน INC-3019 และบริบทเกรย์โซน",
-           en:"Bakamla expelled a China CG vessel over a survey · Japan expanded 24h aerial watch — supports INC-3019 and grey-zone context." },
+      ai:{ th:"บาคัมลาขับไล่เรือยามฝั่งจีนปมการสำรวจ · ญี่ปุ่นขยายเฝ้าระวังทางอากาศ 24 ชม. — บริบทเกรย์โซน",
+           en:"Bakamla expelled a China CG vessel over a survey · Japan expanded 24h aerial watch — grey-zone context." },
       verdict:"corroborating",
     },
     {
       id:"N-3281", srcKey:"MARAD", outlet:"US MARAD / NAVCENT", time:"Mar 26", ago:{th:"ประกาศ",en:"advisory"},
-      reliability:"A", credibility:5, linkedInc:"INC-3041",
+      reliability:"A", credibility:5,
       url:"https://www.maritime.dot.gov/msci/2026-006-red-sea-bab-el-mandeb-strait-gulf-aden-arabian-sea-and-somali-basin-houthi-attacks",
       raw:{ th:"ประกาศเตือนความปลอดภัยทางทะเล: ทะเลแดง ช่องแคบบับเอลมันเดบ อ่าวเอเดน — ภัยจากฮูตี",
             en:"MSCI advisory: Red Sea, Bab el-Mandeb, Gulf of Aden — Houthi threat" },
-      ai:{ th:"แหล่งทางการ · แนะนำเรือสหรัฐฯ ปรับเข็ม/ความเร็ว ระวัง AIS และประสาน NAVCENT NCAGS ตลอด 24 ชม. — ยืนยันมาตรการของ INC-3041",
-           en:"Official source · advises US ships to vary course/speed, manage AIS, and coordinate with NAVCENT NCAGS 24/7 — confirms posture for INC-3041." },
+      ai:{ th:"แหล่งทางการ · แนะนำเรือสหรัฐฯ ปรับเข็ม/ความเร็ว ระวัง AIS และประสาน NAVCENT NCAGS ตลอด 24 ชม.",
+           en:"Official source · advises US ships to vary course/speed, manage AIS, and coordinate with NAVCENT NCAGS 24/7" },
       verdict:"confirmed",
     },
     {
       id:"N-3275", srcKey:"NW", outlet:"Newsweek / Maxar", time:"Aug 28", ago:{th:"ภาพดาวเทียม",en:"satellite"},
-      reliability:"B", credibility:4, linkedInc:"INC-3038",
+      reliability:"B", credibility:4,
       url:"https://www.newsweek.com/satellite-photos-show-chinese-ship-badly-damaged-south-china-sea-crash-2120908",
       raw:{ th:"ภาพถ่ายดาวเทียมเผยเรือยามฝั่งจีนเสียหายหนักจากการชนในทะเลจีนใต้",
             en:"Satellite photos show Chinese ship badly damaged in South China Sea crash" },
-      ai:{ th:"ภาพ Maxar ยืนยันเรือ CCG-3104 หัวเรือเสียหายหลังชนเรือพิฆาตขณะไล่เรือฟิลิปปินส์ — บริบทความตึงเครียดสการ์โบโรห์ (INC-3038)",
-           en:"Maxar imagery confirms CCG-3104's bow damage after colliding with a destroyer while chasing a Philippine boat — Scarborough tension context (INC-3038)." },
+      ai:{ th:"ภาพ Maxar ยืนยันเรือ CCG-3104 หัวเรือเสียหายหลังชนเรือพิฆาตขณะไล่เรือฟิลิปปินส์ — บริบทความตึงเครียดสการ์โบโรห์",
+           en:"Maxar imagery confirms CCG-3104's bow damage after colliding with a destroyer while chasing a Philippine boat — Scarborough tension context." },
       verdict:"partial",
     },
     {
       id:"N-3270", srcKey:"AJ", outlet:"Al Jazeera", time:"Jan 23", ago:{th:"รายงานข่าว",en:"report"},
-      reliability:"B", credibility:4, linkedInc:"INC-3038",
+      reliability:"B", credibility:4,
       url:"https://www.aljazeera.com/news/2026/1/23/cargo-ship-capsizes-in-disputed-area-of-south-china-sea",
       raw:{ th:"เรือสินค้าพลิกคว่ำในพื้นที่พิพาททะเลจีนใต้ ลูกเรือฟิลิปปินส์ 21 คน",
             en:"Cargo ship capsizes in disputed area of South China Sea; 21 Filipino crew" },
-      ai:{ th:"ยืนยันจำนวนลูกเรือและพื้นที่ใกล้สการ์โบโรห์ที่จีน-ฟิลิปปินส์อ้างสิทธิ์ทับซ้อน — สอดคล้องรายงานของ INC-3038",
-           en:"Confirms crew count and location near contested Scarborough Shoal — consistent with INC-3038." },
+      ai:{ th:"ยืนยันจำนวนลูกเรือและพื้นที่ใกล้สการ์โบโรห์ที่จีน-ฟิลิปปินส์อ้างสิทธิ์ทับซ้อน",
+           en:"Confirms crew count and location near contested Scarborough Shoal" },
       verdict:"corroborating",
     },
     {
       id:"N-3262", srcKey:"RIV", outlet:"Riviera Maritime", time:"5 d", ago:{th:"5 วัน",en:"5 d"},
-      reliability:"B", credibility:3, linkedInc:"INC-3008",
+      reliability:"B", credibility:3,
       url:"https://www.rivieramm.com/news-content-hub/news-content-hub/2026-maritime-threats-three-seas-dominate-incidents-salvage-potential-87142",
       raw:{ th:"ภัยทางทะเลปี 2026: สามทะเลเสี่ยงสูง (ดำ แดง บอลติก) และจุดเสี่ยงแคริบเบียน-ทะเลจีนใต้",
             en:"2026 maritime threats: three seas dominate, plus Caribbean & South China Sea" },
-      ai:{ th:"บทวิเคราะห์ความเสี่ยงเชิงคาดการณ์ · ระบุแคริบเบียนตอนใต้และทะเลจีนใต้เป็นจุดเสี่ยงเพิ่มเติม — บริบทของ INC-3008",
-           en:"Forward-looking risk analysis · names southern Caribbean and South China Sea as added hotspots — context for INC-3008." },
+      ai:{ th:"บทวิเคราะห์ความเสี่ยงเชิงคาดการณ์ · ระบุแคริบเบียนตอนใต้และทะเลจีนใต้เป็นจุดเสี่ยงเพิ่มเติม",
+           en:"Forward-looking risk analysis · names southern Caribbean and South China Sea as added hotspots" },
       verdict:"context",
     },
   ];
 
-  // ---- live stat tiles (global) ----
-  const stats = {
-    vesselsTracked: 18432,
-    vesselsDelta: +312,
-    activeIncidents: 8,
-    darkVessels: 23,
-    osintToday: 642,
-    osintDelta: +58,
-    aiProcessed: 588,
-    coverage: 87,
-  };
+  // ---- ตัวเลขสถิติ / กราฟ / รายงานประจำวัน ----
+  // ลบออกแล้ว: เดิมเป็นค่าสมมติที่พิมพ์ตายตัว ไม่ได้มาจากข้อมูลจริง
+  // หน้าจอที่เคยใช้ค่าเหล่านี้ถูกปรับให้แสดงเฉพาะข้อมูลที่ตรวจสอบได้แทน
 
-  // ---- OSINT source mix ----
-  const sourceMix = [
-    { key:"AIS", label:"AIS / MarineTraffic", count: 142 },
-    { key:"GC",  label:"Maritime news", count: 64 },
-    { key:"NW",  label:"Satellite / SAR", count: 39 },
-    { key:"UKMTO", label:"Gov advisories", count: 33 },
-    { key:"DIP", label:"Analysis / think-tank", count: 21 },
-    { key:"LL",  label:"Lloyd's List data", count: 18 },
-  ];
-
-  // ---- incident category breakdown (7d) ----
-  const catMix = [
-    { key:"ATTACK",  label:{th:"โจมตีเรือพาณิชย์",en:"Attacks on shipping"}, count: 14, color:"#f6553f" },
-    { key:"DARK",    label:{th:"กองเรือเงา/ปิดสัญญาณ",en:"Shadow / dark fleet"}, count: 12, color:"#b07cf0" },
-    { key:"GREY",    label:{th:"เกรย์โซน/เผชิญหน้า",en:"Grey-zone clashes"}, count: 9, color:"#e3b341" },
-    { key:"CABLE",   label:{th:"สายเคเบิลใต้ทะเล",en:"Subsea cable"}, count: 6, color:"#4d9bf0" },
-    { key:"PIRACY",  label:{th:"โจรสลัด",en:"Piracy"}, count: 5, color:"#f0884d" },
-    { key:"SAR",     label:{th:"ค้นหา-ช่วยเหลือ",en:"SAR"}, count: 4, color:"#46c976" },
-  ];
-
-  // ---- 24h activity sparkline ----
-  const activity24h = [14,11,9,12,16,18,15,19,22,24,28,21,19,26,31,27,23,29,34,28,22,18,15,12];
-
-  // ---- daily brief ----
-  const brief = {
-    date: { th:"10 มิถุนายน 2569", en:"10 June 2026" },
-    classification: "OFFICIAL USE — OSINT",
-    bluf:{
-      th:"ภาพรวมความมั่นคงทางทะเลโลกอยู่ระดับ 'เฝ้าระวังสูง' (ELEVATED) จากสามจุดร้อนหลัก: (1) ฮูตีส่งสัญญาณรื้อฟื้นการโจมตีในทะเลแดงหลังสถานการณ์อิหร่าน (2) การโจมตีกองเรือเงาในทะเลดำ-บอลติกและการตัดสายเคเบิลใต้ทะเล (3) ความตึงเครียดเกรย์โซนในทะเลจีนใต้รวมเหตุเรืออับปางใกล้สการ์โบโรห์",
-      en:"Global maritime posture is ELEVATED, driven by three hotspots: (1) Houthi signals to resume Red Sea attacks amid the Iran situation; (2) shadow-fleet strikes in the Black/Baltic Seas and undersea cable damage; (3) South China Sea grey-zone tension including the Scarborough Shoal sinking."
-    },
-    highlights:[
-      { sev:"critical", inc:"INC-3041",
-        th:"ฮูตีส่งสัญญาณกลับมาโจมตีเรือในทะเลแดง — UKMTO เตือน, เบี้ยประกันภัยสงครามจ่อพุ่ง",
-        en:"Houthis signal renewed Red Sea attacks — UKMTO advisory, war-risk premiums set to spike." },
-      { sev:"high", inc:"INC-3038",
-        th:"เรือเทกองธงสิงคโปร์อับปางใกล้สการ์โบโรห์ มีผู้เสียชีวิต — ปฏิบัติการ SAR ร่วมจีน-ฟิลิปปินส์",
-        en:"Singapore bulker sinks near Scarborough with fatalities — joint China–Philippines SAR." },
-      { sev:"high", inc:"INC-3035",
-        th:"ยูเครนโจมตีเรือบรรทุกน้ำมันกองเรือเงาใกล้โนโวรอสซีสค์ในทะเลดำ",
-        en:"Ukraine strikes shadow-fleet tankers near Novorossiysk in the Black Sea." },
-      { sev:"high", inc:"INC-3030",
-        th:"ฟินแลนด์ควบคุมเรือกองเรือเงาปมสายเคเบิลใต้ทะเลบอลติกเสียหาย",
-        en:"Finland seizes a ghost-fleet vessel over Baltic undersea cable damage." },
-    ],
-    outlook:{
-      th:"คาดการณ์ 24 ชม.ข้างหน้า: ความเสี่ยงในทะเลแดง/ช่องแคบฮอร์มุซยังสูงและขึ้นกับพลวัตอิหร่าน · กองเรือเงาและการก่อกวนโครงสร้างใต้ทะเลในยุโรปมีแนวโน้มต่อเนื่อง · ทะเลจีนใต้ยังตึงเครียดเชิงเกรย์โซน แนะคงระดับเฝ้าระวังสูง เพิ่มการยืนยันด้วยภาพถ่ายดาวเทียมในจุดร้อน และประสานเครือข่ายพันธมิตร (CTF-153, EUNAVFOR Aspides, NATO Baltic Sentry)",
-      en:"Next 24h: Red Sea / Hormuz risk stays high and Iran-dependent · shadow-fleet and undersea-infrastructure interference in Europe likely to persist · South China Sea grey-zone tension continues. Recommend sustaining ELEVATED posture, increasing satellite confirmation over hotspots, and coordinating with partner task forces (CTF-153, EUNAVFOR Aspides, NATO Baltic Sentry)."
-    },
-    metrics:[
-      { k:{th:"เหตุการณ์ใหม่",en:"New incidents"}, v:"8" },
-      { k:{th:"ปิดเหตุแล้ว",en:"Resolved"}, v:"1" },
-      { k:{th:"เรือเฝ้าระวัง",en:"Vessels of interest"}, v:"8" },
-      { k:{th:"ข่าว OSINT ประมวลผล",en:"OSINT processed"}, v:"588" },
-    ],
-  };
 
   // ---- generic fallback incident timeline ----
   const incTimeline = [
@@ -263,5 +199,5 @@ window.MDA_DATA = (function () {
     { th:"ประสานเครือข่ายพันธมิตร/กองเรือเฉพาะกิจในพื้นที่", en:"Coordinate with partner task forces operating in-theatre." },
   ];
 
-  return { sources, vessels, events, news, stats, sourceMix, catMix, activity24h, brief, incTimeline, recommendations, threatDomains };
+  return { sources, vessels, events, news, incTimeline, recommendations, threatDomains };
 })();

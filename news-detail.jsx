@@ -20,6 +20,27 @@ const ADM_CRED = {
 const REL_SCORE  = { A: 95, B: 80, C: 65, D: 45, E: 25, F: 40 };
 const CRED_SCORE = { "1": 95, "2": 80, "3": 62, "4": 42, "5": 22 };
 
+/* แยกบทวิเคราะห์เป็นหัวข้อ (รองรับทั้ง "1. หัวข้อ" และข้อความล้วน)
+   เพื่อให้แสดงผลอ่านง่ายกว่าการโยน pre-wrap ก้อนเดียว */
+function parseAssessment(text) {
+  const lines = String(text || "").split("\n");
+  const secs = [];
+  let cur = null;
+  lines.forEach(ln => {
+    if (/^\s*\d+\.\s+\S/.test(ln)) {                 // บรรทัดหัวข้อ เช่น "3. ภัยคุกคามที่เกี่ยวข้อง"
+      if (cur) secs.push(cur);
+      cur = { heading: ln.trim(), body: "" };
+    } else {
+      if (!cur) cur = { heading: "", body: "" };
+      cur.body += (cur.body ? "\n" : "") + ln;
+    }
+  });
+  if (cur) secs.push(cur);
+  return secs
+    .map(s => ({ heading: s.heading, body: s.body.replace(/^\n+|\n+$/g, "") }))
+    .filter(s => s.heading || s.body.trim());
+}
+
 function NewsDetail({ item, lang, onNav, showToast }) {
   const T = (th, en) => (lang === "th" ? th : en);
   const n = item;
@@ -63,6 +84,33 @@ function NewsDetail({ item, lang, onNav, showToast }) {
     ? new Date(n.time).toLocaleString(lang === "th" ? "th-TH" : "en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
     : (n.time || "");
 
+  /* ข่าวอื่นในระบบที่อยู่พื้นที่เดียวกันหรือด้านภัยคุกคามเดียวกัน
+     → ส่งไปให้ตัววิเคราะห์ใช้ประเมินว่าเป็นเหตุการณ์เดี่ยวหรือแนวโน้มต่อเนื่อง */
+  const related = React.useMemo(() => {
+    const pool = (window.MDA_ALL_NEWS || []).filter(x => x && x.id !== n.id);
+    const myDomains = new Set(domains.map(d => d.key));
+    const out = [];
+    pool.forEach(x => {
+      const g = window.geocodeText
+        ? window.geocodeText(x.raw && x.raw.en, x.raw && x.raw.th, x.ai && x.ai.en, x.ai && x.ai.th, x.outlet)
+        : null;
+      const sameArea = geo && g && g.en === geo.en;
+      const xd = window.classifyThreats ? window.classifyThreats(x) : [];
+      const sameDomain = xd.some(k => myDomains.has(k));
+      if (sameArea || (sameDomain && myDomains.size > 0)) {
+        out.push({
+          title:  (x.raw && (x.raw.th || x.raw.en)) || "",
+          outlet: x.outlet || x.srcKey || "",
+          region: g ? (lang === "th" ? g.th : g.en) : "",
+          sameArea: !!sameArea,
+        });
+      }
+    });
+    // ข่าวพื้นที่เดียวกันสำคัญกว่า → เรียงขึ้นก่อน
+    out.sort((a, b) => (b.sameArea ? 1 : 0) - (a.sameArea ? 1 : 0));
+    return out.slice(0, 8);
+  }, [n, geo, domains, lang]);
+
   const runAI = async () => {
     setAiState("loading"); setAiText("");
     try {
@@ -74,8 +122,11 @@ function NewsDetail({ item, lang, onNav, showToast }) {
           summary:     (n.ai && (n.ai.en || n.ai.th)) || "",
           outlet:      n.outlet || (src && src.name) || n.srcKey,
           region:      geo ? (lang === "th" ? geo.th : geo.en) : "",
+          regionKey:   geo ? geo.en : "",
           reliability: rel, credibility: cred, verdict: n.verdict,
           threats:     domains.map(d => (lang === "th" ? d.th : d.en)),
+          threatKeys:  domains.map(d => d.key),
+          related,
           lang,
         }),
         signal: AbortSignal.timeout ? AbortSignal.timeout(35000) : undefined,
@@ -157,12 +208,68 @@ function NewsDetail({ item, lang, onNav, showToast }) {
             {aiState === "error" && (
               <div className="col" style={{ gap: 8 }}>
                 <div style={{ color: "var(--crit)", fontSize: "var(--fs-sm)" }}>⚠ {T("วิเคราะห์ไม่สำเร็จ", "Analysis failed")}</div>
+                <div className="dim" style={{ fontSize: "var(--fs-xs)", lineHeight: 1.6 }}>
+                  {T("เซิร์ฟเวอร์ไม่ตอบรับ /api/analyze — ตรวจว่ารันด้วย server.py ไม่ใช่ python -m http.server",
+                     "The server did not answer /api/analyze — make sure it runs server.py, not python -m http.server")}
+                </div>
                 <button className="btn btn-ghost btn-sm" onClick={runAI}>{T("ลองใหม่", "Retry")}</button>
               </div>
             )}
             {aiState === "done" && (
-              <div className="nsum" style={{ color: "var(--text)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{aiText}</div>
+              <div className="col" style={{ gap: 10 }}>
+                {parseAssessment(aiText).map((sec, i) => (
+                  <div key={i}>
+                    {sec.heading && (
+                      <div className="dim up" style={{ fontSize: 10, letterSpacing: "0.06em", marginBottom: 4 }}>
+                        {sec.heading}
+                      </div>
+                    )}
+                    <div className="nsum" style={{ color: "var(--text)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                      {sec.body}
+                    </div>
+                  </div>
+                ))}
+                <div className="row" style={{ gap: 8, marginTop: 2 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={runAI}>
+                    <Icon name="refresh" size={13} />{T("วิเคราะห์ใหม่", "Re-run")}
+                  </button>
+                  <button className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      navigator.clipboard && navigator.clipboard.writeText(aiText);
+                      if (showToast) showToast(T("คัดลอกบทวิเคราะห์แล้ว", "Assessment copied"), "ok");
+                    }}>
+                    <Icon name="brief" size={13} />{T("คัดลอก", "Copy")}
+                  </button>
+                </div>
+              </div>
             )}
+          </Panel>
+
+          {/* ข่าวที่เกี่ยวข้อง — ฐานข้อมูลที่ใช้ประกอบการวิเคราะห์ */}
+          <Panel title={T("ข่าวที่เกี่ยวข้องในระบบ", "Correlated Reporting")} icon="link"
+            action={<span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>{related.length}</span>}>
+            {!related.length && (
+              <div className="dim" style={{ fontSize: "var(--fs-sm)" }}>
+                {T("ไม่พบข่าวอื่นในพื้นที่หรือด้านภัยคุกคามเดียวกัน", "No other reporting in the same area or threat domain")}
+              </div>
+            )}
+            <div className="col" style={{ gap: 8 }}>
+              {related.map((r, i) => (
+                <div key={i} className="row" style={{ gap: 8, alignItems: "flex-start" }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: "50%", marginTop: 6, flex: "none",
+                    background: r.sameArea ? "var(--accent)" : "var(--text-mute)",
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>{r.title}</div>
+                    <div className="dim" style={{ fontSize: "var(--fs-xs)" }}>
+                      {r.outlet}{r.region ? " · " + r.region : ""}
+                      {r.sameArea && " · " + T("พื้นที่เดียวกัน", "same area")}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Panel>
         </div>
 

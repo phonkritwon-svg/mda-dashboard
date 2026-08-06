@@ -20,11 +20,25 @@ function StatTile({ k, v, unit, delta, spark, bars, glow, icon, color }) {
 }
 
 function Dashboard({ data, lang, onNav, showToast, addEvent }) {
-  const { stats, events, news, sourceMix, catMix, activity24h } = data;
+  const { events } = data;
   const T = (th, en) => (lang === "th" ? th : en);
   const [refreshing, setRefreshing] = useState(false);
-  const maxSrc = Math.max(...sourceMix.map(s => s.count));
-  const maxCat = Math.max(...catMix.map(c => c.count));
+
+  /* ── ใช้แหล่งข้อมูลชุดเดียวกับหน้าแผนที่ เพื่อให้แผนที่ทั้งสองหน้าตรงกัน ──
+     เดิมหน้านี้อ่านจาก data.vessels ซึ่งเป็นอาเรย์ว่าง แผนที่จึงโล่งไม่เหมือนหน้าแผนที่ */
+  const { news: liveNews } = window.useNewsUpdater(data.news);
+  const { aisVessels } = window.useLiveVessels();
+  const newsVessels = React.useMemo(
+    () => (window.extractVesselsFromNews ? window.extractVesselsFromNews(liveNews) : []),
+    [liveNews]
+  );
+  const usingAis = aisVessels.length > 0;
+  const vessels = usingAis ? aisVessels : newsVessels;
+  const newsPoints = React.useMemo(
+    () => (window.extractNewsPointsFromNews ? window.extractNewsPointsFromNews(liveNews) : []),
+    [liveNews]
+  );
+  const ofInterest = vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
   const handleRefresh = () => {
     if (refreshing) return;
@@ -57,30 +71,13 @@ function Dashboard({ data, lang, onNav, showToast, addEvent }) {
         </div>
       </div>
 
-      {/* stat tiles */}
-      <div className="grid" style={{ gridTemplateColumns: "repeat(6, 1fr)", marginBottom: 12 }}>
-        <StatTile icon="ship" k={T("เรือที่ติดตาม", "Vessels tracked")}
-          v={stats.vesselsTracked.toLocaleString()}
-          delta={{ dir: "up", text: "+" + stats.vesselsDelta + " " + T("วันนี้", "today") }} />
-        <StatTile icon="alert" k={T("เหตุการณ์ที่ใช้งาน", "Active incidents")}
-          v={stats.activeIncidents} glow color="var(--crit)" />
-        <StatTile icon="target" k={T("เรือปิดสัญญาณ", "Dark vessels")}
-          v={stats.darkVessels} color="var(--crit)" />
-        <StatTile icon="feed" k={T("ข่าว OSINT วันนี้", "OSINT today")}
-          v={stats.osintToday}
-          delta={{ dir: "up", text: "+" + stats.osintDelta }}
-          bars={activity24h.slice(-10)} />
-        <StatTile icon="cpu" k={T("AI ประมวลผลแล้ว", "AI processed")}
-          v={stats.aiProcessed} color="var(--accent)" />
-        <StatTile icon="shield" k={T("ความครอบคลุม", "Coverage")}
-          v={stats.coverage} unit="%" color="var(--ok)" />
-      </div>
+      {/* แถวตัวเลขสถิติถูกลบออก — เดิมเป็นค่าสมมติที่พิมพ์ตายตัว ไม่ได้มาจากข้อมูลจริง */}
 
       {/* main grid */}
       <div className="grid" style={{
         gridTemplateColumns: "1.55fr 1.1fr 0.95fr",
         alignItems: "stretch",
-        height: "calc(100vh - 270px)", minHeight: 460,
+        height: "calc(100vh - 190px)", minHeight: 460,
       }}>
 
         {/* left: map preview */}
@@ -93,20 +90,31 @@ function Dashboard({ data, lang, onNav, showToast, addEvent }) {
               </a>
             }>
             <div style={{ position: "relative", height: "100%", minHeight: 220 }}>
-              <MapView vessels={data.vessels} events={events} lang={lang} sweep
+              {/* ตั้งค่าให้ตรงกับหน้าแผนที่: เรือจากข่าว + จุดข่าว + เหตุการณ์ ชุดเดียวกัน */}
+              <MapView vessels={vessels} events={events} lang={lang} sweep
+                newsPoints={newsPoints} showNews
+                onSelectNews={(p) => onNav("newsDetail", { item: p.item })}
                 selected={null}
                 onSelect={(v) => onNav("map", { vessel: v })}
                 onSelectEvent={(e) => onNav("incident", { id: e.id })} />
               <div className="map-hud map-stat" style={{ left: 10, top: 10 }}>
                 <div className="ms">
-                  <div className="k">{T("เรือในพื้นที่", "In area")}</div>
-                  <div className="v">{data.vessels.length}</div>
+                  <div className="k">
+                    {usingAis ? T("เรือ AIS สด", "Live AIS") : T("เรือจากข่าว", "From news")}
+                    <span style={{
+                      display: "inline-block", width: 6, height: 6, borderRadius: "50%", marginLeft: 5,
+                      background: usingAis ? "var(--ok)" : "var(--text-mute)",
+                    }} />
+                  </div>
+                  <div className="v">{vessels.length}</div>
                 </div>
                 <div className="ms">
                   <div className="k">{T("เฝ้าระวัง", "Of interest")}</div>
-                  <div className="v" style={{ color: "var(--accent)" }}>
-                    {data.vessels.filter(v => v.status !== "normal" && v.status !== "friendly").length}
-                  </div>
+                  <div className="v" style={{ color: "var(--accent)" }}>{ofInterest.length}</div>
+                </div>
+                <div className="ms">
+                  <div className="k">{T("จุดข่าว", "News")}</div>
+                  <div className="v" style={{ color: "#5fb0c9" }}>{newsPoints.length}</div>
                 </div>
               </div>
             </div>
@@ -157,52 +165,24 @@ function Dashboard({ data, lang, onNav, showToast, addEvent }) {
           </div>
         </Panel>
 
-        {/* right column */}
+        {/* right column
+            แผง "ระดับภัยคุกคาม" / "แหล่งข่าว OSINT" / "หมวดเหตุการณ์" ถูกลบออก
+            เดิมใช้ตัวเลขสมมติทั้งหมด (ดัชนี 68, กราฟแท่ง) ไม่ได้คำนวณจากข้อมูลจริง */}
         <div className="col" style={{ gap: 12, minHeight: 0, overflow: "auto" }}>
-          <Panel title={T("ระดับภัยคุกคาม", "Threat Posture")} icon="shield">
-            <div className="row" style={{ gap: 16, alignItems: "center" }}>
-              <Gauge value={68} label={T("ดัชนี", "INDEX")} color="var(--accent)" />
-              <div className="col" style={{ gap: 8, flex: 1 }}>
-                <div><span className="badge badge-warn"><span className="bdot"></span>ELEVATED</span></div>
-                <div className="dim" style={{ fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>
-                  {T(
-                    "เฝ้าระวังสูงจากภัยทะเลแดง กองเรือเงา และความตึงเครียดในทะเลจีนใต้",
-                    "Elevated by Red Sea threat, shadow-fleet activity, and SCS tension."
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="divider"></div>
-            <ThreatMeter value={68} lang={lang} />
-          </Panel>
-
-          <Panel title={T("แหล่งข่าว OSINT", "OSINT Sources")} icon="feed"
+          <Panel title={T("ฟีดข่าวกรอง", "Intelligence Feed")} icon="feed"
             action={
               <a className="panel-link" onClick={() => onNav("osint")}>
-                {T("ฟีด", "Feed")}<Icon name="chevR" size={13} />
+                {T("เปิดฟีด", "Open feed")}<Icon name="chevR" size={13} />
               </a>
             }>
-            {sourceMix.map(s => (
-              <div className="srcbar" key={s.key}>
-                <div className="nm"><SrcChip srcKey={s.key} /></div>
-                <div className="track">
-                  <div className="fill" style={{ width: (s.count / maxSrc * 100) + "%" }}></div>
-                </div>
-                <div className="ct">{s.count}</div>
-              </div>
-            ))}
-          </Panel>
-
-          <Panel title={T("หมวดเหตุการณ์ (7 วัน)", "Incident Mix (7d)")} icon="list">
-            {catMix.map(c => (
-              <div className="srcbar" key={c.key}>
-                <div className="nm" style={{ width: 110 }}>{tx(c.label, lang)}</div>
-                <div className="track">
-                  <div className="fill" style={{ width: (c.count / maxCat * 100) + "%", background: c.color }}></div>
-                </div>
-                <div className="ct">{c.count}</div>
-              </div>
-            ))}
+            <div className="dim" style={{ fontSize: "var(--fs-sm)", lineHeight: 1.7 }}>
+              {T("ข่าวทั้งหมดดึงจากสำนักข่าวจริงและแสดงเฉพาะรายการที่มีลิงก์ต้นฉบับตรวจสอบได้",
+                 "All reporting is pulled from real outlets; only items with a verifiable source link are shown.")}
+            </div>
+            <div className="divider"></div>
+            <a className="panel-link" onClick={() => onNav("chat")}>
+              <Icon name="spark" size={13} />{T("ถาม-ตอบเกี่ยวกับข่าว", "Ask about the reporting")}
+            </a>
           </Panel>
         </div>
       </div>

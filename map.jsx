@@ -52,18 +52,6 @@ const MAP_STYLE = `
     white-space: nowrap;
   }
   .mda-label::before { display: none !important; }
-  .choke-label {
-    background: rgba(6,9,18,0.92) !important;
-    border: 1px solid rgba(255,68,68,0.5) !important;
-    border-radius: 4px;
-    color: #ff8888 !important;
-    font-family: var(--font-mono) !important;
-    font-size: 9px !important;
-    padding: 1px 5px;
-    white-space: nowrap;
-    letter-spacing: 0.04em;
-  }
-  .choke-label::before { display: none !important; }
 `;
 
 /* ── Shipping lanes (approximate great-circle waypoints) ── */
@@ -88,29 +76,6 @@ const SHIPPING_LANES = [
   { name: "Australia", pts: [[103.8,1.3],[112,-8],[115,-32],[115,-33.9],[130,-35],[151,-34],[174,-36.9]] },
 ];
 
-/* ── Strategic Chokepoints ── */
-const CHOKEPOINTS = [
-  { name: "Bab el-Mandeb", lat: 12.6,  lon: 43.4,  risk: "high" },
-  { name: "Strait of Hormuz", lat: 26.6, lon: 56.3, risk: "high" },
-  { name: "Suez Canal",     lat: 30.0,  lon: 32.6,  risk: "watch" },
-  { name: "Strait of Malacca", lat: 1.3, lon: 103.8, risk: "normal" },
-  { name: "Gibraltar",     lat: 35.9,  lon: -5.4,   risk: "normal" },
-  { name: "Dover Strait",  lat: 51.1,  lon: 1.3,    risk: "normal" },
-  { name: "Bosphorus",     lat: 41.1,  lon: 29.0,   risk: "watch" },
-  { name: "Panama Canal",  lat: 9.0,   lon: -79.6,  risk: "normal" },
-  { name: "Cape of Good Hope", lat: -33.9, lon: 18.4, risk: "normal" },
-  { name: "Danish Straits", lat: 57.0, lon: 10.6,   risk: "normal" },
-];
-
-function chokeHtml(risk) {
-  const col = risk === "high" ? "#ff4444" : risk === "watch" ? "#e3b341" : "#33d6c8";
-  return `<div style="position:relative;width:14px;height:14px;">
-    <div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid ${col};animation:pulse-ring 3s linear infinite;pointer-events:none;opacity:0.6;"></div>
-    <div style="position:absolute;inset:0;border-radius:50%;background:${col};opacity:0.2;"></div>
-    <div style="position:absolute;inset:3px;border-radius:50%;background:${col};opacity:0.9;box-shadow:0 0 6px ${col};"></div>
-  </div>`;
-}
-
 function vesselHtml(v, isSelected) {
   const vt = window.VTYPE[v.type] || window.VTYPE.cargo;
   const col = vt.color;
@@ -125,19 +90,34 @@ function vesselHtml(v, isSelected) {
     ? `<div style="position:absolute;inset:-5px;border-radius:50%;border:1.5px dashed ${col};pointer-events:none;"></div>`
     : "";
 
-  let shape = "";
-  if (v.type === "dark") {
-    shape = `<path d="M0,-8 L5.5,5 L0,2.5 L-5.5,5 Z" fill="none" stroke="${col}" stroke-width="2"/>`;
-  } else if (v.type === "navy") {
-    shape = `<path d="M0,-8 L5.5,5 L0,2.5 L-5.5,5 Z" fill="${col}" stroke="#0a0d12" stroke-width="0.8"/>`;
-  } else {
-    shape = `<path d="M0,-7 L5,5 L0,2 L-5,5 Z" fill="${col}"/>`;
-  }
+  /* สัญลักษณ์เรือแบบ VesselFinder (vesselfinder.com)
+     - เรือที่มีข้อมูลเดินเรือ → ลูกศรหัวแหลมชี้ตามเข็ม ท้ายเรือเว้าเข้า
+     - เรือจอด/ไม่มีข้อมูลความเร็ว-เข็ม → วงกลม (ตามธรรมเนียมของ VesselFinder)
+     - สีตามประเภทเรือ AIS · เส้นขอบเทาบาง ๆ ให้เห็นชัดบนพื้นแผนที่ทุกโทน */
+  const stroke = window.VTYPE_STROKE || "#999999";
+  const isDark = v.type === "dark";
+  // วงกลม = มีข้อมูล AIS จริงและเรือหยุดนิ่ง (จอด/ทอดสมอ)
+  // เรือที่มาจากข่าวยังไม่มีค่าความเร็ว-เข็มจาก AIS → คงรูปลูกศรเรือไว้
+  const hasAisNav = !v.fromNews && typeof v.sp === "number";
+  const moored    = hasAisNav && v.sp <= 0.5;
+
+  const paint = isDark
+    // เรือปิดสัญญาณ: ลำตัวโปร่ง เน้นว่าไม่มีข้อมูล AIS ยืนยัน
+    ? `fill="none" stroke="${col}" stroke-width="1.7"`
+    : `fill="${col}" stroke="${stroke}" stroke-width="1"`;
+
+  const arrow = "M0,-10 L5.4,7.6 L0,3.9 L-5.4,7.6 Z";
+  const shape = moored
+    ? `<circle cx="0" cy="0" r="5.2" ${paint}/>`
+    : `<g transform="rotate(${v.course || 0})">
+         <path d="${arrow}" ${paint} stroke-linejoin="round"/>
+       </g>`;
 
   return `<div style="position:relative;width:${sz}px;height:${sz}px;">
     ${ring}${sel}
-    <svg width="${sz}" height="${sz}" viewBox="-12 -12 24 24" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">
-      <g transform="rotate(${v.course})">${shape}</g>
+    <svg width="${sz}" height="${sz}" viewBox="-12 -12 24 24" xmlns="http://www.w3.org/2000/svg"
+         style="display:block;overflow:visible;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45));">
+      ${shape}
     </svg>
   </div>`;
 }
@@ -152,6 +132,15 @@ function eventHtml(sev) {
   </div>`;
 }
 
+/* จุดข่าว — วงเล็กกว่าจุดเหตุการณ์ ไม่มีวงกระเพื่อม เพื่อไม่ให้แย่งสายตา */
+function newsHtml(color) {
+  const c = color || "#5fb0c9";
+  return `<div style="position:relative;width:11px;height:11px;">
+    <div style="position:absolute;inset:0;border-radius:50%;background:${c};opacity:0.22;"></div>
+    <div style="position:absolute;inset:3px;border-radius:50%;background:${c};box-shadow:0 0 5px ${c};"></div>
+  </div>`;
+}
+
 function focusHtml() {
   return `<div style="position:relative;width:22px;height:22px;">
     <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--accent);animation:pulse-ring 1.8s linear infinite;pointer-events:none;"></div>
@@ -161,16 +150,16 @@ function focusHtml() {
 }
 
 function MapView({
-  vessels = [], events = [], selected, onSelect, onSelectEvent, lang,
-  showLabels = false, showTracks = true, showEvents = true, sweep = false,
-  showLanes = true, showChokepoints = true, focus = null, view = null,
+  vessels = [], events = [], newsPoints = [], selected, onSelect, onSelectEvent, onSelectNews, lang,
+  showLabels = false, showTracks = true, showEvents = true, showNews = true, sweep = false,
+  showLanes = true, focus = null, view = null,
   zoomable = false, initialCenter = [20, 10], initialZoom = 2,
 }) {
   const containerRef = React.useRef(null);
   const mapRef       = React.useRef(null);
   const tileRef      = React.useRef(null);
   const layersRef    = React.useRef({
-    vessels: null, events: null, tracks: null, lanes: null, chokes: null,
+    vessels: null, events: null, tracks: null, lanes: null, news: null,
   });
 
   /* ── init map ──────────────────────────────────────────────── */
@@ -208,11 +197,11 @@ function MapView({
     }
 
     const lanes  = L.layerGroup().addTo(map);
-    const chokes = L.layerGroup().addTo(map);
     const tl     = L.layerGroup().addTo(map);
+    const nl     = L.layerGroup().addTo(map);   // จุดข่าว (อยู่ใต้เหตุการณ์/เรือ)
     const el     = L.layerGroup().addTo(map);
     const vl     = L.layerGroup().addTo(map);
-    layersRef.current = { vessels: vl, events: el, tracks: tl, lanes, chokes };
+    layersRef.current = { vessels: vl, events: el, tracks: tl, lanes, news: nl };
     mapRef.current = map;
 
     setTimeout(() => {
@@ -224,7 +213,7 @@ function MapView({
       map.remove();
       mapRef.current = null;
       tileRef.current = null;
-      layersRef.current = { vessels: null, events: null, tracks: null, lanes: null, chokes: null };
+      layersRef.current = { vessels: null, events: null, tracks: null, lanes: null, news: null };
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -265,26 +254,6 @@ function MapView({
       }).addTo(lanes);
     });
   }, [showLanes, zoomable]);
-
-  /* ── chokepoints ──────────────────────────────────────────── */
-  React.useEffect(() => {
-    const { chokes } = layersRef.current;
-    if (!chokes) return;
-    chokes.clearLayers();
-    if (!showChokepoints) return;
-
-    CHOKEPOINTS.forEach(cp => {
-      const icon = L.divIcon({
-        html: chokeHtml(cp.risk), className: "", iconSize: [14, 14], iconAnchor: [7, 7],
-      });
-      const m = L.marker([cp.lat, cp.lon], { icon });
-      m.bindTooltip(cp.name, {
-        permanent: false, direction: "top", offset: [0, -8],
-        className: "choke-label",
-      });
-      m.addTo(chokes);
-    });
-  }, [showChokepoints]);
 
   /* ── vessels + tracks ─────────────────────────────────────── */
   React.useEffect(() => {
@@ -343,6 +312,32 @@ function MapView({
     });
   }, [events, showEvents]);
 
+  /* ── จุดข่าว: ปักทุกข่าวที่ระบุพื้นที่ได้ ───────────────────── */
+  React.useEffect(() => {
+    const { news: nl } = layersRef.current;
+    if (!nl) return;
+    nl.clearLayers();
+    if (!showNews) return;
+
+    newsPoints.forEach(p => {
+      const icon = L.divIcon({
+        html: newsHtml(p.color), className: "", iconSize: [11, 11], iconAnchor: [5.5, 5.5],
+      });
+      const title = (p.title && (lang === "th" ? (p.title.th || p.title.en) : (p.title.en || p.title.th))) || "";
+      const where = p.region ? (lang === "th" ? p.region.th : p.region.en) : "";
+      L.marker([p.lat, p.lon], { icon })
+        .bindTooltip(
+          `<div style="max-width:250px;white-space:normal;line-height:1.4">
+             <div style="opacity:.65;font-size:9px">${where}${p.outlet ? " · " + p.outlet : ""}</div>
+             <div>${title}</div>
+           </div>`,
+          { direction: "top", offset: [0, -6], className: "mda-label", sticky: false }
+        )
+        .on("click", (ev) => { L.DomEvent.stopPropagation(ev); onSelectNews && onSelectNews(p); })
+        .addTo(nl);
+    });
+  }, [newsPoints, showNews, lang]);
+
   /* ── focus: บินไปจุดที่ส่งมาจากฟีดข่าว + ปักหมุดเด่น ──────────── */
   React.useEffect(() => {
     const map = mapRef.current;
@@ -390,4 +385,4 @@ function MapView({
   );
 }
 
-Object.assign(window, { MapView, projPt, projX, projY, CHOKEPOINTS, SHIPPING_LANES });
+Object.assign(window, { MapView, projPt, projX, projY, SHIPPING_LANES });

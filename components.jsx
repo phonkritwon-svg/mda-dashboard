@@ -51,6 +51,8 @@ const ICON_PATHS = {
   wave: '<path d="M2 8c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 14c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
+  expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  shrink: '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
 };
 function Icon({ name, size = 24, style, className, strokeWidth = 1.8 }) {
   return (
@@ -193,13 +195,17 @@ function Panel({ title, icon, action, children, style, bodyClass = "", flush }) 
   );
 }
 
-/* ---- vessel type glyph color ---- */
+/* ---- vessel type glyph color ----
+   ชุดสีตามมาตรฐาน VesselFinder (vesselfinder.com) — เทียบรหัสประเภทเรือ AIS:
+   4 = Cargo (เหลือง) · 6 = Tanker (ส้ม) · 5 = Fishing (ฟ้า)
+   7 = SAR/Military (แดง) · 1 = Unknown (เทา) · เส้นขอบ #999999 ทุกประเภท   */
+const VTYPE_STROKE = "#999999";
 const VTYPE = {
-  cargo:   { color:"#7d99b5", label:{th:"เรือสินค้า",en:"Cargo"} },
-  tanker:  { color:"#5fb0c9", label:{th:"เรือบรรทุกน้ำมัน",en:"Tanker"} },
-  fishing: { color:"#46c976", label:{th:"เรือประมง",en:"Fishing"} },
-  navy:    { color:"#e3b341", label:{th:"เรือรบ (มิตร)",en:"Navy (friendly)"} },
-  dark:    { color:"#f6553f", label:{th:"เรือปิดสัญญาณ",en:"Dark / Unknown"} },
+  cargo:   { color:"#ffff02", label:{th:"เรือสินค้า",en:"Cargo"} },
+  tanker:  { color:"#fea321", label:{th:"เรือบรรทุกน้ำมัน",en:"Tanker"} },
+  fishing: { color:"#6fc6fe", label:{th:"เรือประมง",en:"Fishing"} },
+  navy:    { color:"#ff2020", label:{th:"เรือรบ (มิตร)",en:"Navy (friendly)"} },
+  dark:    { color:"#c1c1c1", label:{th:"เรือปิดสัญญาณ",en:"Dark / Unknown"} },
 };
 
 /* ============================================================
@@ -345,7 +351,7 @@ function FocusGroupLabel({ kind, lang, count }) {
 
 Object.assign(window, {
   LangCtx, useLang, tx, Icon, ICON_PATHS, SEV, SevBadge, Badge, SrcChip,
-  Sparkline, MiniBars, ThreatMeter, Confidence, Gauge, Panel, VTYPE,
+  Sparkline, MiniBars, ThreatMeter, Confidence, Gauge, Panel, VTYPE, VTYPE_STROKE,
   TimeScopeBar, timeWindow, inTimeWindow,
   FOCUS_COUNTRIES, FOCUS_RE, focusCountryOf, focusPartition, FocusToggle, FocusGroupLabel,
 });

@@ -43,6 +43,65 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   };
   const resetRegion = () => { setMapView({ lat: 20, lon: 10, zoom: 2 }); setRegionLabel(null); setRegionOpen(false); };
 
+  /* ── โหมดเต็มจอ: ซ่อน UI รอบข้างทั้งหมด เหลือเฉพาะแผนที่ ──
+     ใช้เทคนิค FLIP — จำกรอบแผนที่ก่อนสลับโหมด แล้วให้แผนที่ "ค่อย ๆ ขยาย"
+     จากตำแหน่งเดิมไปเต็มจอด้วย transform (ลื่นเพราะใช้ GPU) */
+  const FS_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";   // ease-out-quint: ออกตัวเร็ว จบนุ่ม
+  const FS_MS   = 520;
+  const [fullscreen, setFullscreen] = useState(false);
+  const mapPanelRef = React.useRef(null);
+  const fromRectRef = React.useRef(null);
+
+  // เก็บกรอบแผนที่ "ก่อน" React จัดเลย์เอาต์ใหม่ เพื่อใช้เป็นจุดตั้งต้นของอนิเมชัน
+  const switchFullscreen = React.useCallback((next) => {
+    setFullscreen(prev => {
+      if (prev === next) return prev;
+      const el = mapPanelRef.current;
+      fromRectRef.current = el ? el.getBoundingClientRect() : null;
+      return next;
+    });
+  }, []);
+
+  React.useLayoutEffect(() => {
+    const el = mapPanelRef.current;
+    const from = fromRectRef.current;
+    fromRectRef.current = null;
+    if (!el || !from) return;
+
+    const to = el.getBoundingClientRect();
+    if (!to.width || !to.height) return;
+
+    // ย้อนแผนที่กลับไปทับตำแหน่งเดิมก่อน (ยังไม่มีอนิเมชัน) แล้วค่อยปล่อยให้วิ่งเข้าที่
+    const dx = from.left - to.left;
+    const dy = from.top - to.top;
+    const sx = from.width / to.width;
+    const sy = from.height / to.height;
+
+    el.style.transformOrigin = "top left";
+    el.style.willChange = "transform";
+
+    // 1) วางแผนที่ทับตำแหน่งเดิมแบบไม่มีอนิเมชัน
+    el.style.transition = "none";
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    void el.offsetWidth;   // บังคับ reflow ให้ค่าข้างบนมีผลจริงก่อน (ไม่ต้องรอ rAF)
+
+    // 2) ปล่อยให้วิ่งเข้าที่จริงอย่างนุ่มนวล
+    el.style.transition = `transform ${FS_MS}ms ${FS_EASE}`;
+    el.style.transform = "";
+
+    const done = () => { el.style.transition = ""; el.style.willChange = ""; el.style.transform = ""; };
+    el.addEventListener("transitionend", done, { once: true });
+    const guard = setTimeout(done, FS_MS + 120);   // กันกรณี transitionend ไม่ยิง
+    return () => { clearTimeout(guard); el.removeEventListener("transitionend", done); };
+  }, [fullscreen]);
+
+  // ออกจากโหมดเต็มจอด้วยปุ่ม Esc
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") switchFullscreen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [switchFullscreen]);
+
   useEffect(() => {
     if (focus && showToast) {
       showToast(T("แสดงตำแหน่งจากข่าว", "Showing location from news") + (focus.label ? " · " + focus.label : ""), "info");
@@ -54,16 +113,29 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const [visible, setVisible] = useState({
     cargo: true, tanker: true, fishing: true, navy: true, dark: true,
     incidents: true,   // จุดเหตุการณ์จากข่าวบนแผนที่
+    news: true,        // จุดข่าวทั้งหมดที่ระบุพื้นที่ได้
   });
-  const [layers, setLayers] = useState({ tracks: true, labels: false, sweep: true, lanes: true, chokes: true });
+  const [layers, setLayers] = useState({ tracks: true, labels: false, sweep: true, lanes: true });
   const toggle = (k) => setLayers(l => ({ ...l, [k]: !l[k] }));
   const toggleVis = (k) => setVisible(s => ({ ...s, [k]: !s[k] }));
-  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, dark: val, incidents: val });
+  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, dark: val, incidents: val, news: val });
 
-  // หมุดเรือมาจากข่าวจริง (สแกนชื่อเรือ+พื้นที่จากฟีดข่าว) แทนเรือ dummy
   const { news: liveNews } = window.useNewsUpdater(data.news);
-  const vessels = React.useMemo(
+
+  /* ── หมุดเรือ ──
+     ถ้าเซิร์ฟเวอร์ต่อ AISStream ได้ → ใช้ตำแหน่งเรือจริง หมุดจะขยับเองตามเรือที่แล่นอยู่
+     ถ้ายังไม่ได้ตั้งคีย์ AIS → ถอยไปใช้หมุดที่สกัดจากข่าว (ตำแหน่งโดยประมาณตามภูมิภาค) */
+  const { aisVessels, ais } = window.useLiveVessels();
+  const newsVessels = React.useMemo(
     () => (window.extractVesselsFromNews ? window.extractVesselsFromNews(liveNews) : []),
+    [liveNews]
+  );
+  const usingAis = aisVessels.length > 0;
+  const vessels = usingAis ? aisVessels : newsVessels;
+
+  // อ่านข่าวทุกชิ้น → หาพื้นที่จากเนื้อข่าว → ปักเป็นจุดบนแผนที่
+  const newsPoints = React.useMemo(
+    () => (window.extractNewsPointsFromNews ? window.extractNewsPointsFromNews(liveNews) : []),
     [liveNews]
   );
 
@@ -167,7 +239,8 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   };
 
   const typeCount = (k) => vessels.filter(v => v.type === k).length;
-  const hiddenCount = Object.keys(window.VTYPE).filter(k => !visible[k]).length + (visible.incidents ? 0 : 1);
+  const hiddenCount = Object.keys(window.VTYPE).filter(k => !visible[k]).length
+    + (visible.incidents ? 0 : 1) + (visible.news ? 0 : 1);
 
   const CheckRow = ({ checked, onChange, color, label, count }) => (
     <label
@@ -180,9 +253,27 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     </label>
   );
 
+  // UI รอบข้าง: ค่อย ๆ จางหายตอนเข้าเต็มจอ แทนการหายวับ
+  const chromeStyle = {
+    opacity: fullscreen ? 0 : 1,
+    transform: fullscreen ? "translateY(-6px)" : "none",
+    transition: `opacity ${Math.round(FS_MS * 0.5)}ms ease, transform ${Math.round(FS_MS * 0.5)}ms ${FS_EASE}`,
+    pointerEvents: fullscreen ? "none" : "auto",
+  };
+
   return (
-    <div className="screen" style={{ height: "100%", display: "flex", flexDirection: "column", paddingBottom: 16 }}>
-      <div className="page-head" style={{ marginBottom: 12 }}>
+    <div className="screen"
+      style={{ height: "100%", display: "flex", flexDirection: "column", paddingBottom: 16 }}>
+      {/* ฉากหลังทึบ: จางเข้ามาคลุมเมนู/แถบบนของแอป ระหว่างแผนที่ขยายเต็มจอ */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 880, background: "var(--bg)",
+        opacity: fullscreen ? 1 : 0,
+        transition: `opacity ${Math.round(FS_MS * 0.6)}ms ease`,
+        pointerEvents: fullscreen ? "auto" : "none",
+        visibility: fullscreen ? "visible" : "hidden",
+      }} />
+
+      <div className="page-head" style={{ marginBottom: 12, ...chromeStyle }}>
         <div>
           <div className="eyebrow">LIVE TACTICAL MAP</div>
           <div className="page-title">{T("แผนที่สถานการณ์ · เรือและเหตุการณ์", "Situation Map · Vessels & Events")}</div>
@@ -206,11 +297,15 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           <button className="btn btn-ghost btn-sm" onClick={handleExport}>
             <Icon name="download" size={14} />{T("ส่งออก CSV", "Export CSV")}
           </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => switchFullscreen(true)}
+            title={T("แสดงแผนที่เต็มจอ (ออกด้วย Esc)", "Fullscreen map (Esc to exit)")}>
+            <Icon name="expand" size={14} />{T("เต็มจอ", "Fullscreen")}
+          </button>
         </div>
       </div>
 
       {/* search + vessel-type filters */}
-      <div className="row" style={{ marginBottom: 12, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="row" style={{ marginBottom: 12, gap: 10, flexWrap: "wrap", alignItems: "center", ...chromeStyle }}>
         <div style={{ position: "relative" }}>
           <Icon name="search" size={14}
             style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none" }} />
@@ -261,13 +356,14 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
                 <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 4px" }}>{T("เหตุการณ์จากข่าว", "Incidents (news)")}</div>
                 <CheckRow checked={visible.incidents} onChange={() => toggleVis("incidents")}
                   color="var(--crit)" label={T("จุดเหตุการณ์บนแผนที่", "Incident dots")} count={data.events.length} />
+                <CheckRow checked={visible.news} onChange={() => toggleVis("news")}
+                  color="#5fb0c9" label={T("จุดข่าวบนแผนที่", "News dots")} count={newsPoints.length} />
 
                 <div className="divider" style={{ margin: "6px 4px" }} />
                 <div className="dim up" style={{ fontSize: 10, padding: "2px 9px 4px" }}>{T("ชั้นข้อมูลแผนที่", "Map layers")}</div>
                 <CheckRow checked={layers.tracks} onChange={() => toggle("tracks")} label={T("เส้นทาง AIS", "AIS tracks")} />
                 <CheckRow checked={layers.labels} onChange={() => toggle("labels")} label={T("ป้ายเรือ", "Labels")} />
                 <CheckRow checked={layers.lanes}  onChange={() => toggle("lanes")}  label={T("เส้นเดินเรือ", "Ship lanes")} />
-                <CheckRow checked={layers.chokes} onChange={() => toggle("chokes")} label={T("ช่องแคบ", "Chokepoints")} />
                 <CheckRow checked={layers.sweep}  onChange={() => toggle("sweep")}  label={T("เรดาร์กวาด", "Radar sweep")} />
               </div>
             </>
@@ -320,20 +416,50 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: "1fr 330px", gap: 12, flex: 1, minHeight: 0 }}>
-        {/* MAP */}
-        <div className="panel" style={{ padding: 0, position: "relative", overflow: "hidden", isolation: "isolate", borderRadius: 0, border: "none" }}>
+        {/* MAP — ในโหมดเต็มจอจะหลุดออกจากกริดไปคลุมทั้งหน้าจอ (มีอนิเมชันขยายจากตำแหน่งเดิม) */}
+        <div className="panel" ref={mapPanelRef}
+          style={{
+            padding: 0, position: fullscreen ? "fixed" : "relative",
+            ...(fullscreen ? { inset: 0, zIndex: 890, margin: 0 } : null),
+            overflow: "hidden", isolation: "isolate", borderRadius: 0, border: "none",
+          }}>
           <MapView vessels={filteredVessels} events={scopedEvents} lang={lang}
             selected={selected} onSelect={setSelected} focus={focus} view={mapView}
             onSelectEvent={(e) => onNav("incident", { id: e.id })}
+            newsPoints={newsPoints} showNews={visible.news}
+            onSelectNews={(p) => onNav("newsDetail", { item: p.item })}
             showTracks={layers.tracks} showEvents={visible.incidents}
             showLabels={layers.labels} sweep={layers.sweep} zoomable={true}
-            showLanes={layers.lanes} showChokepoints={layers.chokes}
+            showLanes={layers.lanes}
             initialCenter={focus ? [focus.lat, focus.lon] : [20, 10]} initialZoom={focus ? 5 : 2} />
+
+          {/* ปุ่มเข้า/ออกโหมดเต็มจอ — ลอยอยู่มุมขวาบนของแผนที่ */}
+          <button className="btn btn-ghost btn-sm"
+            onClick={() => switchFullscreen(!fullscreen)}
+            title={fullscreen
+              ? T("ออกจากโหมดเต็มจอ (Esc)", "Exit fullscreen (Esc)")
+              : T("แสดงแผนที่เต็มจอ", "Fullscreen map")}
+            style={{
+              position: "absolute", top: 12, right: 12, zIndex: 500,
+              background: "var(--surface-2)", border: "1px solid var(--border-2)",
+              boxShadow: "var(--shadow)",
+            }}>
+            <Icon name={fullscreen ? "shrink" : "expand"} size={14} />
+            {fullscreen ? T("ออกจากเต็มจอ", "Exit") : T("เต็มจอ", "Fullscreen")}
+          </button>
 
           {/* top-left stats */}
           <div className="map-hud map-stat">
             <div className="ms">
-              <div className="k">{T("แสดงอยู่", "Showing")}</div>
+              <div className="k">
+                {usingAis ? T("เรือ AIS สด", "Live AIS") : T("เรือจากข่าว", "From news")}
+                <span style={{
+                  display: "inline-block", width: 6, height: 6, borderRadius: "50%", marginLeft: 5,
+                  background: usingAis ? "var(--ok)" : "var(--text-mute)",
+                }} title={usingAis
+                  ? T("รับตำแหน่งจริงจาก AISStream", "Live positions from AISStream")
+                  : (ais.error || T("ยังไม่ได้ตั้งคีย์ AIS", "AIS key not configured"))} />
+              </div>
               <div className="v">{filteredVessels.length}</div>
             </div>
             <div className="ms">
@@ -344,6 +470,10 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
               <div className="k">{T("เหตุการณ์สด", "Live")}</div>
               <div className="v" style={{ color: "var(--crit)" }}>{data.events.filter(e => !e.resolved).length}</div>
             </div>
+            <div className="ms">
+              <div className="k">{T("จุดข่าว", "News")}</div>
+              <div className="v" style={{ color: "#5fb0c9" }}>{visible.news ? newsPoints.length : 0}</div>
+            </div>
           </div>
 
           {/* legend */}
@@ -351,15 +481,26 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
             {Object.entries(window.VTYPE).map(([k, vt]) => (
               <div className="legend-row" key={k}>
                 <span className="sym">
-                  <svg width="12" height="12">
-                    <path d="M6,1 L10,11 L6,8.5 L2,11 Z"
+                  {/* สัญลักษณ์เรือแบบ VesselFinder — ลูกศรหัวแหลม ท้ายเว้า */}
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M6,0.4 L9.3,11.1 L6,8.9 L2.7,11.1 Z"
                       fill={k === "dark" ? "none" : vt.color}
-                      stroke={vt.color} strokeWidth="1.2" />
+                      stroke={k === "dark" ? vt.color : (window.VTYPE_STROKE || "#999999")}
+                      strokeWidth="1" strokeLinejoin="round" />
                   </svg>
                 </span>
                 {tx(vt.label, lang)}
               </div>
             ))}
+            <div className="legend-row">
+              <span className="sym">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                  <circle cx="6" cy="6" r="5" fill="#5fb0c9" opacity="0.22" />
+                  <circle cx="6" cy="6" r="2.5" fill="#5fb0c9" />
+                </svg>
+              </span>
+              {T("จุดข่าว", "News")}
+            </div>
           </div>
 
           {/* vessel detail card */}
@@ -422,7 +563,8 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           )}
         </div>
 
-        {/* RIGHT RAIL */}
+        {/* RIGHT RAIL — จางหายในโหมดเต็มจอ */}
+        <div style={{ minHeight: 0, display: "flex", flexDirection: "column", ...chromeStyle }}>
         <Panel flush
           title={
             <div className="pill-tabs" style={{ border: "none", background: "transparent", padding: 0 }}>
@@ -492,6 +634,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
             )}
           </div>
         </Panel>
+        </div>
       </div>
     </div>
   );

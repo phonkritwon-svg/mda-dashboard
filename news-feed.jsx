@@ -113,27 +113,55 @@ function contentHash(text) {
   return String(Math.abs(h));
 }
 
+// มีอักษรไทยอยู่แล้วหรือไม่ (ถ้ามี ไม่ต้องแปล)
+function hasThai(text) {
+  return /[฀-๿]/.test(text || "");
+}
+
+// แปล 1 ข้อความด้วย Google Translate (endpoint ฟรี ไม่ต้องมี key)
+async function gtransTh(text) {
+  if (!text || !text.trim() || hasThai(text)) return text || "";
+  try {
+    const url = new URL("https://translate.googleapis.com/translate_a/single");
+    url.searchParams.set("client", "gtx");
+    url.searchParams.set("sl", "auto");
+    url.searchParams.set("tl", "th");
+    url.searchParams.set("dt", "t");
+    url.searchParams.set("q", text.slice(0, 500));
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url.toString(), { signal: ctrl.signal });
+    clearTimeout(timer);
+    const data = await res.json();
+    return (data[0] || []).map(p => p[0] || "").join("") || text;
+  } catch {
+    return text;   // แปลไม่สำเร็จ → ใช้ต้นฉบับ
+  }
+}
+
+function applyTranslationCache(items, cacheObj) {
+  return items.map(n => {
+    const hash = contentHash(n.raw.en || "");
+    const cached = cacheObj[hash];
+    if (!cached) return n;
+    return {
+      ...n,
+      raw: { th: cached.th_title || n.raw.en, en: n.raw.en },
+      ai:  { th: cached.th_summary || n.ai.en, en: n.ai.en },
+    };
+  });
+}
+
 async function aiSummarizeTh(items) {
   const cache = loadTranslationCache();
   const needTranslate = items.filter(n => {
     const hash = contentHash(n.raw.en || "");
-    return !cache[hash];
+    return !cache[hash] && !hasThai(n.raw.th);   // ข้ามข่าวที่เป็นไทยแล้ว
   });
 
-  if (!needTranslate.length) {
-    // apply cached translations
-    return items.map(n => {
-      const hash = contentHash(n.raw.en || "");
-      const cached = cache[hash];
-      if (!cached) return n;
-      return {
-        ...n,
-        raw: { th: cached.th_title || n.raw.en, en: n.raw.en },
-        ai:  { th: cached.th_summary || n.ai.en, en: n.ai.en },
-      };
-    });
-  }
+  if (!needTranslate.length) return applyTranslationCache(items, cache);
 
+  // 1) ลองใช้ AI summarize ฝั่ง server ก่อน (ใช้ได้เฉพาะบน Vercel)
   try {
     const res = await fetch("/api/summarize", {
       method: "POST",
@@ -149,33 +177,35 @@ async function aiSummarizeTh(items) {
       signal: AbortSignal.timeout ? AbortSignal.timeout(35000) : undefined,
     });
     const data = await res.json();
-    if (!data.summaries || data.error) return items;
+    if (data.summaries && !data.error) {
+      const newCache = { ...cache };
+      data.summaries.forEach((s, i) => {
+        const orig = needTranslate[s.index !== undefined ? s.index : i];
+        if (orig) {
+          const hash = contentHash(orig.raw.en || "");
+          newCache[hash] = s;
+        }
+      });
+      saveTranslationCache(newCache);
+      return applyTranslationCache(items, newCache);
+    }
+  } catch { /* server ไม่พร้อม → ใช้ fallback ด้านล่าง */ }
 
-    // บันทึกลง cache
-    const newCache = { ...cache };
-    data.summaries.forEach((s, i) => {
-      const orig = needTranslate[s.index !== undefined ? s.index : i];
-      if (orig) {
-        const hash = contentHash(orig.raw.en || "");
-        newCache[hash] = s;
-      }
-    });
-    saveTranslationCache(newCache);
-
-    // apply to all items
-    return items.map(n => {
+  // 2) Fallback: แปลด้วย Google Translate ทีละข่าว (ขนานกันทั้งหมด)
+  const newCache = { ...cache };
+  await Promise.allSettled(needTranslate.map(async n => {
+    const [thTitle, thSummary] = await Promise.all([
+      gtransTh(n.raw.en),
+      gtransTh(n.ai.en),
+    ]);
+    const changed = (thTitle && thTitle !== n.raw.en) || (thSummary && thSummary !== n.ai.en);
+    if (changed) {
       const hash = contentHash(n.raw.en || "");
-      const s = newCache[hash];
-      if (!s) return n;
-      return {
-        ...n,
-        raw: { th: s.th_title || n.raw.en, en: n.raw.en },
-        ai:  { th: s.th_summary || n.ai.en, en: n.ai.en },
-      };
-    });
-  } catch {
-    return items;
-  }
+      newCache[hash] = { th_title: thTitle, th_summary: thSummary };
+    }
+  }));
+  saveTranslationCache(newCache);
+  return applyTranslationCache(items, newCache);
 }
 
 async function fetchAllLiveNews() {
@@ -198,10 +228,23 @@ function saveNewsCache(items) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(items)); } catch {}
 }
 
+/* ── กฎ: แสดงเฉพาะข่าวที่มีแหล่งอ้างอิงตรวจสอบได้ ──
+   ข่าวใดไม่มีลิงก์ต้นฉบับ (url ว่าง หรือเป็น "#") ถือว่าไม่มีที่มา → ไม่นำมาแสดง
+   ป้องกันข่าวที่สร้างขึ้นเองหรือดึงมาไม่สมบูรณ์ปนเข้ามาในฟีดข่าวกรอง */
+function hasVerifiableSource(n) {
+  return !!(n && typeof n.url === "string" && /^https?:\/\/\S+$/i.test(n.url.trim()));
+}
+
 function mergeWithBase(live, base) {
   const liveIds = new Set(live.map(n => n.id));
   const baseFallback = base.filter(n => !liveIds.has(n.id));
-  return [...live, ...baseFallback];
+  const all = [...live, ...baseFallback];
+  const kept = all.filter(hasVerifiableSource);
+  const dropped = all.length - kept.length;
+  if (dropped > 0) {
+    console.warn("[MDA] ตัดข่าวที่ไม่มีแหล่งอ้างอิงออก " + dropped + " ชิ้น จากทั้งหมด " + all.length);
+  }
+  return kept;
 }
 
 /* ---- Supabase: shared central news store ---- */
@@ -273,7 +316,7 @@ async function queryNewsArchive(sinceISO, untilISO, limit) {
     if (untilISO) q = q.lte("published_at", untilISO);
     const { data, error } = await q;
     if (error) { console.warn("[MDA] news archive read", error.message); return []; }
-    let items = (data || []).map(rowToItem);
+    let items = (data || []).map(rowToItem).filter(hasVerifiableSource);
     items = await aiSummarizeTh(items);
     return items;
   } catch (e) {
@@ -371,11 +414,48 @@ function useNewsUpdater(baseNews) {
     [liveNews, baseNews]
   );
 
+  // เปิดให้หน้าอื่นเข้าถึงคลังข่าวล่าสุด (หน้ารายละเอียดใช้หาข่าวที่เกี่ยวข้อง)
+  React.useEffect(() => { window.MDA_ALL_NEWS = merged; }, [merged]);
+
   return { news: merged, liveCount: liveNews.length, fetching, lastFetch, fetchError, doFetch };
 }
 
+/* ============================================================
+   AIS สด — ดึงตำแหน่งเรือจริงจากเซิร์ฟเวอร์ (/api/vessels)
+   เซิร์ฟเวอร์เป็นผู้ถือ AISSTREAM_API_KEY และเปิด WebSocket ค้างไว้
+   หน้าเว็บแค่มาดึงภาพรวมล่าสุดทุก 15 วินาที → หมุดขยับตามเรือจริง
+   ============================================================ */
+const AIS_POLL_MS = 15000;
+
+function useLiveVessels() {
+  const [vessels, setVessels] = React.useState([]);
+  const [ais, setAis] = React.useState({ connected: false, error: null, count: 0 });
+
+  React.useEffect(() => {
+    let alive = true;
+    const pull = async () => {
+      try {
+        const res = await fetch("/api/vessels", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const j = await res.json();
+        if (!alive) return;
+        setAis({ connected: !!j.connected, error: j.error || null, count: j.count || 0 });
+        setVessels(Array.isArray(j.vessels) ? j.vessels : []);
+      } catch (e) {
+        if (alive) setAis(a => ({ ...a, connected: false, error: "เชื่อมต่อเซิร์ฟเวอร์ AIS ไม่ได้" }));
+      }
+    };
+    pull();
+    const id = setInterval(pull, AIS_POLL_MS);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  return { aisVessels: vessels, ais };
+}
+
 Object.assign(window, {
+  useLiveVessels,
   useNewsUpdater, mdaTimeAgo, LIVE_SOURCES, fetchAllLiveNews,
   loadFromSupabase, pushToSupabase, queryNewsArchive, aiSummarizeTh,
-  loadTranslationCache, saveTranslationCache,
+  loadTranslationCache, saveTranslationCache, hasVerifiableSource,
 });

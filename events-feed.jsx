@@ -27,21 +27,57 @@ const REGION_PRESETS = [
 /* จับคู่ข้อความข่าว → พิกัดพื้นที่ทางทะเล (ใช้ปักหมุด "ดูบนแผนที่" จากฟีดข่าว)
    ตรงกับชุดภูมิภาคในฝั่ง cron (api/cron-news.py) */
 const MDA_GEO_REGIONS = [
-  { re: /red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen/i,        th: "ทะเลแดง / บับเอลมันเดบ",    en: "Red Sea / Bab el-Mandeb", lat: 13.5, lon: 43.3 },
-  { re: /strait of hormuz|hormuz|fujairah|persian gulf/i,      th: "ช่องแคบฮอร์มุซ",            en: "Strait of Hormuz",        lat: 26.5, lon: 56.3 },
-  { re: /gulf of aden|\baden\b/i,                              th: "อ่าวเอเดน",                 en: "Gulf of Aden",            lat: 12.5, lon: 47.0 },
-  { re: /south china sea|scarborough|spratly|paracel|second thomas|taiwan strait/i, th: "ทะเลจีนใต้", en: "South China Sea", lat: 15.0, lon: 117.0 },
-  { re: /strait of malacca|malacca|singapore strait/i,         th: "ช่องแคบมะละกา",             en: "Strait of Malacca",       lat: 2.5,  lon: 101.0 },
-  { re: /gulf of thailand/i,                                   th: "อ่าวไทย",                   en: "Gulf of Thailand",        lat: 9.5,  lon: 101.5 },
-  { re: /andaman/i,                                            th: "ทะเลอันดามัน",              en: "Andaman Sea",             lat: 8.0,  lon: 97.0 },
-  { re: /natuna/i,                                             th: "ทะเลนาตูนาเหนือ",           en: "North Natuna Sea",        lat: 5.0,  lon: 109.2 },
-  { re: /black sea|novorossiysk|odes[as]|crimea/i,            th: "ทะเลดำ",                    en: "Black Sea",               lat: 44.0, lon: 36.0 },
-  { re: /baltic|gulf of finland|kattegat|gotland/i,           th: "ทะเลบอลติก",                en: "Baltic Sea",              lat: 59.0, lon: 21.0 },
-  { re: /gulf of guinea|nigeria|lagos/i,                       th: "อ่าวกินี",                  en: "Gulf of Guinea",          lat: 3.0,  lon: 5.0 },
-  { re: /somali|horn of africa|gulf of oman|arabian sea/i,    th: "ทะเลอาหรับ / จะงอยแอฟริกา", en: "Arabian Sea / Horn",      lat: 12.0, lon: 55.0 },
-  { re: /mediterranean|aegean|libya|gaza/i,                    th: "ทะเลเมดิเตอร์เรเนียน",       en: "Mediterranean Sea",       lat: 34.0, lon: 18.0 },
-  { re: /caribbean|venezuela|panama canal/i,                   th: "ทะเลแคริบเบียน",            en: "Caribbean Sea",           lat: 14.0, lon: -72.0 },
-  { re: /indian ocean/i,                                       th: "มหาสมุทรอินเดีย",           en: "Indian Ocean",            lat: 5.0,  lon: 75.0 },
+  { re: /red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen|ทะเลแดง|บับเอล/i,        th: "ทะเลแดง / บับเอลมันเดบ",    en: "Red Sea / Bab el-Mandeb", lat: 13.5, lon: 43.3 },
+  { re: /strait of hormuz|hormuz|fujairah|persian gulf|ช่องแคบฮอร์มุซ/i,      th: "ช่องแคบฮอร์มุซ",            en: "Strait of Hormuz",        lat: 26.5, lon: 56.3 },
+  { re: /gulf of aden|\baden\b|อ่าวเอเดน/i,                              th: "อ่าวเอเดน",                 en: "Gulf of Aden",            lat: 12.5, lon: 47.0 },
+  { re: /south china sea|scarborough|spratly|paracel|second thomas|taiwan strait|ทะเลจีนใต้|สการ์โบโรห์|พารา?เซล|สปร(?:าต|ตลี)|ทะเลจีน/i, th: "ทะเลจีนใต้", en: "South China Sea", lat: 15.0, lon: 117.0 },
+  { re: /strait of malacca|malacca|singapore strait|ช่องแคบมะละกา|มะละกา|สิงค์โปร์|singapor/i,         th: "ช่องแคบมะละกา",             en: "Strait of Malacca",       lat: 2.5,  lon: 101.0 },
+  { re: /gulf of thailand|อ่าวไทย|ท้องอ่าว/i,                                   th: "อ่าวไทย",                   en: "Gulf of Thailand",        lat: 9.5,  lon: 101.5 },
+  { re: /andaman|ทะเลอันดามัน|อนุดามัน/i,                                            th: "ทะเลอันดามัน",              en: "Andaman Sea",             lat: 8.0,  lon: 97.0 },
+  { re: /natuna|นาตูนา/i,                                             th: "ทะเลนาตูนาเหนือ",           en: "North Natuna Sea",        lat: 5.0,  lon: 109.2 },
+  { re: /black sea|novorossiysk|odes[as]|crimea|ทะเลดำ|โนโวรอสซีสค์/i,            th: "ทะเลดำ",                    en: "Black Sea",               lat: 44.0, lon: 36.0 },
+  { re: /baltic|gulf of finland|kattegat|gotland|ทะเลบอลติก|บอลติก/i,           th: "ทะเลบอลติก",                en: "Baltic Sea",              lat: 59.0, lon: 21.0 },
+  { re: /gulf of guinea|nigeria|lagos|อ่าวกินี/i,                       th: "อ่าวกินี",                  en: "Gulf of Guinea",          lat: 3.0,  lon: 5.0 },
+  { re: /somali|horn of africa|gulf of oman|arabian sea|สโมลี|โซมาเลีย|ทะเลอาหรับ/i,    th: "ทะเลอาหรับ / จะงอยแอฟริกา", en: "Arabian Sea / Horn",      lat: 12.0, lon: 55.0 },
+  { re: /caribbean|venezuela|panama canal|ทะเลแคริบเบียน/i,                   th: "ทะเลแคริบเบียน",            en: "Caribbean Sea",           lat: 14.0, lon: -72.0 },
+
+  /* ── ท่าเรือ / แม่น้ำ / เมืองท่า (เจาะจง — ต้องมาก่อนระดับประเทศ) ── */
+  { re: /\brhine\b|duisburg|แม่น้ำไรน์/i,                       th: "แม่น้ำไรน์ (เยอรมนี)",       en: "Rhine (Germany)",         lat: 51.4, lon: 6.8 },
+  { re: /\bdanube\b|แม่น้ำดานูบ/i,                              th: "แม่น้ำดานูบ",               en: "Danube",                  lat: 45.4, lon: 19.3 },
+  { re: /rotterdam|antwerp|ร็อตเตอร์ดัม/i,                      th: "ร็อตเตอร์ดัม–แอนต์เวิร์ป",    en: "Rotterdam–Antwerp",       lat: 51.9, lon: 4.1 },
+  { re: /shanghai|ningbo|qingdao|\bwuhu\b|yangtze|เซี่ยงไฮ้/i,  th: "ชายฝั่งจีนตะวันออก",         en: "East China Coast",        lat: 31.0, lon: 122.5 },
+  { re: /yokosuka|\btokyo\b|\bosaka\b|โยโกสุกะ/i,               th: "ญี่ปุ่น",                   en: "Japan",                   lat: 35.2, lon: 139.7 },
+  { re: /\bbusan\b|incheon|ปูซาน/i,                             th: "เกาหลีใต้",                 en: "South Korea",             lat: 35.1, lon: 129.1 },
+  { re: /norfolk|wallops|chesapeake|newport news/i,             th: "ชายฝั่งตะวันออกสหรัฐฯ",       en: "US East Coast",           lat: 36.9, lon: -76.0 },
+  { re: /pearl harbor|\bguam\b|เพิร์ลฮาร์เบอร์/i,               th: "แปซิฟิกตะวันตก (สหรัฐฯ)",     en: "West Pacific (US)",       lat: 21.3, lon: -157.9 },
+  { re: /santos|petrobras|rio de janeiro|\bbrazil/i,            th: "บราซิล / แอตแลนติกใต้",      en: "Brazil / S. Atlantic",    lat: -23.5, lon: -43.0 },
+  { re: /argentin|river plate|parana river|buenos aires/i,      th: "อาร์เจนตินา",               en: "Argentina",               lat: -35.0, lon: -57.0 },
+
+  /* ── ระดับประเทศ / กองทัพเรือ (ข่าวจัดซื้อ-ต่อเรือมักไม่ระบุพิกัด) ── */
+  { re: /royal navy|\buk\b|united kingdom|britain|british|portsmouth|devonport|ราชนาวีอังกฤษ|อังกฤษ/i,
+                                                                th: "สหราชอาณาจักร / ทะเลเหนือ",  en: "United Kingdom / North Sea", lat: 55.0, lon: 1.0 },
+  { re: /netherlands|dutch|\brnln\b|hnlms|เนเธอร์แลนด์/i,       th: "เนเธอร์แลนด์",              en: "Netherlands",             lat: 52.6, lon: 4.2 },
+  { re: /\bgermany\b|german navy|rheinmetall|\bfgs\b|เยอรมนี/i, th: "เยอรมนี",                   en: "Germany",                 lat: 54.2, lon: 8.5 },
+  { re: /\bspain\b|spanish navy|\bindra\b|ferrol|cadiz|สเปน/i,  th: "สเปน",                      en: "Spain",                   lat: 42.5, lon: -9.5 },
+  { re: /\bitaly\b|italian navy|sicily|\bgenoa\b|อิตาลี/i,      th: "อิตาลี",                    en: "Italy",                   lat: 40.0, lon: 13.5 },
+  { re: /\bgreece\b|greek|piraeus|กรีซ/i,                       th: "กรีซ",                      en: "Greece",                  lat: 37.5, lon: 24.5 },
+  { re: /\bmalta\b|มอลตา/i,                                     th: "มอลตา",                     en: "Malta",                   lat: 35.9, lon: 14.5 },
+  { re: /\bturkey\b|turkish|\biraq\b|ตุรกี|อิรัก/i,             th: "ตุรกี–อิรัก",               en: "Turkey–Iraq",             lat: 36.8, lon: 35.0 },
+  { re: /\bhungary\b|ฮังการี/i,                                 th: "ฮังการี (ยุโรปกลาง)",        en: "Hungary (C. Europe)",     lat: 47.5, lon: 19.0 },
+  { re: /\bcanada\b|canadian|แคนาดา/i,                          th: "แคนาดา",                    en: "Canada",                  lat: 48.5, lon: -63.0 },
+  { re: /\baustralia\b|\brann\b|australian navy|ออสเตรเลีย/i,    th: "ออสเตรเลีย",                en: "Australia",               lat: -33.9, lon: 151.5 },
+  { re: /\bindia\b|indian navy|mumbai|cochin|hindustan|อินเดีย/i, th: "อินเดีย",                 en: "India",                   lat: 18.9, lon: 72.5 },
+  { re: /\bchina\b|chinese|จีน/i,                               th: "จีน",                       en: "China",                   lat: 30.0, lon: 123.0 },
+  { re: /jones act|\bus navy\b|u\.s\. navy|american|white house|virginia-class|saildrone|สหรัฐ/i,
+                                                                th: "สหรัฐอเมริกา",              en: "United States",           lat: 38.0, lon: -74.0 },
+
+  /* ── มหาสมุทร / ทะเลกว้าง (ตัวสุดท้าย — ใช้เมื่อไม่เจอที่เจาะจงกว่า) ── */
+  { re: /mediterranean|aegean|libya|gaza|ทะเลเมดิเตอร์/i,       th: "ทะเลเมดิเตอร์เรเนียน",       en: "Mediterranean Sea",       lat: 34.0, lon: 18.0 },
+  { re: /north sea|norway|norwegian|denmark|ทะเลเหนือ|นอร์เวย์/i, th: "ทะเลเหนือ",                en: "North Sea",               lat: 56.5, lon: 3.0 },
+  { re: /arctic|icebreaker|svalbard|greenland|อาร์กติก|เรือตัดน้ำแข็ง/i, th: "มหาสมุทรอาร์กติก",   en: "Arctic Ocean",            lat: 78.0, lon: 15.0 },
+  { re: /indian ocean|มหาสมุทรอินเดีย/i,                        th: "มหาสมุทรอินเดีย",           en: "Indian Ocean",            lat: 5.0,  lon: 75.0 },
+  { re: /pacific|แปซิฟิก/i,                                     th: "มหาสมุทรแปซิฟิก",           en: "Pacific Ocean",           lat: 5.0,  lon: 175.0 },
+  { re: /atlantic|แอตแลนติก/i,                                  th: "มหาสมุทรแอตแลนติก",         en: "Atlantic Ocean",          lat: 28.0, lon: -40.0 },
 ];
 
 // รับข้อความหลายชิ้น (หัวข้อ/สรุป ไทย+อังกฤษ) → {lat, lon, th, en} หรือ null
@@ -112,6 +148,52 @@ function extractVesselsFromNews(newsArr) {
       url:    n.url,
       region: geo,
       note:   { th: th || en, en: en || th },
+    });
+  });
+  return out;
+}
+
+/* ============================================================
+   จุดข่าวบนแผนที่ — อ่านข่าว "ทุกชิ้น" หาพื้นที่จากเนื้อข่าว
+   แล้วปักหมุดทั้งหมด (ไม่จำกัดเฉพาะข่าวที่พูดถึงเรือ)
+   ============================================================ */
+function extractNewsPointsFromNews(newsArr) {
+  const out = [];
+  const seenPerRegion = {};          // นับจำนวนข่าวต่อภูมิภาค เพื่อกระจายไม่ให้จุดทับกัน
+
+  (newsArr || []).forEach(n => {
+    const en  = (n.raw && (n.raw.en || n.raw.th)) || "";
+    const th  = (n.raw && n.raw.th) || "";
+    const sum = (n.ai && (n.ai.en || n.ai.th)) || "";
+    const sth = (n.ai && n.ai.th) || "";
+
+    const geo = geocodeText(en, th, sum, sth, n.outlet);
+    if (!geo) return;                // ข่าวที่ระบุพื้นที่ไม่ได้ → ไม่ปักหมุด
+
+    // สีจุดตามด้านภัยคุกคามของข่าว (ถ้าจับได้) มิฉะนั้นใช้สีข่าวทั่วไป
+    const domKeys = window.classifyThreats ? window.classifyThreats(n) : [];
+    const domMeta = window.MDA_THREAT_DOMAINS || [];
+    const dom = domKeys.length ? domMeta.find(d => d.key === domKeys[0]) : null;
+
+    // กระจายแบบก้นหอย (golden angle) รอบจุดศูนย์กลางภูมิภาค
+    const i = seenPerRegion[geo.en] || 0;
+    seenPerRegion[geo.en] = i + 1;
+    const ang = i * 137.5 * Math.PI / 180;
+    const rad = i === 0 ? 0 : 0.5 * Math.sqrt(i);
+
+    out.push({
+      id:      "np_" + (n.id || out.length),
+      lat:     geo.lat + rad * Math.cos(ang),
+      lon:     geo.lon + rad * Math.sin(ang),
+      color:   dom ? dom.color : "#5fb0c9",
+      domain:  dom ? { key: dom.key, th: dom.th, en: dom.en } : null,
+      title:   { th: th || en, en: en || th },
+      outlet:  n.outlet,
+      srcKey:  n.srcKey,
+      time:    n.time,
+      url:     n.url,
+      region:  geo,
+      item:    n,                    // ส่งข่าวต้นฉบับไปเปิดหน้ารายละเอียดได้
     });
   });
   return out;
@@ -465,5 +547,5 @@ function AddEventButton({ addEvent, lang, showToast, className }) {
 Object.assign(window, {
   useEventsUpdater, addEventToSupabase, loadEventsFromSupabase, queryEventsArchive,
   AddEventModal, AddEventButton, REGION_PRESETS,
-  geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews,
+  geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews, extractNewsPointsFromNews,
 });
