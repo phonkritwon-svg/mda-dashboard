@@ -464,6 +464,27 @@ body {
 .map-stat .ms .k { font-size: 9px; text-transform:uppercase; letter-spacing:0.1em; color: var(--text-dim); }
 .map-stat .ms .v { font-family: var(--font-mono); font-size: 17px; font-weight:600; margin-top:2px; }
 
+/* ── อนิเมชันการซูม ──────────────────────────────────────────
+   เปลี่ยนเฉพาะ "เส้นโค้งความเร็ว" ไม่ยืดเวลา
+   ease-out-quint ออกตัวเร็วแล้วค่อย ๆ จอด (เส้นเดียวกับโหมดเต็มจอ)
+   ให้ความรู้สึกลื่นกว่า ease-out ปริยายของ Leaflet
+
+   ห้ามเกิน 250ms เด็ดขาด — leaflet.js บรรทัด 4827 ตั้ง
+   setTimeout(_onZoomTransitionEnd, 250) ไว้ตายตัวเพื่อกัน webkit
+   ไม่ยิง transitionend พอครบ 250ms มันจะถอดคลาส .leaflet-zoom-anim
+   แล้วกระโดดไปสถานะสุดท้ายทันที ถ้า transition ยาวกว่านั้นจะโดนตัด
+   กลางคัน = กระตุกตอนจบ · 240ms เผื่อไว้กันเหลื่อมเวลา
+
+   หมายเหตุ: ไม่ใส่ transition ให้ .leaflet-marker-icon เพราะ Leaflet
+   ขยับหมุดด้วยการแปลงทั้งเพน ถ้าใส่หมุดจะวิ่งตามช้ากว่าแผนที่          */
+.leaflet-zoom-anim .leaflet-zoom-animated {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* เคารพการตั้งค่าระบบของผู้ใช้ที่ขอลดการเคลื่อนไหว */
+@media (prefers-reduced-motion: reduce) {
+  .leaflet-zoom-anim .leaflet-zoom-animated { transition-duration: 1ms; }
+}
+
 .vessel { cursor: pointer; }
 .vessel-label {
   font-family: var(--font-mono); font-size: 8px; fill: var(--text-dim);

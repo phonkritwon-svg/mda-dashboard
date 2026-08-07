@@ -183,6 +183,22 @@ function MapView({
       attributionControl:   false,
       maxBounds:            WORLD_BOUNDS,
       maxBoundsViscosity:   1.0,
+
+      /* ── ความลื่นของการซูม ──────────────────────────────────────
+         ค่าปริยายของ Leaflet คือ zoomSnap:1 — ล้อเมาส์ขยับนิดเดียวก็
+         กระโดดเต็ม 1 ระดับ (มาตราส่วนเปลี่ยนเท่าตัว) จึงรู้สึกกระตุก
+         zoomSnap 0.25 ให้หยุดได้ที่ระดับเศษส่วน การหมุนล้อจึงไล่ไปทีละ
+         ขั้นละเอียด ส่วน zoomDelta คงไว้ที่ 1 เพื่อให้ปุ่ม +/- และคีย์บอร์ด
+         ยังขยับเต็มระดับตามที่ผู้ใช้คาด
+         wheelPxPerZoomLevel สูงขึ้น = ต้องหมุนล้อมากขึ้นต่อ 1 ระดับ
+         (ค่าปริยาย 60 ไวเกินไปกับ trackpad) · debounce ต่ำลงให้ตอบสนองไว */
+      zoomSnap:             0.25,
+      zoomDelta:            1,
+      wheelPxPerZoomLevel:  140,
+      wheelDebounceTime:    20,
+      zoomAnimation:        true,
+      zoomAnimationThreshold: 6,   // ปริยาย 4 — ให้การกระโดดไกลยังมีอนิเมชัน
+      fadeAnimation:        true,
     });
 
     /* basemap ตามธีมปัจจุบัน (สลับได้ภายหลังด้วย setUrl) */
