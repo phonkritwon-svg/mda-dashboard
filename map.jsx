@@ -76,9 +76,50 @@ const SHIPPING_LANES = [
   { name: "Australia", pts: [[103.8,1.3],[112,-8],[115,-32],[115,-33.9],[130,-35],[151,-34],[174,-36.9]] },
 ];
 
-function vesselHtml(v, isSelected) {
-  const vt = window.VTYPE[v.type] || window.VTYPE.cargo;
+/* ── ความสดของตำแหน่ง AIS ─────────────────────────────────────
+   เรือที่แล่นอยู่ส่งตำแหน่งทุก 2-10 วินาที · เรือทอดสมอทุก ~3 นาที
+   เงียบเกิน 10 นาทีจึงผิดปกติ (ดับ AIS หรือหลุดพื้นที่รับสัญญาณ)
+   เซิร์ฟเวอร์เก็บหมุดไว้ถึง 30 นาที (STALE_SECONDS ใน ais.py) หมุดที่เห็น
+   จึงอาจเก่ามากโดยที่หน้าจอเดิมไม่บอกเลย — เรือ 20 นอตเคลื่อนที่ได้
+   ~18 กม. ใน 29 นาที การวาดตำแหน่งเก่าให้ดูเท่าตำแหน่งสดจึงทำให้เข้าใจผิด
+   สองช่องทางสื่อสาร: ความทึบ = ความสด · วงประ = ขาดสัญญาณ            */
+const AIS_FRESH_SEC = 180;
+const AIS_LOST_SEC  = 600;
+
+function ageOpacity(sec) {
+  if (!(sec > AIS_FRESH_SEC)) return 1;
+  if (sec >= AIS_LOST_SEC)    return 0.42;
+  return 1 - ((sec - AIS_FRESH_SEC) / (AIS_LOST_SEC - AIS_FRESH_SEC)) * 0.58;
+}
+
+function ageText(sec, th) {
+  if (sec < 60) return th ? sec + " วินาทีที่แล้ว" : sec + "s ago";
+  const m = Math.round(sec / 60);
+  return th ? m + " นาทีที่แล้ว" : m + " min ago";
+}
+
+/* ข้อความ hover — เดิม tooltip บอกแค่ชื่อเรือ ทั้งที่ AIS ส่งความเร็ว เข็ม
+   และอายุตำแหน่งมาให้ครบแล้ว */
+function vesselTitle(v, th) {
+  const vt = window.VTYPE[v.type] || window.VTYPE.unknown;
+  const bits = [v.name || v.id, window.tx(vt.label, th ? "th" : "en")];
+  if (typeof v.sp === "number" && !v.fromNews) {
+    bits.push(v.sp.toFixed(1) + (th ? " นอต" : " kn"));
+    if (v.sp > 0.5) bits.push((th ? "เข็ม " : "COG ") + Math.round(v.course || 0) + "°");
+  }
+  if (typeof v.ageSec === "number") {
+    bits.push((th ? "อัปเดต " : "updated ") + ageText(v.ageSec, th));
+    if (v.ageSec >= AIS_LOST_SEC) bits.push(th ? "⚠ ขาดสัญญาณ" : "⚠ signal lost");
+  }
+  return bits.join(" · ");
+}
+
+function vesselHtml(v, isSelected, th) {
+  const vt = window.VTYPE[v.type] || window.VTYPE.unknown;
   const col = vt.color;
+  const age = typeof v.ageSec === "number" ? v.ageSec : null;
+  const opacity = age === null ? 1 : ageOpacity(age);
+  const lost = age !== null && age >= AIS_LOST_SEC;
   const isAlert = v.status === "critical" || v.status === "watch";
   const critCol = v.status === "critical" ? "#ff4444" : "#e3b341";
   const sz = 24;
@@ -102,7 +143,7 @@ function vesselHtml(v, isSelected) {
   const moored    = hasAisNav && v.sp <= 0.5;
 
   const paint = isDark
-    // เรือปิดสัญญาณ: ลำตัวโปร่ง เน้นว่าไม่มีข้อมูล AIS ยืนยัน
+    // กองเรือเงา: ลำตัวโปร่ง เน้นว่าไม่มีข้อมูล AIS ยืนยัน
     ? `fill="none" stroke="${col}" stroke-width="1.7"`
     : `fill="${col}" stroke="${stroke}" stroke-width="1"`;
 
@@ -113,8 +154,16 @@ function vesselHtml(v, isSelected) {
          <path d="${arrow}" ${paint} stroke-linejoin="round"/>
        </g>`;
 
-  return `<div style="position:relative;width:${sz}px;height:${sz}px;">
-    ${ring}${sel}
+  /* วงประจาง ๆ = ตำแหน่งนี้เก่าเกิน 10 นาที อย่าใช้ตัดสินใจโดยไม่ยืนยันซ้ำ
+     ใช้เส้นประคนละแบบกับวงเลือก (inset -5px) เพื่อไม่ให้สับสน */
+  const staleRing = lost
+    ? `<div style="position:absolute;inset:-8px;border-radius:50%;border:1px dashed ${stroke};opacity:0.75;pointer-events:none;"></div>`
+    : "";
+
+  const title = vesselTitle(v, th).replace(/"/g, "&quot;");
+
+  return `<div title="${title}" style="position:relative;width:${sz}px;height:${sz}px;opacity:${opacity.toFixed(2)};">
+    ${ring}${sel}${staleRing}
     <svg width="${sz}" height="${sz}" viewBox="-12 -12 24 24" xmlns="http://www.w3.org/2000/svg"
          style="display:block;overflow:visible;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45));">
       ${shape}
@@ -278,10 +327,12 @@ function MapView({
     vl.clearLayers();
     tl.clearLayers();
 
+    const th = lang !== "en";
+
     vessels.forEach(v => {
       const isSelected = selected && selected.id === v.id;
       const icon = L.divIcon({
-        html:      vesselHtml(v, isSelected),
+        html:      vesselHtml(v, isSelected, th),
         className: "",
         iconSize:  [24, 24],
         iconAnchor:[12, 12],
@@ -291,10 +342,12 @@ function MapView({
       marker.on("click", (ev) => { L.DomEvent.stopPropagation(ev); onSelect && onSelect(v); });
 
       if (showLabels) {
-        marker.bindTooltip(v.name || v.id, {
-          permanent: true, direction: "right", offset: [10, 0],
-          className: "mda-label",
-        });
+        // ป้ายถาวรบอกความเก่าด้วย มิฉะนั้นเปิดโหมดป้ายแล้วยังไม่รู้ว่าหมุดไหนค้าง
+        const stale = typeof v.ageSec === "number" && v.ageSec >= AIS_LOST_SEC;
+        marker.bindTooltip(
+          (v.name || v.id) + (stale ? (th ? " · ค้าง " : " · stale ") + ageText(v.ageSec, th) : ""),
+          { permanent: true, direction: "right", offset: [10, 0], className: "mda-label" }
+        );
       }
 
       vl.addLayer(marker);
@@ -302,14 +355,17 @@ function MapView({
       if (showTracks && v.sp > 0) {
         const rad = (v.course - 90) * Math.PI / 180;
         const dist = 0.18 + v.sp * 0.012;
-        const vt = window.VTYPE[v.type] || window.VTYPE.cargo;
+        const vt = window.VTYPE[v.type] || window.VTYPE.unknown;
+        // เส้นทำนายทิศจางลงตามอายุตำแหน่งเช่นเดียวกับหมุด — ตำแหน่งเก่า
+        // ยิ่งทำนายไม่ได้ ยิ่งไม่ควรวาดให้ดูมั่นใจ
+        const fade = typeof v.ageSec === "number" ? ageOpacity(v.ageSec) : 1;
         L.polyline(
           [[v.lat, v.lon], [v.lat + Math.sin(rad) * dist, v.lon + Math.cos(rad) * dist]],
-          { color: vt.color, weight: 1.5, opacity: 0.55, dashArray: "4 6" }
+          { color: vt.color, weight: 1.5, opacity: 0.55 * fade, dashArray: "4 6" }
         ).addTo(tl);
       }
     });
-  }, [vessels, selected, showLabels, showTracks]);
+  }, [vessels, selected, showLabels, showTracks, lang]);
 
   /* ── events ───────────────────────────────────────────────── */
   React.useEffect(() => {
@@ -401,4 +457,8 @@ function MapView({
   );
 }
 
-Object.assign(window, { MapView, projPt, projX, projY, SHIPPING_LANES });
+Object.assign(window, {
+  MapView, projPt, projX, projY, SHIPPING_LANES,
+  // เกณฑ์ความสดของตำแหน่ง — หน้าอื่น (legend, แผงรายละเอียดเรือ) ต้องใช้ค่าเดียวกัน
+  AIS_FRESH_SEC, AIS_LOST_SEC, ageOpacity, ageText,
+});

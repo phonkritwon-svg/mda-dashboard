@@ -204,8 +204,13 @@ const VTYPE = {
   cargo:   { color:"#ffff02", label:{th:"เรือสินค้า",en:"Cargo"} },
   tanker:  { color:"#fea321", label:{th:"เรือบรรทุกน้ำมัน",en:"Tanker"} },
   fishing: { color:"#6fc6fe", label:{th:"เรือประมง",en:"Fishing"} },
-  navy:    { color:"#ff2020", label:{th:"เรือรบ (มิตร)",en:"Navy (friendly)"} },
-  dark:    { color:"#c1c1c1", label:{th:"เรือปิดสัญญาณ",en:"Dark / Unknown"} },
+  navy:    { color:"#ff2020", label:{th:"เรือรบ / หน่วยรัฐ",en:"Navy / gov"} },
+  /* "unknown" กับ "dark" ต้องแยกกันเด็ดขาด
+     unknown = ยังไม่รู้ประเภท (ShipStaticData ยังไม่มา) — เรื่องปกติ ไม่ใช่ภัย
+     dark    = ข่าวระบุว่าเป็นกองเรือเงา/ถูกคว่ำบาตร/จงใจดับ AIS — เป็นภัยจริง
+     ของเดิมใช้ "dark" ปนกันทั้งสองความหมาย ทำให้เรือปกติถูกนับเป็นเรือเฝ้าระวัง */
+  unknown: { color:"#c1c1c1", label:{th:"ไม่ทราบประเภท",en:"Unknown type"} },
+  dark:    { color:"#b07cf0", label:{th:"กองเรือเงา / ปิดสัญญาณ",en:"Shadow / dark fleet"} },
 };
 
 /* ============================================================

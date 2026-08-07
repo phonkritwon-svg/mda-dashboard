@@ -38,21 +38,32 @@ _state = {"connected": False, "error": None, "started": False, "messages": 0, "s
 
 # ── แปลงรหัสประเภทเรือ AIS → ประเภทที่แผนที่ใช้ ──
 def ship_type_to_kind(t):
+    """ไม่รู้ประเภท → "unknown" เท่านั้น ห้ามคืน "dark"
+
+    บนแดชบอร์ดนี้ "dark" หมายถึงจงใจดับสัญญาณ/กองเรือเงา ซึ่งเป็นข้อกล่าวหา
+    ที่หนักเกินกว่าจะสรุปจากการที่ ShipStaticData ยังมาไม่ถึง — เรือเกือบทุกลำ
+    ส่ง PositionReport ก่อนข้อมูลนิ่งเสมอ ถ้าเหมารวมเป็น dark ทั้งหมด
+    แผนที่จะเต็มไปด้วยสัญญาณเตือนลวงจนตัวเลข "เฝ้าระวัง" ใช้ไม่ได้
+
+    รหัสที่ไม่เข้าหมวดใดก็คืน "unknown" เช่นกัน ดีกว่าเดาผิดฝั่ง —
+    ของเดิมเหมา 31-39 เป็น "navy" ทำให้เรือใบและเรือสำราญ (36, 37)
+    ถูกวาดเป็นเรือรบ
+    """
     try:
         t = int(t)
     except (TypeError, ValueError):
-        return "dark"
-    if 30 <= t <= 39:
-        return "fishing" if t == 30 else "navy"
+        return "unknown"
+    if t == 30:
+        return "fishing"                    # 30 = ประมง
+    if t in (35, 51, 55):
+        return "navy"                       # ทหาร · ค้นหาช่วยเหลือ · บังคับใช้กฎหมาย
     if 60 <= t <= 69:
-        return "cargo"      # เรือโดยสาร — แสดงรวมกับเรือสินค้า
+        return "cargo"                      # เรือโดยสาร — แสดงรวมกับเรือสินค้า
     if 70 <= t <= 79:
         return "cargo"
     if 80 <= t <= 89:
         return "tanker"
-    if 35 in (t,) or 51 == t:
-        return "navy"
-    return "dark"
+    return "unknown"
 
 
 def _put(mmsi, patch):
@@ -111,8 +122,10 @@ def snapshot():
         items = [dict(v) for v in _vessels.values()
                  if v.get("lat") is not None and now - v.get("updated", 0) < STALE_SECONDS]
     for v in items:
+        # อายุของตำแหน่ง — หน้าเว็บใช้จางหมุดตามความเก่า
+        # เรือ 20 นอต เดินทางได้ ~18 กม. ใน 29 นาที ตำแหน่งเก่าจึงต้องดูออกว่าเก่า
         v["ageSec"] = int(now - v.pop("updated", now))
-        v.setdefault("type", "dark")
+        v.setdefault("type", "unknown")   # ยังไม่ได้ ShipStaticData ≠ ปิดสัญญาณ
         v.setdefault("flag", "")
         v.setdefault("status", "normal")
     items.sort(key=lambda v: v["ageSec"])

@@ -113,14 +113,14 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [visible, setVisible] = useState({
-    cargo: true, tanker: true, fishing: true, navy: true, dark: true,
+    cargo: true, tanker: true, fishing: true, navy: true, unknown: true, dark: true,
     incidents: true,   // จุดเหตุการณ์จากข่าวบนแผนที่
     news: true,        // จุดข่าวทั้งหมดที่ระบุพื้นที่ได้
   });
   const [layers, setLayers] = useState({ tracks: true, labels: false, sweep: true, lanes: true });
   const toggle = (k) => setLayers(l => ({ ...l, [k]: !l[k] }));
   const toggleVis = (k) => setVisible(s => ({ ...s, [k]: !s[k] }));
-  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, dark: val, incidents: val, news: val });
+  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, unknown: val, dark: val, incidents: val, news: val });
 
   const { news: liveNews } = window.useNewsUpdater(data.news);
 
@@ -494,6 +494,20 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
                 {tx(vt.label, lang)}
               </div>
             ))}
+            {/* ความสดของตำแหน่ง — ไม่ใช่ประเภทเรือ จึงแยกออกมาจากรายการข้างบน */}
+            <div className="legend-row" title={T(
+              "หมุดจะจางลงตามอายุตำแหน่ง · วงประ = เงียบเกิน " + Math.round((window.AIS_LOST_SEC || 600) / 60) + " นาที",
+              "Pins fade with position age · dashed ring = silent over " + Math.round((window.AIS_LOST_SEC || 600) / 60) + " min")}>
+              <span className="sym">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                  <circle cx="6" cy="6" r="5.2" fill="none" strokeDasharray="2 2"
+                    stroke={window.VTYPE_STROKE || "#999999"} strokeWidth="1" />
+                  <path d="M6,2.6 L8.2,9.4 L6,8 L3.8,9.4 Z"
+                    fill={window.VTYPE_STROKE || "#999999"} opacity="0.5" />
+                </svg>
+              </span>
+              {T("ขาดสัญญาณ / ตำแหน่งค้าง", "Signal lost / stale")}
+            </div>
             <div className="legend-row">
               <span className="sym">
                 <svg width="12" height="12" viewBox="0 0 12 12">
