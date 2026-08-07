@@ -223,7 +223,7 @@ function MapView({
       minZoom:              2,
       maxZoom:              18,
       zoomControl:          false,
-      scrollWheelZoom:      zoomable,
+      scrollWheelZoom:      false,   // เขียนเอง — ดูตัวจัดการ wheel ด้านล่าง
       dragging:             zoomable,
       touchZoom:            zoomable,
       doubleClickZoom:      zoomable,
@@ -234,17 +234,12 @@ function MapView({
       maxBoundsViscosity:   1.0,
 
       /* ── ความลื่นของการซูม ──────────────────────────────────────
-         ค่าปริยายของ Leaflet คือ zoomSnap:1 — ล้อเมาส์ขยับนิดเดียวก็
-         กระโดดเต็ม 1 ระดับ (มาตราส่วนเปลี่ยนเท่าตัว) จึงรู้สึกกระตุก
-         zoomSnap 0.25 ให้หยุดได้ที่ระดับเศษส่วน การหมุนล้อจึงไล่ไปทีละ
-         ขั้นละเอียด ส่วน zoomDelta คงไว้ที่ 1 เพื่อให้ปุ่ม +/- และคีย์บอร์ด
-         ยังขยับเต็มระดับตามที่ผู้ใช้คาด
-         wheelPxPerZoomLevel สูงขึ้น = ต้องหมุนล้อมากขึ้นต่อ 1 ระดับ
-         (ค่าปริยาย 60 ไวเกินไปกับ trackpad) · debounce ต่ำลงให้ตอบสนองไว */
-      zoomSnap:             0.25,
+         zoomSnap 0 = ไม่ปัดระดับเลย แผนที่หยุดที่ 6.37 ได้ ทำให้การซูม
+         ด้วยล้อ/แทร็กแพดไหลต่อเนื่องจริง (ดูตัวจัดการ wheel ด้านล่าง)
+         scrollWheelZoom ปิดไว้เพราะเราเขียนเอง — ของ Leaflet ทำงานแบบ
+         สะสม → หน่วง → เล่นอนิเมชัน จึงกระโดดตามหลังมือเสมอ            */
+      zoomSnap:             0,
       zoomDelta:            1,
-      wheelPxPerZoomLevel:  140,
-      wheelDebounceTime:    20,
       zoomAnimation:        true,
       zoomAnimationThreshold: 6,   // ปริยาย 4 — ให้การกระโดดไกลยังมีอนิเมชัน
       fadeAnimation:        true,
@@ -269,12 +264,42 @@ function MapView({
     layersRef.current = { vessels: vl, events: el, tracks: tl, lanes, news: nl };
     mapRef.current = map;
 
+    /* ── ซูมล้อเมาส์ / แทร็กแพด แบบต่อเนื่อง ──────────────────────
+       ขยับระดับซูมทันทีทุกเหตุการณ์ wheel โดยไม่ใส่อนิเมชันและไม่หน่วง
+       ซูมจึงเกาะติดการเลื่อนนิ้วแบบ 1:1 แทนที่จะกระโดดตามหลัง
+       (ต้องคู่กับ zoomSnap 0 ด้านบน มิฉะนั้นค่าจะถูกปัดทิ้ง)
+
+       ยึดจุดใต้เคอร์เซอร์ไว้กับที่ด้วย setZoomAround — พฤติกรรมเดียวกับ
+       แผนที่ทั่วไป คือซูมเข้าหาสิ่งที่กำลังชี้อยู่ ไม่ใช่กลางจอ            */
+    const WHEEL_PX_PER_LEVEL = 250;   // ยิ่งมาก = ต้องเลื่อนมากขึ้นต่อ 1 ระดับ
+    const onWheel = (e) => {
+      e.preventDefault();
+      // deltaMode 1 = นับเป็นบรรทัด (Firefox/เมาส์บางรุ่น) · 0 = พิกเซล
+      const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const now = map.getZoom();
+      const next = Math.max(map.getMinZoom(),
+                   Math.min(map.getMaxZoom(), now - px / WHEEL_PX_PER_LEVEL));
+      if (Math.abs(next - now) < 1e-4) return;
+      map.setZoomAround(map.mouseEventToContainerPoint(e), next, { animate: false });
+    };
+    const wheelEl = containerRef.current;
+    if (zoomable) wheelEl.addEventListener("wheel", onWheel, { passive: false });
+
+    /* ปุ่ม +/- ควรจอดที่ระดับเต็มเสมอ แม้ล้อจะพาไปค้างที่ 6.37 —
+       ระดับเต็มคือจุดที่ไทล์คมที่สุด ผู้ใช้จึงต้องมีทางกลับไปหาได้
+       zoomSnap 0 ปิดการปัดของ Leaflet ไปแล้ว จึงต้องปัดเองตรงนี้
+       (คีย์บอร์ดกับดับเบิลคลิกเรียก setZoom ตรง ๆ ไม่ผ่านทางนี้)        */
+    map.zoomIn  = (d, o) => map.setZoom(Math.floor(map.getZoom() + 1e-6) + (d || 1), o);
+    map.zoomOut = (d, o) => map.setZoom(Math.ceil(map.getZoom() - 1e-6) - (d || 1), o);
+
     setTimeout(() => {
       map.invalidateSize();
       if (zoomable) map.fitWorld({ animate: false });
     }, 150);
 
     return () => {
+      // ผูก listener ไว้เองกับ container จึงต้องถอดเอง — map.remove() ไม่ถอดให้
+      if (zoomable) wheelEl.removeEventListener("wheel", onWheel);
       map.remove();
       mapRef.current = null;
       tileRef.current = null;
