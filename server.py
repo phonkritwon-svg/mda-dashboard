@@ -143,6 +143,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    def end_headers(self):
+        """ห้ามเบราว์เซอร์ cache อะไรทั้งสิ้นบนเซิร์ฟเวอร์ dev
+
+        SimpleHTTPRequestHandler ส่งแค่ Last-Modified ไม่ส่ง Cache-Control
+        เมื่อไม่มีทั้ง Cache-Control และ Expires เบราว์เซอร์จะเดาอายุเอง
+        (heuristic caching, RFC 9111 §4.2.2) ประมาณ 10% ของเวลาที่ผ่านมา
+        นับจาก Last-Modified — ไฟล์ที่แก้ไว้ 3 วันก่อนจึงถูกถือว่าสดอีก ~7 ชม.
+        โดยไม่ถามเซิร์ฟเวอร์เลย
+
+        ผลคือแก้โค้ดแล้วรีเฟรชก็ยังเห็นของเก่า และการ bump ?v= ใน index.html
+        ก็ไม่ช่วย เพราะตัว index.html เองคือไฟล์ที่ค้างอยู่ใน cache
+        """
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        return http.server.SimpleHTTPRequestHandler.end_headers(self)
+
     def do_GET(self):
         if self.path.split("?")[0] == "/api/vessels":
             self._json(ais_mod.snapshot())
