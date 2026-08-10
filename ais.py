@@ -142,11 +142,9 @@ def snapshot():
 def _run(api_key):
     import websocket   # websocket-client
 
-    # ชื่อฟิลด์คือ "Apikey" ตามตัวอย่างบน aisstream.io — ไม่ใช่ "APIKey"
-    # ทดสอบด้วยคีย์ใหม่ในสภาพสะอาดแล้วพบว่า "APIKey" ถูกเซิร์ฟเวอร์ปิดการเชื่อมต่อ
-    # ส่วน "Apikey" ถูกรับไว้ (ซ็อกเก็ตเปิดค้าง) — สะกดผิดจึงเงียบแบบไม่มี error
+    # "APIKey" — A และ K ใหญ่ ตามเอกสาร aisstream.io/documentation
     sub = json.dumps({
-        "Apikey": api_key,
+        "APIKey": api_key,
         "BoundingBoxes": BOUNDING_BOXES,
         "FilterMessageTypes": ["PositionReport", "ShipStaticData"],
     })

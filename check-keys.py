@@ -82,8 +82,8 @@ def check_aisstream(key):
     def on_open(ws):
         ev["opened"] = True
         # ขอทั้งโลกเพื่อให้มีข้อมูลไหลแน่ถ้าคีย์ผ่าน
-        # "Apikey" ตามเอกสาร aisstream.io — สะกดเป็น "APIKey" แล้วโดนปิดการเชื่อมต่อ
-        ws.send(json.dumps({"Apikey": key, "BoundingBoxes": [[[-90, -180], [90, 180]]]}))
+        # "APIKey" — A และ K ใหญ่ ตามเอกสาร aisstream.io/documentation
+        ws.send(json.dumps({"APIKey": key, "BoundingBoxes": [[[-90, -180], [90, 180]]]}))
 
     def on_message(ws, m):
         ev["msg"] = str(m)[:200]
