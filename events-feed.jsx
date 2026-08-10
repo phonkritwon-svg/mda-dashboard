@@ -159,6 +159,134 @@ function extractVesselsFromNews(newsArr) {
 }
 
 /* ============================================================
+   เหตุการณ์เฝ้าระวังจากข่าว — คู่ขนานฝั่งเบราว์เซอร์ของ to_event_row()
+   ใน api/cron-news.py
+
+   ทำไมต้องมีสองที่:
+     cron เขียนเหตุการณ์ลง Supabase วันละครั้ง ถ้าตารางว่าง ต่อ Supabase
+     ไม่ได้ หรือข่าวเพิ่งเข้ามาหลัง cron รอบล่าสุด หน้าเหตุการณ์จะโล่งสนิท
+     ทั้งที่ฟีดข่าวมีข่าวภัยจริงอยู่ตรงหน้า — อนุมานจากข่าวที่โหลดมาแล้ว
+     จึงเติมช่องว่างนั้นได้โดยไม่ต้องรอ
+
+   ใช้ regex ชุดเดียวกับฝั่ง cron เป๊ะ ๆ (SEV_CRIT / SEV_HIGH / THREAT_CATS)
+   บวกคำไทย เพราะข่าวถูกแปลเป็นไทยแล้ว ถ้าจับแต่อังกฤษจะพลาดของที่แปลไปแล้ว
+   ============================================================ */
+/* "โจมตี" เดี่ยว ๆ ใช้ไม่ได้เป็นเกณฑ์ความรุนแรง — ภาษาไทยใช้คำนี้แปลทั้ง
+   attack, hits, strikes, slams ผลที่วัดได้คือ "ไต้ฝุ่นโจมตีโอกินาวา" และ
+   "สหภาพแรงงานบุกโจมตีท่าเรือ" กลายเป็นเหตุวิกฤตทางความมั่นคงไปด้วย
+   จึงบังคับให้คู่กับเป้าหมายหรืออาวุธเสมอ                                */
+const EV_SEV_CRIT = /\b(attacked|missile|drone strike|explosion|killed|sunk|sinking|hijack|under fire|ballistic|opened fire)\b|attack on (a )?(ship|vessel|tanker|port)|โจมตีเรือ|โจมตีท่าเรือ|ขีปนาวุธ|ระเบิด|เสียชีวิต|จมลง|อับปาง|จี้เรือ|ยิงใส่/i;
+const EV_SEV_HIGH = /\b(seiz|detain|collision|capsiz|distress|piracy|pirate|smuggl|illegal fishing|incursion|intercept|boarded|sabotage)\b|ยึดเรือ|ควบคุมตัว|ชนกัน|พลิกคว่ำ|ขอความช่วยเหลือ|โจรสลัด|ลักลอบ|ประมงผิดกฎหมาย|รุกล้ำ|สกัดกั้น|ก่อวินาศกรรม/i;
+
+/* ข่าวที่ "พูดถึง" ภัยแต่ไม่ใช่เหตุการณ์ — จัดซื้อ งบประมาณ ต่อเรือ ซ้อมรบ
+   ทดลองอาวุธ ข่าวธุรกิจ ล้วนเต็มไปด้วยคำว่าโดรน ขีปนาวุธ เรือรบ
+   ถ้าไม่กันออก แผงเฝ้าระวังจะเต็มไปด้วยข่าวจัดซื้อจนของจริงจมหาย        */
+const EV_NOT_INCIDENT = /\b(order|orders|ordered|contract|tender|procure|procurement|budget|billion|cost|deliver(y|ed)|christen|keel|shipyard|exercise|drill|trial|prototype|concept|unveil|explores?|study|report says)\b|คำสั่งซื้อ|สัญญา|งบประมาณ|จัดซื้อ|จัดหา|ต่อเรือ|อู่ต่อเรือ|ซ้อมรบ|ทดสอบ|ทดลอง|ต้นแบบ|เปิดตัว|ผลการศึกษา|พันล้าน/i;
+
+/* หมวดก่อการร้ายต้องมี "ตัวแสดงหรืออาวุธ" ไม่ใช่แค่คำว่าโจมตี
+   ของฝั่ง cron ใส่ attack|struck ไว้ในหมวดนี้ด้วย ผลคือข่าวอะไรก็ตามที่มี
+   คำว่าโจมตีอยู่ในบทสรุป ถูกเหมาเป็นก่อการร้ายทางทะเลหมด (วัดได้ 14 จาก 17)
+   ถ้าไม่มีตัวบ่งชี้ชัดก็ปล่อยให้ตกไปเป็น MARITIME ตามปกติ ตรงไปตรงมากว่า */
+const EV_CATS = [
+  ["SEARCH & RESCUE",    /rescue|distress|capsiz|sinking|missing|overboard|search and rescue|ค้นหา|ช่วยเหลือ|สูญหาย|พลิกคว่ำ|อับปาง/i],
+  ["PIRACY",             /piracy|pirate|armed robbery|hijack|kidnap|โจรสลัด|ปล้น|จี้เรือ|ลักพา/i],
+  ["IUU FISHING",        /illegal fishing|\biuu\b|trawler|poach|ประมงผิดกฎหมาย|เรือประมง|รุกล้ำ|ลอบจับ/i],
+  ["MARITIME TERRORISM", /houthi|militant|terror|limpet mine|\bied\b|missile|drone strike|ฮูตี|ก่อการร้าย|ขีปนาวุธ|ทุ่นระเบิด/i],
+  ["DRUG & ARMS",        /drug|narcotic|smuggl|contraband|weapons? seiz|ยาเสพติด|ลักลอบ|อาวุธ/i],
+  ["SUBSEA / INFRA",     /cable|pipeline|sabotage|infrastructure|สายเคเบิล|ท่อ|ก่อวินาศกรรม|โครงสร้างพื้นฐาน/i],
+];
+
+/* ข่าวจาก Supabase เก็บ time เป็น ISO ส่วนข่าวตั้งต้นเก็บเป็น "07:30" อยู่แล้ว
+   ถ้าปล่อยผ่าน ช่องเวลาบนแผงจะโชว์ 2026-08-09T06:10:48.000Z ดิบ ๆ
+   จัดรูปแบบให้ตรงกับเหตุการณ์จาก Supabase (eventRowToObj) จะได้ดูเป็นชุดเดียวกัน */
+function evTimeLabel(t) {
+  if (!t) return "";
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(t))) return String(t);   // "07:30" — ใช้ได้เลย
+  const d = new Date(t);
+  if (isNaN(d)) return String(t);
+  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/* หน้ารายละเอียดเหตุการณ์เขียนว่า "({ago} ที่แล้ว)" จึงต้องส่งเฉพาะปริมาณ
+   เช่น "45 นาที" ไม่ใช่ "45 นาทีที่แล้ว" ซึ่งเป็นสิ่งที่ mdaTimeAgo คืนมา
+   ข้อมูลตั้งต้นใน data.js เก็บแบบสั้นอยู่แล้ว ตัวที่ผ่าน mdaTimeAgo จึงอ่านว่า
+   "1 วันที่แล้ว ที่แล้ว" — ตัดคำต่อท้ายออกให้เข้ารูปเดียวกัน */
+function evAgo(t) {
+  if (!t || !window.mdaTimeAgo) return { th: "", en: "" };
+  const strip = (s) => String(s || "").replace(/ที่แล้ว$/, "").replace(/\s+ago$/, "").trim();
+  return { th: strip(window.mdaTimeAgo(t, "th")), en: strip(window.mdaTimeAgo(t, "en")) };
+}
+
+function extractEventsFromNews(newsArr) {
+  const out = [];
+  (newsArr || []).forEach(n => {
+    // กฎเดียวกับฟีดข่าว: ไม่มีลิงก์ต้นฉบับตรวจสอบได้ = ไม่นับเป็นเหตุการณ์
+    if (window.hasVerifiableSource && !window.hasVerifiableSource(n)) return;
+
+    const en  = (n.raw && (n.raw.en || n.raw.th)) || "";
+    const th  = (n.raw && n.raw.th) || "";
+    const sum = (n.ai && (n.ai.en || n.ai.th)) || "";
+    const sth = (n.ai && n.ai.th) || "";
+    const hay = [en, th, sum, sth].join("  ");
+    /* ระดับความรุนแรงอ่านจาก "พาดหัว" เท่านั้น ไม่รวมบทสรุป
+       บทสรุปมักเล่าภูมิหลัง ("หลังเหตุโจมตีเมื่อเดือนก่อน…") คำรุนแรงจึงโผล่
+       แม้ในข่าวที่ไม่ใช่เหตุรุนแรง — วัดแล้วทำให้ 15 จาก 17 ชิ้นเป็นวิกฤต
+       รวมข่าวคลี่คลายอย่าง "ตกลงเปิดเส้นทางปลอดภัย" พาดหัวคือสิ่งที่บอกว่า
+       "เกิดอะไรขึ้น" จริง ๆ ส่วนหมวดหมู่ยังดูทั้งชิ้นได้ เพราะเป็นเรื่องหัวข้อ */
+    const headline = [en, th].join("  ");
+
+    const geo = geocodeText(en, th, sum, sth, n.outlet);
+    if (!geo) return;                       // ระบุพื้นที่ไม่ได้ = ปักหมุดไม่ได้
+    if (EV_NOT_INCIDENT.test(headline)) return;   // ข่าวจัดซื้อ/ซ้อม/ธุรกิจ
+
+    let sev = EV_SEV_CRIT.test(headline) ? "critical"
+            : (EV_SEV_HIGH.test(headline) ? "high" : null);
+    const catHit = EV_CATS.find(c => c[1].test(hay));
+    if (!sev && !catHit) return;            // ไม่มีสัญญาณภัยเลย = เป็นข่าวเฉย ๆ ไม่ใช่เหตุการณ์
+
+    out.push({
+      id:       "news_" + (n.id || out.length),
+      sev:      sev || "medium",
+      cat:      catHit ? catHit[0] : "MARITIME",
+      srcKey:   n.srcKey || null,
+      time:     evTimeLabel(n.time),
+      /* หน้ารายละเอียดพิมพ์ "รายงานเมื่อ X (Y ที่แล้ว)" — ถ้า ago ว่าง
+         จะเหลือวงเล็บเปล่า ๆ จึงคำนวณเองจากเวลาข่าวเมื่อข่าวไม่ได้ให้มา */
+      ago:      (n.ago && (n.ago.th || n.ago.en)) ? n.ago : evAgo(n.time),
+      region:   { th: geo.th, en: geo.en },
+      area:     { th: geo.th, en: geo.en },
+      title:    { th: th || en, en: en || th },
+      summary:  { th: sth || sum, en: sum || sth },
+      lat:      geo.lat,
+      lon:      geo.lon,
+      vessel:   null,
+      conf:     n.credibility || 3,
+      tags:     [],
+      source:   { outlet: n.outlet || "", url: n.url || "" },
+      resolved: false,
+      origin:   "news",                     // แยกจาก "cron"/"manual" ได้ที่ปลายทาง
+      publishedAt: n.publishedAt || null,
+      newsItem: n,                          // ให้หน้ารายละเอียดย้อนกลับไปที่ข่าวต้นทางได้
+    });
+  });
+  return out;
+}
+
+/* รวมเหตุการณ์จากฐานข้อมูลกับที่อนุมานจากข่าว
+   ของจาก Supabase ถือเป็นตัวจริงเสมอ — ถ้าซ้ำลิงก์กัน ให้ตัวอนุมานหลีกทาง
+   มิฉะนั้นเหตุการณ์เดียวจะโผล่สองครั้งหลัง cron ทำงาน */
+function mergeEvents(dbEvents, newsEvents) {
+  const seen = new Set(
+    (dbEvents || []).map(e => (e.source && e.source.url) || "").filter(Boolean)
+  );
+  const extra = (newsEvents || []).filter(e => !seen.has(e.source.url));
+  const sev = { critical: 0, high: 1, medium: 2, low: 3 };
+  return [...(dbEvents || []), ...extra].sort(
+    (a, b) => (sev[a.sev] ?? 9) - (sev[b.sev] ?? 9)
+  );
+}
+
+/* ============================================================
    จุดข่าวบนแผนที่ — อ่านข่าว "ทุกชิ้น" หาพื้นที่จากเนื้อข่าว
    แล้วปักหมุดทั้งหมด (ไม่จำกัดเฉพาะข่าวที่พูดถึงเรือ)
    ============================================================ */
@@ -210,10 +338,8 @@ function eventRowToObj(r) {
   const timeStr = t
     ? new Date(t).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
     : "";
-  const ago = {
-    th: window.mdaTimeAgo ? window.mdaTimeAgo(t, "th") : "",
-    en: window.mdaTimeAgo ? window.mdaTimeAgo(t, "en") : "",
-  };
+  // ส่งเฉพาะปริมาณ ไม่รวมคำว่า "ที่แล้ว" — ดูเหตุผลที่ evAgo()
+  const ago = evAgo(t);
   return {
     id:      r.id,
     sev:     r.sev || "medium",
@@ -553,4 +679,5 @@ Object.assign(window, {
   useEventsUpdater, addEventToSupabase, loadEventsFromSupabase, queryEventsArchive,
   AddEventModal, AddEventButton, REGION_PRESETS,
   geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews, extractNewsPointsFromNews,
+  extractEventsFromNews, mergeEvents,
 });

@@ -214,13 +214,31 @@ function App() {
     showToast(T("เปิด Tweaks Panel แล้ว", "Tweaks panel opened"), "info");
   };
 
+  // ---- ฟีดข่าว: ใช้ร่วมกันทั้งการแจ้งเตือนและการอนุมานเหตุการณ์ ----
+  const { news: feedNews } = window.useNewsUpdater(window.MDA_DATA.news);
+
   // ---- เหตุการณ์จาก Supabase (cron สร้างอัตโนมัติ + ฟอร์มเพิ่มเอง) ----
   const { events: liveEvents, addEvent } = window.useEventsUpdater();
-  const data = Object.assign({}, window.MDA_DATA, { events: liveEvents });
+
+  /* เติมด้วยเหตุการณ์ที่อนุมานจากข่าวสดในเครื่อง
+     cron เขียนลง Supabase วันละครั้งเท่านั้น ระหว่างรอบ (หรือถ้าต่อ Supabase
+     ไม่ได้) หน้าเหตุการณ์จะว่างเปล่าทั้งที่ฟีดมีข่าวภัยอยู่ตรงหน้า
+     รวมที่นี่จุดเดียว ทุกหน้าที่อ่าน data.events จึงได้ชุดเดียวกัน —
+     ภาพรวม · หน้าเหตุการณ์ · หมุดบนแผนที่ · ตัวเลขบนแถบข้าง            */
+  const newsEvents = React.useMemo(
+    () => (window.extractEventsFromNews ? window.extractEventsFromNews(feedNews) : []),
+    [feedNews]
+  );
+  const mergedEvents = React.useMemo(
+    () => (window.mergeEvents ? window.mergeEvents(liveEvents, newsEvents)
+                              : liveEvents),
+    [liveEvents, newsEvents]
+  );
+
+  const data = Object.assign({}, window.MDA_DATA, { events: mergedEvents });
   const screenProps = { data, lang, onNav, showToast, addEvent };
 
   // ---- การแจ้งเตือนจริง: เด้งเมื่อมีข่าว/เหตุการณ์ใหม่เข้าฟีด ----
-  const { news: feedNews } = window.useNewsUpdater(window.MDA_DATA.news);
   const { notifications, unread: notifUnread, markAllSeen } = window.useNotifications(feedNews);
 
   const screens = {
