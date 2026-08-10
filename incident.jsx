@@ -24,8 +24,14 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
     );
   }
 
-  const id = (initial && initial.id) || data.events[0].id;
-  const e = data.events.find(x => x.id === id) || data.events[0];
+  const events = data.events;
+  const id = (initial && initial.id) || events[0].id;
+  const e = events.find(x => x.id === id) || events[0];
+  const idx = Math.max(0, events.findIndex(x => x.id === e.id));
+  const go = (i) => {
+    const t = events[Math.max(0, Math.min(events.length - 1, i))];
+    if (t && t.id !== e.id) onNav("incident", { id: t.id });
+  };
   const v = e.vessel ? data.vessels.find(x => x.id === e.vessel) : null;
   const relatedNews = data.news.filter(n => n.linkedInc === e.id);
   const sevScore = { critical: 86, high: 64, medium: 42, low: 22 }[e.sev] || 22;
@@ -37,6 +43,16 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
   const [escalated, setEscalated] = useState(false);
   const [tasked, setTasked] = useState(false);
   const [addOfficerOpen, setAddOfficerOpen] = useState(false);
+
+  /* สถานะเหล่านี้ผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ
+     ก่อนหน้านี้ไม่มีทางสลับเหตุการณ์จึงไม่เคยเห็นปัญหา — พอสลับได้แล้ว
+     ป้าย "ยกระดับแล้ว" กับชื่อผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป */
+  React.useEffect(() => {
+    setEscalated(false);
+    setTasked(false);
+    setAssignee("");
+    setAssignOpen(false);
+  }, [e.id]);
   const [newOfficer, setNewOfficer] = useState({ rank: "น.ต.", firstName: "", lastName: "", role: "" });
 
   const fmtPos = (lat, lon) => {
@@ -244,6 +260,52 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
         <Icon name="chevR" size={14} style={{ transform: "rotate(180deg)" }} />
         {T("กลับไปแผนที่เหตุการณ์", "Back to map & events")}
       </div>
+
+      {/* ── แถบสลับเหตุการณ์ ──────────────────────────────────────
+          เดิมหน้านี้แสดงเหตุการณ์เดียวแล้วจบ ต้องถอยไปหน้าอื่นเพื่อเปลี่ยนเรื่อง
+          ทั้งที่การเฝ้าระวังคือการกวาดดูทีละเหตุการณ์ต่อเนื่อง            */}
+      {events.length > 1 && (
+        <div className="row" style={{ gap: 8, alignItems: "center", marginBottom: 12 }}>
+          <button className="btn btn-ghost btn-sm" disabled={idx <= 0}
+            onClick={() => go(idx - 1)} title={T("เหตุการณ์ก่อนหน้า", "Previous incident")}>
+            <Icon name="chevR" size={14} style={{ transform: "rotate(180deg)" }} />
+          </button>
+          <span className="mono dim" style={{ fontSize: "var(--fs-sm)", minWidth: 52, textAlign: "center" }}>
+            {idx + 1} / {events.length}
+          </span>
+          <button className="btn btn-ghost btn-sm" disabled={idx >= events.length - 1}
+            onClick={() => go(idx + 1)} title={T("เหตุการณ์ถัดไป", "Next incident")}>
+            <Icon name="chevR" size={14} />
+          </button>
+
+          {/* รายการทั้งหมด — เรียงตามความรุนแรงเหมือนที่อื่น กดข้ามไปตัวไหนก็ได้ */}
+          <div className="row" style={{ gap: 6, overflowX: "auto", flex: 1, paddingBottom: 2 }}>
+            {events.map((ev, i) => {
+              const active = ev.id === e.id;
+              const col = (window.SEV[ev.sev] || window.SEV.low).color;
+              return (
+                <button key={ev.id} onClick={() => go(i)} title={tx(ev.title, lang)}
+                  className="btn btn-sm"
+                  style={{
+                    flex: "0 0 auto", maxWidth: 190, whiteSpace: "nowrap",
+                    overflow: "hidden", textOverflow: "ellipsis",
+                    borderColor: active ? col : "var(--border-2)",
+                    background: active ? "color-mix(in srgb, " + col + " 14%, transparent)" : "transparent",
+                    color: active ? "var(--text)" : "var(--text-dim)",
+                  }}>
+                  <span style={{
+                    display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                    background: col, marginRight: 6, verticalAlign: "middle",
+                  }} />
+                  {/* ใช้พาดหัว ไม่ใช่ชื่อพื้นที่ — หลายเหตุการณ์อยู่พื้นที่เดียวกัน
+                      ป้ายจะซ้ำจนแยกไม่ออกว่าอันไหนคืออันไหน */}
+                  {tx(ev.title, lang)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="page-head">
         <div>
