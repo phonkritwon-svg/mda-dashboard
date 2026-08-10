@@ -148,37 +148,52 @@ def _run(api_key):
         "FilterMessageTypes": ["PositionReport", "ShipStaticData"],
     })
 
+    ws = None
     backoff = 3
     while True:
         try:
             ws = websocket.create_connection(
                 "wss://stream.aisstream.io/v0/stream", timeout=30)
             ws.send(sub)
-            _state["connected"] = True
+            # ยังไม่ประกาศว่า "เชื่อมต่อแล้ว" ตรงนี้ — เปิดซ็อกเก็ตได้ไม่ได้แปลว่า
+            # คีย์ผ่าน AISStream รับซ็อกเก็ตก่อนแล้วค่อยปิดเงียบ ๆ ถ้าคีย์ใช้ไม่ได้
+            # ถ้าตั้ง connected=True ตรงนี้ หน้าเว็บจะขึ้นเขียวทั้งที่ไม่มีข้อมูลไหลเลย
             _state["error"] = None
             _state["since"] = time.time()
-            backoff = 3
-            print("[MDA] AIS: เชื่อมต่อ AISStream สำเร็จ")
+            print("[MDA] AIS: เปิดช่องสัญญาณแล้ว รอข้อมูลชุดแรก…")
 
             while True:
                 raw = ws.recv()
                 if not raw:
                     break
+                if not _state["connected"]:
+                    _state["connected"] = True
+                    backoff = 3          # รีเซ็ตเมื่อ "ได้ข้อมูลจริง" เท่านั้น
+                    print("[MDA] AIS: ได้รับข้อมูลแล้ว — คีย์ใช้งานได้")
                 try:
                     _handle(json.loads(raw))
                 except Exception:
                     pass
         except Exception as e:
+            msg = str(e)
             _state["connected"] = False
-            _state["error"] = str(e)[:200]
-            print("[MDA] AIS: หลุดการเชื่อมต่อ —", str(e)[:120], "· ต่อใหม่ใน", backoff, "วิ")
+            _state["error"] = msg[:200]
+            # 429 = ต่อถี่เกินไป (AISStream ให้ 1 การเชื่อมต่อต่อคีย์)
+            # ถ้าถอยแค่ระดับเดิมจะยิงซ้ำจนหน้าต่างลงโทษไม่มีวันหมด
+            if "429" in msg:
+                backoff = max(backoff, 120)
+                print("[MDA] AIS: ถูกจำกัดอัตรา (429) — ต่อถี่เกินไป "
+                      "หรือมีอีกโปรเซสถือคีย์เดียวกันอยู่ · รอ", backoff, "วิ")
+            else:
+                print("[MDA] AIS: หลุดการเชื่อมต่อ —", msg[:120], "· ต่อใหม่ใน", backoff, "วิ")
         finally:
             try:
-                ws.close()
+                if ws is not None:
+                    ws.close()
             except Exception:
                 pass
         time.sleep(backoff)
-        backoff = min(backoff * 2, 60)
+        backoff = min(backoff * 2, 300)
 
 
 def start(api_key=None):

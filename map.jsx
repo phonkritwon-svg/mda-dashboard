@@ -111,6 +111,9 @@ function vesselTitle(v, th) {
     bits.push((th ? "อัปเดต " : "updated ") + ageText(v.ageSec, th));
     if (v.ageSec >= AIS_LOST_SEC) bits.push(th ? "⚠ ขาดสัญญาณ" : "⚠ signal lost");
   }
+  // หมุดจากข่าวคือตำแหน่ง "โดยประมาณตามพื้นที่ที่ข่าวพูดถึง" ไม่ใช่การติดตามเรือจริง
+  // ต้องบอกให้ชัด มิฉะนั้นดูแล้วแยกไม่ออกจากหมุด AIS
+  if (v.fromNews) bits.push(th ? "ตำแหน่งโดยประมาณจากข่าว" : "approx. position from reporting");
   return bits.join(" · ");
 }
 
@@ -137,10 +140,13 @@ function vesselHtml(v, isSelected, th) {
      - สีตามประเภทเรือ AIS · เส้นขอบเทาบาง ๆ ให้เห็นชัดบนพื้นแผนที่ทุกโทน */
   const stroke = window.VTYPE_STROKE || "#999999";
   const isDark = v.type === "dark";
-  // วงกลม = มีข้อมูล AIS จริงและเรือหยุดนิ่ง (จอด/ทอดสมอ)
-  // เรือที่มาจากข่าวยังไม่มีค่าความเร็ว-เข็มจาก AIS → คงรูปลูกศรเรือไว้
+  /* ลูกศรใช้ได้เฉพาะเมื่อ "รู้เข็มจริง" เท่านั้น
+     เรือที่สกัดจากข่าวมี course = 0 เพราะไม่มีข้อมูล ไม่ใช่เพราะมุ่งหน้าทิศเหนือ
+     ของเดิมวาดเป็นลูกศรทั้งหมด แผนที่จึงแสดงกองเรือชี้ขึ้นเหนือพร้อมกันหมด
+     ทั้งที่ไม่มีลำไหนรู้ทิศเลย — วงกลมคือสัญลักษณ์มาตรฐานของ "ไม่ทราบเข็ม"
+     (ธรรมเนียมเดียวกับ VesselFinder) จึงใช้กับทั้งเรือจอดและเรือที่ไร้ข้อมูล */
   const hasAisNav = !v.fromNews && typeof v.sp === "number";
-  const moored    = hasAisNav && v.sp <= 0.5;
+  const knowsHeading = hasAisNav && v.sp > 0.5;
 
   const paint = isDark
     // กองเรือเงา: ลำตัวโปร่ง เน้นว่าไม่มีข้อมูล AIS ยืนยัน
@@ -148,11 +154,11 @@ function vesselHtml(v, isSelected, th) {
     : `fill="${col}" stroke="${stroke}" stroke-width="1"`;
 
   const arrow = "M0,-10 L5.4,7.6 L0,3.9 L-5.4,7.6 Z";
-  const shape = moored
-    ? `<circle cx="0" cy="0" r="5.2" ${paint}/>`
-    : `<g transform="rotate(${v.course || 0})">
+  const shape = knowsHeading
+    ? `<g transform="rotate(${v.course || 0})">
          <path d="${arrow}" ${paint} stroke-linejoin="round"/>
-       </g>`;
+       </g>`
+    : `<circle cx="0" cy="0" r="5.2" ${paint}/>`;
 
   /* วงประจาง ๆ = ตำแหน่งนี้เก่าเกิน 10 นาที อย่าใช้ตัดสินใจโดยไม่ยืนยันซ้ำ
      ใช้เส้นประคนละแบบกับวงเลือก (inset -5px) เพื่อไม่ให้สับสน */
