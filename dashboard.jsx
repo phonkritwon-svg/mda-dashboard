@@ -169,6 +169,10 @@ function Dashboard({ data, lang, onNav, showToast, addEvent }) {
             แผง "ระดับภัยคุกคาม" / "แหล่งข่าว OSINT" / "หมวดเหตุการณ์" ถูกลบออก
             เดิมใช้ตัวเลขสมมติทั้งหมด (ดัชนี 68, กราฟแท่ง) ไม่ได้คำนวณจากข้อมูลจริง */}
         <div className="col" style={{ gap: 12, minHeight: 0, overflow: "auto" }}>
+          {/* สภาพทะเลจริงจาก Open-Meteo — ดึงในเบราว์เซอร์ ไม่ต้องมี key หรือ serverless
+              วางไว้บนสุดเพราะสภาพทะเลกำหนดว่าอะไรทำได้บ้างในวันนั้น */}
+          <MarineConditions lang={lang} />
+
           <Panel title={T("ฟีดข่าวกรอง", "Intelligence Feed")} icon="feed"
             action={
               <a className="panel-link" onClick={() => onNav("osint")}>
