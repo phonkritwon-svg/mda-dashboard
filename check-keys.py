@@ -82,7 +82,8 @@ def check_aisstream(key):
     def on_open(ws):
         ev["opened"] = True
         # ขอทั้งโลกเพื่อให้มีข้อมูลไหลแน่ถ้าคีย์ผ่าน
-        ws.send(json.dumps({"APIKey": key, "BoundingBoxes": [[[-90, -180], [90, 180]]]}))
+        # "Apikey" ตามเอกสาร aisstream.io — สะกดเป็น "APIKey" แล้วโดนปิดการเชื่อมต่อ
+        ws.send(json.dumps({"Apikey": key, "BoundingBoxes": [[[-90, -180], [90, 180]]]}))
 
     def on_message(ws, m):
         ev["msg"] = str(m)[:200]
@@ -119,9 +120,11 @@ def check_aisstream(key):
         return False, "ต่อไม่ถึงเซิร์ฟเวอร์ (%s) — ตรวจอินเทอร์เน็ต/ไฟร์วอลล์" % (ev["err"] or "timeout")
 
     if ev["closed"]:
-        return False, ("เชื่อมต่อได้แต่เซิร์ฟเวอร์ปิดทันทีโดยไม่ส่งข้อมูล = คีย์ยังใช้ไม่ได้\n"
-                       "     สาเหตุที่พบบ่อย: ยังไม่ได้ยืนยันอีเมล หรือคีย์เพิ่งสร้างยังไม่ทันมีผล\n"
-                       "     ลองเข้า https://aisstream.io/apikeys ตรวจว่าคีย์ยัง active อยู่")
+        return False, ("เชื่อมต่อได้แต่เซิร์ฟเวอร์ปิดทันทีโดยไม่ส่งข้อมูล\n"
+                       "     พบบ่อยสุด: เพิ่งต่อถี่เกินไป — AISStream ให้ 1 การเชื่อมต่อต่อคีย์\n"
+                       "     ปิด server.py ให้หมด รอ 15-30 นาที แล้วรันสคริปต์นี้ครั้งเดียว\n"
+                       "     ถ้ายังเหมือนเดิม: เข้า https://aisstream.io/apikeys "
+                       "(ล็อกอินด้วย GitHub) ตรวจว่าคีย์ยัง active")
     return False, "เชื่อมต่อได้แต่ไม่มีข้อมูลไหลมาใน 20 วินาที — ลองใหม่อีกครั้ง"
 
 
