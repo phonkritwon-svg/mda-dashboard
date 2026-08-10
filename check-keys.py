@@ -77,7 +77,8 @@ def check_aisstream(key):
         return False, "ยังไม่ได้ติดตั้ง websocket-client → pip install websocket-client"
 
     import threading
-    ev = {"opened": False, "msg": None, "closed": False, "err": None}
+    ev = {"opened": False, "msg": None, "closed": False, "err": None,
+          "code": None, "reason": None}
 
     def on_open(ws):
         ev["opened"] = True
@@ -93,7 +94,11 @@ def check_aisstream(key):
         ev["err"] = type(e).__name__
 
     def on_close(ws, code, reason):
+        # รหัสและเหตุผลตอนปิดคือคำอธิบายเดียวที่ AISStream ให้มา
+        # ถ้าทิ้งไป จะเหลือแค่ "ปิดแล้ว" ซึ่งแยกไม่ออกว่าคีย์ผิด ต่อถี่ไป หรืออย่างอื่น
         ev["closed"] = True
+        ev["code"] = code
+        ev["reason"] = reason
 
     app = websocket.WebSocketApp(
         "wss://stream.aisstream.io/v0/stream",
@@ -120,7 +125,9 @@ def check_aisstream(key):
         return False, "ต่อไม่ถึงเซิร์ฟเวอร์ (%s) — ตรวจอินเทอร์เน็ต/ไฟร์วอลล์" % (ev["err"] or "timeout")
 
     if ev["closed"]:
+        detail = "close code=%s reason=%r" % (ev["code"], ev["reason"])
         return False, ("เชื่อมต่อได้แต่เซิร์ฟเวอร์ปิดทันทีโดยไม่ส่งข้อมูล\n"
+                       "     " + detail + "\n"
                        "     พบบ่อยสุด: เพิ่งต่อถี่เกินไป — AISStream ให้ 1 การเชื่อมต่อต่อคีย์\n"
                        "     ปิด server.py ให้หมด รอ 15-30 นาที แล้วรันสคริปต์นี้ครั้งเดียว\n"
                        "     ถ้ายังเหมือนเดิม: เข้า https://aisstream.io/apikeys "
