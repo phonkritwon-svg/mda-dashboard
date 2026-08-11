@@ -136,10 +136,28 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const vessels = usingAis ? aisVessels : newsVessels;
 
   // อ่านข่าวทุกชิ้น → หาพื้นที่จากเนื้อข่าว → ปักเป็นจุดบนแผนที่
-  const newsPoints = React.useMemo(
+  const newsPointsAll = React.useMemo(
     () => (window.extractNewsPointsFromNews ? window.extractNewsPointsFromNews(liveNews) : []),
     [liveNews]
   );
+
+  /* ── โหมดเน้นข่าวในประเทศไทย ────────────────────────────────────
+     กรองเหลือเฉพาะจุดที่เนื้อข่าวชี้ว่าเกิดในราชอาณาจักร
+     ต่างจากปุ่ม "เน้นเพื่อนบ้าน" ที่เพียงดันขึ้นก่อนแต่ยังแสดงทั้งโลก —
+     บนแผนที่การซ่อนของที่ไม่เกี่ยวชัดเจนกว่าการเรียงลำดับ            */
+  const [thaiOnly, setThaiOnly] = useState(false);
+  const newsPoints = React.useMemo(() => {
+    if (!thaiOnly) return newsPointsAll;
+    return newsPointsAll.filter(p => {
+      const n = p.item || {};
+      const hay = [
+        p.region && p.region.th, p.region && p.region.en,
+        n.raw && n.raw.th, n.raw && n.raw.en,
+        n.ai && n.ai.th, n.ai && n.ai.en, n.outlet,
+      ].filter(Boolean).join("  ");
+      return window.isThaiDomestic ? window.isThaiDomestic(hay) : true;
+    });
+  }, [newsPointsAll, thaiOnly]);
 
   const ofInterest = vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
@@ -410,6 +428,29 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
             </>
           )}
         </div>
+
+        {/* เน้นข่าวในประเทศไทย — กรองจุดข่าวเหลือเฉพาะในราชอาณาจักร
+            แล้วบินไปที่ประเทศไทยให้เลย เพราะกดปุ่มนี้แล้วยังต้องเลื่อนหาเองก็ไม่ครบงาน */}
+        <button
+          className={"btn btn-sm " + (thaiOnly ? "btn-primary" : "btn-ghost")}
+          onClick={() => {
+            const next = !thaiOnly;
+            setThaiOnly(next);
+            if (next) {
+              setMapView({ lat: 13.2, lon: 100.9, zoom: 5 });
+              setRegionLabel(T("ประเทศไทย", "Thailand"));
+            }
+          }}
+          title={T("แสดงเฉพาะจุดข่าวที่เกิดในประเทศไทย และเลื่อนแผนที่ไปที่ไทย",
+                   "Show only news located inside Thailand and move the map there")}>
+          <Icon name="pin" size={13} />
+          {T("เน้นข่าวไทย", "Thailand only")}
+          {thaiOnly && (
+            <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
+              {newsPoints.length}/{newsPointsAll.length}
+            </span>
+          )}
+        </button>
 
         <span className="topbar-spacer" />
         <span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>

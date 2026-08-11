@@ -15,6 +15,30 @@ const LIVE_SOURCES = [
     url: "https://navaltoday.com/feed/" },
   { key: "MAREX", name: "Maritime Executive", tag: "NEWS", color: "#3fae6a",
     url: "https://maritime-executive.com/rss/articles" },
+
+  /* ── ข่าวในประเทศไทย (Google News RSS ภาษาไทย) ───────────────────
+     ฟีดอังกฤษด้านบนแทบไม่รายงานเหตุในน่านน้ำไทยเลย แดชบอร์ดของ ศรชล.
+     จึงเห็นแต่ทะเลแดง/ทะเลจีนใต้ ทั้งที่พื้นที่รับผิดชอบจริงคืออ่าวไทย-อันดามัน
+
+     ผูก query กับภัยคุกคาม 9 ด้าน ไม่ใช่ดึงข่าวในประเทศมาทั้งหมด
+     มิฉะนั้นจะกลายเป็นเครื่องอ่านข่าวทั่วไป ไม่ใช่ภาพสถานการณ์ทางทะเล
+     (ชุดเดียวกับใน api/cron-news.py — แก้ที่ไหนควรแก้ทั้งสองที่)      */
+  { key: "THNEWS", name: "ในประเทศ (Google News)", tag: "NEWS", color: "#46c976",
+    url: "https://news.google.com/rss/search?q=" + encodeURIComponent(
+      "(ประมงผิดกฎหมาย OR เรือประมง OR ลอบจับสัตว์น้ำ OR \"แรงงานประมง\") "
+      + "(จับกุม OR ตรวจยึด OR ไทย) when:14d") + "&hl=th&gl=TH&ceid=TH:th" },
+  { key: "THNEWS", name: "ในประเทศ (Google News)", tag: "NEWS", color: "#46c976",
+    url: "https://news.google.com/rss/search?q=" + encodeURIComponent(
+      "(ลักลอบขนส่ง OR ค้ามนุษย์ OR ยาเสพติด) (ชายแดน OR ท่าเรือ OR ทางทะเล) when:14d")
+      + "&hl=th&gl=TH&ceid=TH:th" },
+  { key: "THNEWS", name: "ในประเทศ (Google News)", tag: "NEWS", color: "#46c976",
+    url: "https://news.google.com/rss/search?q=" + encodeURIComponent(
+      "(เรือล่ม OR เรือจม OR กู้ภัยทางทะเล OR \"คลื่นลมแรง\" OR \"น้ำมันรั่ว\") when:14d")
+      + "&hl=th&gl=TH&ceid=TH:th" },
+  { key: "THNEWS", name: "ในประเทศ (Google News)", tag: "NEWS", color: "#46c976",
+    url: "https://news.google.com/rss/search?q=" + encodeURIComponent(
+      "(ศรชล OR \"กองทัพเรือ\" OR \"ตำรวจน้ำ\" OR \"กรมเจ้าท่า\") "
+      + "(ปฏิบัติการ OR ตรวจการณ์ OR จับกุม) when:14d") + "&hl=th&gl=TH&ceid=TH:th" },
 ];
 
 // Register source entries so SrcChip can look them up

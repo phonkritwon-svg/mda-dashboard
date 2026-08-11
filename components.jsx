@@ -309,6 +309,35 @@ const FOCUS_COUNTRIES = [
 ];
 const FOCUS_RE = new RegExp(FOCUS_COUNTRIES.map(c => c.rx.source).join("|"), "i");
 
+/* ── ข่าวที่เกิด "ในประเทศไทย" ────────────────────────────────────────
+   ต่างจาก FOCUS_COUNTRIES ที่เป็นเพื่อนบ้าน — อันนี้คือในราชอาณาจักร
+   ใช้ชื่อจังหวัดเป็นตัวตัดสินหลัก เพราะข่าวในประเทศมักไม่พิมพ์คำว่า
+   "ประเทศไทย" ลงไป แต่ระบุจังหวัดเสมอ                                  */
+const TH_PROVINCE_RE = new RegExp([
+  "นราธิวาส|ปัตตานี|ยะลา|สงขลา|สตูล|พัทลุง|ตรัง|กระบี่|ภูเก็ต|พังงา|ระนอง",
+  "ชุมพร|สุราษฎร์ธานี|นครศรีธรรมราช|ประจวบคีรีขันธ์|เพชรบุรี",
+  "สมุทรปราการ|สมุทรสาคร|สมุทรสงคราม|ชลบุรี|ระยอง|จันทบุรี|ตราด|สระแก้ว",
+  "กรุงเทพ|นนทบุรี|ปทุมธานี|อยุธยา|สระบุรี|ลพบุรี|นครสวรรค์|พิษณุโลก|พิจิตร|เพชรบูรณ์",
+  "ขอนแก่น|นครราชสีมา|โคราช|อุดรธานี|ชัยภูมิ|สุรินทร์|บุรีรัมย์|อุบลราชธานี",
+  "หนองคาย|นครพนม|มุกดาหาร|เลย|กาฬสินธุ์|ร้อยเอ็ด|สกลนคร",
+  "เชียงใหม่|เชียงราย|ลำปาง|ลำพูน|น่าน|แพร่|พะเยา|แม่ฮ่องสอน|ตาก|สุโขทัย|อุตรดิตถ์",
+  "กาญจนบุรี|ราชบุรี|สุพรรณบุรี|นครปฐม",
+  "narathiwat|pattani|yala|songkhla|satun|phuket|krabi|ranong|chumphon",
+  "surat ?thani|nakhon ?si ?thammarat|prachuap|chon ?buri|rayong|chanthaburi",
+  "bangkok|nonthaburi|pathum ?thani|ayutthaya|saraburi|nakhon ?sawan|phitsanulok",
+  "khon ?kaen|nakhon ?ratchasima|udon ?thani|ubon ?ratchathani|nong ?khai|mukdahan",
+  "chiang ?mai|chiang ?rai|mae ?hong ?son|mae ?sot|kanchanaburi|sa ?kaeo",
+].join("|"), "i");
+
+const TH_RE = new RegExp(
+  "\\bthailand\\b|\\bthai\\b|ประเทศไทย|ในไทย|ราชอาณาจักรไทย|ศรชล|กองทัพเรือไทย|" +
+  TH_PROVINCE_RE.source, "i");
+
+// ข่าว/เหตุการณ์นี้เกิดในไทยหรือไม่ (ดูจากข้อความรวมของรายการ)
+function isThaiDomestic(text) {
+  return TH_RE.test(text || "");
+}
+
 // คืนประเทศโฟกัสที่ข้อความนี้ตรง (null = ไม่ตรง)
 function focusCountryOf(text) {
   if (!text) return null;
@@ -359,4 +388,5 @@ Object.assign(window, {
   Sparkline, MiniBars, ThreatMeter, Confidence, Gauge, Panel, VTYPE, VTYPE_STROKE,
   TimeScopeBar, timeWindow, inTimeWindow,
   FOCUS_COUNTRIES, FOCUS_RE, focusCountryOf, focusPartition, FocusToggle, FocusGroupLabel,
+  TH_RE, TH_PROVINCE_RE, isThaiDomestic,
 });

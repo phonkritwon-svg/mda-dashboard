@@ -37,8 +37,89 @@ const MDA_GEO_REGIONS = [
   { re: /koh ?kong|เกาะกง/i,                                  th: "เกาะกง",                    en: "Koh Kong",                lat: 11.6,  lon: 103.0 },
   { re: /\btrat\b|ตราด/i,                                      th: "ตราด",                      en: "Trat",                    lat: 12.0,  lon: 102.5 },
   { re: /overlapping claims|\boca\b|พื้นที่อ้างสิทธิทับซ้อน|พื้นที่ทับซ้อน/i, th: "พื้นที่อ้างสิทธิทับซ้อน (อ่าวไทย)", en: "Gulf of Thailand OCA", lat: 8.0, lon: 102.5 },
+
+  /* ── จังหวัดในประเทศไทย ────────────────────────────────────────────
+     วางไว้ "หลัง" ทะเลที่มีชื่อเฉพาะ แต่ "ก่อน" อ่าวไทย/อันดามันที่กว้าง
+     ข่าวในประเทศจะได้ลงหมุดที่จังหวัด ไม่ใช่ลอยไปกลางอ่าว
+
+     พิกัดเป็นระดับศาลากลางจังหวัด/ใจกลางจังหวัดโดยประมาณ (±ไม่กี่สิบ กม.)
+     พอสำหรับปักหมุดข่าว แต่ไม่ใช่พิกัดจุดเกิดเหตุ — ห้ามใช้ในงานที่ต้องแม่น
+
+     รายการนี้ยังไม่ครบ 77 จังหวัด เลือกเฉพาะจังหวัดชายแดน ชายฝั่ง
+     และจังหวัดใหญ่ที่มักปรากฏในข่าวความมั่นคง เพิ่มได้โดยแทรกบรรทัดใหม่
+     ให้อยู่เหนือกฎ "ประเทศไทย" ท้ายกลุ่ม                                 */
+
+  /* ชายแดนใต้ */
+  { re: /narathiwat|นราธิวาส|สุคิริน|ตากใบ|ระแงะ|เจาะไอร้อง/i,   th: "นราธิวาส",        en: "Narathiwat",       lat: 6.43,  lon: 101.82 },
+  { re: /\bpattani\b|ปัตตานี|สายบุรี|หนองจิก/i,                  th: "ปัตตานี",          en: "Pattani",          lat: 6.87,  lon: 101.25 },
+  { re: /\byala\b|ยะลา|เบตง|บันนังสตา/i,                         th: "ยะลา",             en: "Yala",             lat: 6.54,  lon: 101.28 },
+  { re: /songkhla|สงขลา|หาดใหญ่|สะเดา|ทะเลสาบสงขลา/i,           th: "สงขลา",            en: "Songkhla",         lat: 7.20,  lon: 100.60 },
+  { re: /\bsatun\b|สตูล/i,                                        th: "สตูล",             en: "Satun",            lat: 6.62,  lon: 100.07 },
+
+  /* ชายแดนตะวันตก–เหนือ */
+  { re: /\btak\b|จังหวัดตาก|แม่สอด|mae ?sot|ท่าสายลวด|แม่กุ/i,   th: "ตาก",              en: "Tak",              lat: 16.87, lon: 99.13 },
+  { re: /mae ?hong ?son|แม่ฮ่องสอน/i,                             th: "แม่ฮ่องสอน",       en: "Mae Hong Son",     lat: 19.30, lon: 97.97 },
+  { re: /chiang ?rai|เชียงราย|แม่สาย|เชียงแสน|เชียงของ/i,        th: "เชียงราย",         en: "Chiang Rai",       lat: 19.91, lon: 99.83 },
+  { re: /chiang ?mai|เชียงใหม่/i,                                 th: "เชียงใหม่",        en: "Chiang Mai",       lat: 18.79, lon: 98.98 },
+  { re: /kanchanaburi|กาญจนบุรี|สังขละบุรี|ด่านเจดีย์สามองค์/i,  th: "กาญจนบุรี",        en: "Kanchanaburi",     lat: 14.02, lon: 99.53 },
+  { re: /\branong\b|ระนอง/i,                                      th: "ระนอง",            en: "Ranong",           lat: 9.96,  lon: 98.63 },
+
+  /* ชายแดนอีสาน */
+  { re: /nong ?khai|หนองคาย/i,                                    th: "หนองคาย",          en: "Nong Khai",        lat: 17.88, lon: 102.74 },
+  { re: /nakhon ?phanom|นครพนม/i,                                 th: "นครพนม",           en: "Nakhon Phanom",    lat: 17.41, lon: 104.78 },
+  { re: /mukdahan|มุกดาหาร/i,                                     th: "มุกดาหาร",         en: "Mukdahan",         lat: 16.54, lon: 104.72 },
+  { re: /ubon ?ratchathani|อุบลราชธานี|ช่องเม็ก/i,               th: "อุบลราชธานี",      en: "Ubon Ratchathani", lat: 15.24, lon: 104.85 },
+  { re: /sa ?kaeo|สระแก้ว|อรัญประเทศ|คลองลึก/i,                  th: "สระแก้ว",          en: "Sa Kaeo",          lat: 13.82, lon: 102.07 },
+
+  /* ชายฝั่งตะวันออก */
+  { re: /chanthaburi|จันทบุรี/i,                                  th: "จันทบุรี",         en: "Chanthaburi",      lat: 12.61, lon: 102.10 },
+  { re: /\brayong\b|ระยอง|มาบตาพุด/i,                             th: "ระยอง",            en: "Rayong",           lat: 12.68, lon: 101.25 },
+  { re: /chon ?buri|ชลบุรี|พัทยา|แหลมฉบัง|สัตหีบ|เกาะสีชัง/i,   th: "ชลบุรี",           en: "Chon Buri",        lat: 13.36, lon: 100.98 },
+
+  /* ชายฝั่งอ่าวไทยตอนบน–ใต้ */
+  { re: /samut ?prakan|สมุทรปราการ|บางปู/i,                       th: "สมุทรปราการ",      en: "Samut Prakan",     lat: 13.60, lon: 100.60 },
+  { re: /samut ?sakhon|สมุทรสาคร|มหาชัย/i,                        th: "สมุทรสาคร",        en: "Samut Sakhon",     lat: 13.55, lon: 100.27 },
+  { re: /samut ?songkhram|สมุทรสงคราม/i,                          th: "สมุทรสงคราม",      en: "Samut Songkhram",  lat: 13.41, lon: 100.00 },
+  { re: /phetchaburi|เพชรบุรี|ชะอำ/i,                             th: "เพชรบุรี",         en: "Phetchaburi",      lat: 13.11, lon: 99.94 },
+  { re: /prachuap|ประจวบคีรีขันธ์|หัวหิน|บางสะพาน/i,             th: "ประจวบคีรีขันธ์",  en: "Prachuap Khiri Khan", lat: 11.81, lon: 99.80 },
+  { re: /\bchumphon\b|ชุมพร/i,                                    th: "ชุมพร",            en: "Chumphon",         lat: 10.49, lon: 99.18 },
+  { re: /surat ?thani|สุราษฎร์ธานี|เกาะสมุย|เกาะพะงัน|เกาะเต่า/i, th: "สุราษฎร์ธานี",    en: "Surat Thani",      lat: 9.14,  lon: 99.33 },
+  { re: /nakhon ?si ?thammarat|นครศรีธรรมราช|ขนอม/i,             th: "นครศรีธรรมราช",    en: "Nakhon Si Thammarat", lat: 8.43, lon: 99.96 },
+  { re: /phatthalung|พัทลุง/i,                                    th: "พัทลุง",           en: "Phatthalung",      lat: 7.62,  lon: 100.08 },
+
+  /* ชายฝั่งอันดามัน */
+  { re: /\bphuket\b|ภูเก็ต/i,                                     th: "ภูเก็ต",           en: "Phuket",           lat: 7.88,  lon: 98.39 },
+  { re: /\bkrabi\b|กระบี่/i,                                      th: "กระบี่",           en: "Krabi",            lat: 8.09,  lon: 98.91 },
+  { re: /phang ?nga|พังงา|เขาหลัก/i,                              th: "พังงา",            en: "Phang Nga",        lat: 8.45,  lon: 98.53 },
+  { re: /\btrang\b|ตรัง/i,                                        th: "ตรัง",             en: "Trang",            lat: 7.56,  lon: 99.61 },
+
+  /* กรุงเทพฯ–ปริมณฑล–ภาคกลาง */
+  { re: /bangkok|กรุงเทพ|กทม\.?|จอมทอง|หนองแขม|บางมด|พระราม 2|ดอนเมือง|สุวรรณภูมิ|suvarnabhumi/i,
+                                                                   th: "กรุงเทพมหานคร",    en: "Bangkok",          lat: 13.75, lon: 100.52 },
+  { re: /nonthaburi|นนทบุรี/i,                                    th: "นนทบุรี",          en: "Nonthaburi",       lat: 13.86, lon: 100.51 },
+  { re: /pathum ?thani|ปทุมธานี/i,                                th: "ปทุมธานี",         en: "Pathum Thani",     lat: 14.02, lon: 100.53 },
+  { re: /ayutthaya|อยุธยา|วังน้อย/i,                              th: "พระนครศรีอยุธยา",  en: "Ayutthaya",        lat: 14.35, lon: 100.58 },
+  { re: /saraburi|สระบุรี|หนองโดน/i,                              th: "สระบุรี",          en: "Saraburi",         lat: 14.53, lon: 100.91 },
+  { re: /nakhon ?sawan|นครสวรรค์|ตาคลี|หนองโพ/i,                 th: "นครสวรรค์",        en: "Nakhon Sawan",     lat: 15.70, lon: 100.14 },
+  { re: /phitsanulok|พิษณุโลก|วังทอง|บางกระทุ่ม/i,               th: "พิษณุโลก",         en: "Phitsanulok",      lat: 16.82, lon: 100.26 },
+  { re: /phichit|พิจิตร/i,                                        th: "พิจิตร",           en: "Phichit",          lat: 16.44, lon: 100.35 },
+  { re: /phetchabun|เพชรบูรณ์/i,                                  th: "เพชรบูรณ์",        en: "Phetchabun",       lat: 16.42, lon: 101.16 },
+
+  /* อีสานตอนใน */
+  { re: /khon ?kaen|ขอนแก่น|ภูผาม่าน|ห้วยม่วง|แวงน้อย/i,         th: "ขอนแก่น",          en: "Khon Kaen",        lat: 16.44, lon: 102.83 },
+  { re: /nakhon ?ratchasima|นครราชสีมา|โคราช/i,                   th: "นครราชสีมา",       en: "Nakhon Ratchasima", lat: 14.97, lon: 102.10 },
+  { re: /udon ?thani|อุดรธานี/i,                                  th: "อุดรธานี",         en: "Udon Thani",       lat: 17.41, lon: 102.79 },
+  { re: /chaiyaphum|ชัยภูมิ|บ้านเล่า/i,                           th: "ชัยภูมิ",          en: "Chaiyaphum",       lat: 15.81, lon: 102.03 },
+  { re: /\bsurin\b|สุรินทร์/i,                                    th: "สุรินทร์",         en: "Surin",            lat: 14.88, lon: 103.49 },
+  { re: /buri ?ram|บุรีรัมย์/i,                                   th: "บุรีรัมย์",        en: "Buri Ram",         lat: 14.99, lon: 103.10 },
+
   { re: /gulf of thailand|อ่าวไทย|ท้องอ่าว/i,                                   th: "อ่าวไทย",                   en: "Gulf of Thailand",        lat: 9.5,  lon: 101.5 },
   { re: /andaman|ทะเลอันดามัน|อนุดามัน/i,                                            th: "ทะเลอันดามัน",              en: "Andaman Sea",             lat: 8.0,  lon: 97.0 },
+
+  /* ตัวรับท้ายของกลุ่มไทย — ข่าวที่บอกแค่ว่าเกิดในไทยแต่ไม่ระบุจังหวัด
+     ต้องอยู่ "หลัง" อ่าวไทย/อันดามัน ไม่ใช่ก่อน เพราะคำว่า Thailand
+     อยู่ใน "Gulf of Thailand" ด้วย — วางสลับที่แล้วข่าวอ่าวไทยจะไปลงกรุงเทพฯ */
+  { re: /\bthailand\b|\bthai\b|ประเทศไทย|ในไทย|ราชอาณาจักรไทย/i, th: "ประเทศไทย",        en: "Thailand",         lat: 13.75, lon: 100.52 },
   { re: /natuna|นาตูนา/i,                                             th: "ทะเลนาตูนาเหนือ",           en: "North Natuna Sea",        lat: 5.0,  lon: 109.2 },
   { re: /black sea|novorossiysk|odes[as]|crimea|ทะเลดำ|โนโวรอสซีสค์/i,            th: "ทะเลดำ",                    en: "Black Sea",               lat: 44.0, lon: 36.0 },
   { re: /baltic|gulf of finland|kattegat|gotland|ทะเลบอลติก|บอลติก/i,           th: "ทะเลบอลติก",                en: "Baltic Sea",              lat: 59.0, lon: 21.0 },

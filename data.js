@@ -32,6 +32,7 @@ window.MDA_DATA = (function () {
     AMTI: { name: "CSIS AMTI",              tag: "SAT",  color: "#b07cf0" },
     GFW:  { name: "Global Fishing Watch",   tag: "DATA", color: "#f0884d" },
     GNEWS:{ name: "ภูมิภาค (Google News)",  tag: "NEWS", color: "#e0a020" },
+    THNEWS:{ name: "ในประเทศ (Google News)", tag: "NEWS", color: "#46c976" },
   };
 
   // ---- ภัยคุกคามทางทะเล 9 ด้าน ของ ศรชล. (Thai-MECC) ----
