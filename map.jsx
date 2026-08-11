@@ -65,18 +65,26 @@ const MAP_STYLE = `
     box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
     font-family: var(--font-ui) !important;
     white-space: normal !important;
-    max-width: 330px !important;
     color: var(--text) !important;
+    /* วางแนวนอน: พาดหัวจบใน 1-2 บรรทัด แทนการ์ดสูงแคบแบบเดิม
+       ค่านี้เป็นเพดานเท่านั้น — ตัวจริงถูกบีบตามความกว้างแผงแผนที่
+       ในตัวจัดการ tooltipopen เพราะ CSS มองไม่เห็นขนาดแผง */
+    max-width: 560px !important;
+    width: max-content !important;
   }
   .mda-news-tip::before { display: none !important; }
-  .mda-news-tip .nt-in    { padding: 10px 12px; border-left-width: 3px; border-left-style: solid; }
-  .mda-news-tip .nt-dom   { font-size: 10px; font-weight: 700; letter-spacing: .05em;
-                            text-transform: uppercase; margin-bottom: 5px; }
-  .mda-news-tip .nt-title { font-size: 13.5px; line-height: 1.5; color: var(--text); font-weight: 500; }
-  .mda-news-tip .nt-meta  { font-size: 11px; color: var(--text-dim); margin-top: 7px;
-                            display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
-  .mda-news-tip .nt-hint  { font-size: 10px; color: var(--text-mute); margin-top: 7px;
-                            padding-top: 6px; border-top: 1px solid var(--border-2); }
+  /* แถวเดียว: ป้ายด้านภัยอยู่ซ้าย เนื้อหาอยู่ขวา */
+  .mda-news-tip .nt-in    { display: flex; align-items: flex-start; gap: 10px;
+                            padding: 9px 12px; border-left-width: 3px; border-left-style: solid; }
+  .mda-news-tip .nt-dom   { flex: 0 0 auto; max-width: 118px;
+                            font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+                            line-height: 1.35; padding: 3px 7px; border-radius: 5px;
+                            border: 1px solid currentColor; opacity: .95; }
+  .mda-news-tip .nt-body  { min-width: 0; }   /* ให้ข้อความยาวหดได้ ไม่ดันการ์ดจนล้น */
+  .mda-news-tip .nt-title { font-size: 13.5px; line-height: 1.45; color: var(--text); font-weight: 500; }
+  .mda-news-tip .nt-meta  { font-size: 11px; color: var(--text-dim); margin-top: 5px;
+                            display: flex; flex-wrap: wrap; gap: 3px 7px; align-items: center; }
+  .mda-news-tip .nt-hint  { color: var(--text-mute); }
 `;
 
 /* ── Shipping lanes (approximate great-circle waypoints) ── */
@@ -486,12 +494,41 @@ function MapView({
         .bindTooltip(
           `<div class="nt-in" style="border-left-color:${p.color}">
              ${dom ? `<div class="nt-dom" style="color:${p.color}">${esc(dom)}</div>` : ""}
-             <div class="nt-title">${esc(head)}</div>
-             <div class="nt-meta">${meta}</div>
-             <div class="nt-hint">${th ? "คลิกเพื่อเปิดข่าวเต็ม" : "Click to open the full item"}</div>
+             <div class="nt-body">
+               <div class="nt-title">${esc(head)}</div>
+               <div class="nt-meta">${meta}<span style="opacity:.4">·</span><span class="nt-hint">${
+                 th ? "คลิกเพื่อเปิด" : "click to open"}</span></div>
+             </div>
            </div>`,
           { direction: "top", offset: [0, -8], className: "mda-news-tip", sticky: false }
         )
+        /* Leaflet วางทูลทิปกึ่งกลางหมุดแล้วจบ ไม่ดันกลับเมื่อชนขอบแผนที่
+           การ์ดแนวนอนกว้างกว่าเดิมมาก หมุดที่อยู่ริมขวาจึงถูกตัดหายไปครึ่งใบ
+           วัดหลังเปิดแล้วเลื่อนด้วย marginLeft (กำหนดค่าใหม่ทุกครั้ง
+           ไม่บวกทับ transform ของ Leaflet เพื่อไม่ให้ค่าสะสม) */
+        .on("tooltipopen", (ev) => {
+          const map = mapRef.current;
+          const el = ev.tooltip && ev.tooltip.getElement();
+          if (!map || !el) return;
+          const pad = 8;
+          const mb = map.getContainer().getBoundingClientRect();
+
+          /* ตัวจำกัดความกว้างจริงคือ "แผงแผนที่" ไม่ใช่ขนาดจอ — บนเลย์เอาต์
+             1fr + คอลัมน์ขวา 330px แผนที่อาจกว้างแค่ ~360px ขณะที่ 70vw
+             คำนวณได้ 574px การ์ดจึงกว้างกว่าตัวแผนที่ทั้งอันและยัดไม่ลง
+             CSS มองไม่เห็นความกว้างนี้ ต้องกำหนดตอนเปิดทูลทิป */
+          // ต้องใส่ !important ด้วย ไม่งั้นแพ้กฎ max-width ใน CSS ที่ประกาศ !important ไว้
+          el.style.setProperty("max-width",
+            Math.max(200, Math.min(560, mb.width - pad * 2)) + "px", "important");
+
+          // แล้วค่อยดันกลับถ้ายังชนขอบ (กำหนดค่าใหม่ทุกครั้ง ไม่บวกทับ)
+          el.style.marginLeft = "0px";
+          const tb = el.getBoundingClientRect();
+          let dx = 0;
+          if (tb.right > mb.right - pad) dx = (mb.right - pad) - tb.right;
+          if (tb.left + dx < mb.left + pad) dx = (mb.left + pad) - tb.left;
+          if (dx) el.style.marginLeft = Math.round(dx) + "px";
+        })
         .on("click", (ev) => { L.DomEvent.stopPropagation(ev); onSelectNews && onSelectNews(p); })
         .addTo(nl);
     });
