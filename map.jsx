@@ -85,6 +85,10 @@ const MAP_STYLE = `
   .mda-news-tip .nt-meta  { font-size: 11px; color: var(--text-dim); margin-top: 5px;
                             display: flex; flex-wrap: wrap; gap: 3px 7px; align-items: center; }
   .mda-news-tip .nt-hint  { color: var(--text-mute); }
+  /* รูปอยู่ท้ายแถว ขนาดคงที่ ไม่ยืดตามภาพต้นฉบับ · object-fit กันภาพบิด */
+  .mda-news-tip .nt-img   { flex: 0 0 auto; width: 78px; height: 58px; border-radius: 6px;
+                            object-fit: cover; background: var(--surface-3);
+                            border: 1px solid var(--border-2); }
 `;
 
 /* ── Shipping lanes (approximate great-circle waypoints) ── */
@@ -501,6 +505,8 @@ function MapView({
 
       L.marker([p.lat, p.lon], { icon })
         .bindTooltip(
+          /* รูปประกอบ (ถ้าฟีดส่งมา) วางท้ายการ์ด — หลายฟีดไม่มีรูป
+             onerror ซ่อนตัวเองเมื่อลิงก์เสีย จะได้ไม่เหลือกรอบว่างค้างไว้ */
           `<div class="nt-in" style="border-left-color:${p.color}">
              ${dom ? `<div class="nt-dom" style="color:${p.color}">${esc(dom)}</div>` : ""}
              <div class="nt-body">
@@ -508,6 +514,9 @@ function MapView({
                <div class="nt-meta">${meta}<span style="opacity:.4">·</span><span class="nt-hint">${
                  th ? "คลิกเพื่อเปิด" : "click to open"}</span></div>
              </div>
+             ${p.image ? `<img class="nt-img" src="${esc(p.image)}" alt="" loading="eager"
+                              referrerpolicy="no-referrer"
+                              onerror="this.style.display='none'">` : ""}
            </div>`,
           { direction: "top", offset: [0, -8], className: "mda-news-tip", sticky: false }
         )
@@ -527,8 +536,14 @@ function MapView({
              คำนวณได้ 574px การ์ดจึงกว้างกว่าตัวแผนที่ทั้งอันและยัดไม่ลง
              CSS มองไม่เห็นความกว้างนี้ ต้องกำหนดตอนเปิดทูลทิป */
           // ต้องใส่ !important ด้วย ไม่งั้นแพ้กฎ max-width ใน CSS ที่ประกาศ !important ไว้
-          el.style.setProperty("max-width",
-            Math.max(200, Math.min(560, mb.width - pad * 2)) + "px", "important");
+          const cap = Math.max(200, Math.min(560, mb.width - pad * 2));
+          el.style.setProperty("max-width", cap + "px", "important");
+
+          /* รูปกินความกว้าง 78px ถ้าการ์ดแคบอยู่แล้วข้อความจะเหลือนิดเดียว
+             แล้วพาดหัวตัดจนการ์ดสูงกว่ากว้าง — ผิดวัตถุประสงค์ของแนวนอน
+             แผนที่แคบ (เช่นแผงข้างที่ ~340px) จึงตัดรูปออก เอาข้อความไว้ก่อน */
+          const img = el.querySelector(".nt-img");
+          if (img) img.style.display = cap < 420 ? "none" : "";
 
           // แล้วค่อยดันกลับถ้ายังชนขอบ (กำหนดค่าใหม่ทุกครั้ง ไม่บวกทับ)
           el.style.marginLeft = "0px";

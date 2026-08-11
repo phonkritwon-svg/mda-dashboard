@@ -615,12 +615,23 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
                             flex: "0 0 auto", width: 7, height: 7, borderRadius: "50%",
                             background: p.color, marginTop: 6,
                           }} />
-                          <div style={{ minWidth: 0 }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ fontSize: "var(--fs-sm)", lineHeight: 1.45 }}>{c.head}</div>
                             <div className="dim" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
                               {[c.where, c.src, c.ago].filter(Boolean).join(" · ")}
                             </div>
                           </div>
+                          {/* รูปมีเฉพาะบางฟีด — ไม่มีก็ไม่เว้นที่ไว้
+                              onError ซ่อนตัวเองเมื่อลิงก์เสีย กันกรอบว่างค้าง */}
+                          {p.image && (
+                            <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer"
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                              style={{
+                                flex: "0 0 auto", width: 58, height: 44, borderRadius: 5,
+                                objectFit: "cover", background: "var(--surface-3)",
+                                border: "1px solid var(--border-2)",
+                              }} />
+                          )}
                         </div>
                       );
                     })}

@@ -77,10 +77,24 @@ function stripHtml(str) {
     .replace(/\s+/g, " ").trim().slice(0, 280);
 }
 
+/* หารูปประกอบข่าวจากฟีด — แต่ละสำนักข่าวใส่มาคนละที่
+   enclosure (Naval Today, Splash247) · thumbnail · หรือ <img> ตัวแรกในเนื้อ
+   คืนค่าว่างถ้าไม่มี ซึ่งเป็นกรณีปกติ: gCaptain และ Google News
+   (ที่มาของข่าวไทยทั้งหมด) ไม่ส่งรูปมาเลย ผู้เรียกต้องรับมือกับค่าว่างได้ */
+function feedImage(item) {
+  const enc = (item.enclosure && item.enclosure.link) || "";
+  if (/^https?:\/\//i.test(enc)) return enc;
+  const thumb = (item.thumbnail || "").trim();
+  if (/^https?:\/\//i.test(thumb)) return thumb;
+  const m = /<img[^>]+src=["']([^"']+)["']/i.exec(item.content || item.description || "");
+  return m && /^https?:\/\//i.test(m[1]) ? m[1] : "";
+}
+
 function makeLiveItem(src, item, index) {
   const idRaw = src.key + "_" + (item.pubDate || Date.now()).toString().replace(/\W/g, "").slice(0, 16) + "_" + index;
   return {
     id: "live_" + idRaw,
+    image:       feedImage(item),
     srcKey:      src.key,
     outlet:      src.name,
     cat:         "MARITIME",

@@ -406,6 +406,7 @@ function extractNewsPointsFromNews(newsArr) {
       srcKey:  n.srcKey,
       time:    n.time,
       url:     n.url,
+      image:   n.image || "",        // ว่างได้ — หลายฟีดไม่ส่งรูปมา
       region:  geo,
       item:    n,                    // ส่งข่าวต้นฉบับไปเปิดหน้ารายละเอียดได้
     });
