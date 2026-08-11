@@ -529,61 +529,103 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
 
           {/* ── ฟีดข่าวแนวตั้งด้านขวา — เฉพาะโหมดเต็มจอ ──────────────
               เต็มจอเดิมเหลือแต่แผนที่ ต้องเดาเอาจากหมุดว่าเกิดอะไรขึ้นบ้าง
-              rail นี้เอารายการข่าวชุดเดียวกับที่ปักอยู่มาเรียงให้อ่าน
-              (จึงเปลี่ยนตามปุ่มเน้นข่าวไทยด้วย) กดแล้วบินไปที่หมุดนั้น
-              ไม่ใช่เปิดหน้าใหม่ เพราะการเด้งออกจากเต็มจอคือสิ่งที่ไม่ควรเกิด */}
+
+              rail แสดง "ทั้งไทยและต่างประเทศ" เสมอ ต่างจากหมุดบนแผนที่
+              ที่สลับตามปุ่ม — เพราะ rail คือรายการไว้อ่าน ไม่ใช่ภาพพื้นที่
+              การซ่อนครึ่งหนึ่งของข่าวไว้หลังปุ่มจึงไม่ช่วยอะไรตรงนี้
+              กลุ่มที่ไม่ตรงกับมุมมองแผนที่จะจางลง ให้ยังรู้ว่าอันไหนกำลังปักอยู่
+
+              จางกว่าแผงปกติเพื่อให้ยังเห็นแผนที่ลอดผ่าน — เต็มจอมีไว้ดูแผนที่
+              rail ไม่ควรบังจนกลายเป็นหน้าจอรายการ                        */}
           {fullscreen && visible.news && (
             <div style={{
               position: "absolute", top: 0, right: 0, bottom: 0, width: FS_FEED_W, zIndex: 480,
-              background: "color-mix(in srgb, var(--surface) 92%, transparent)",
-              borderLeft: "1px solid var(--border-2)", backdropFilter: "blur(6px)",
+              background: "color-mix(in srgb, var(--surface) 62%, transparent)",
+              borderLeft: "1px solid color-mix(in srgb, var(--border-2) 60%, transparent)",
+              backdropFilter: "blur(10px)",
               display: "flex", flexDirection: "column",
             }}>
               <div style={{
-                padding: "12px 14px 10px", borderBottom: "1px solid var(--border-2)", flex: "0 0 auto",
+                padding: "12px 14px 10px", flex: "0 0 auto",
+                borderBottom: "1px solid color-mix(in srgb, var(--border-2) 55%, transparent)",
               }}>
-                <div className="eyebrow" style={{ marginBottom: 3 }}>
-                  {thaiOnly ? T("ข่าวในประเทศไทย", "Thai domestic") : T("ข่าวต่างประเทศ", "International")}
-                </div>
+                <div className="eyebrow" style={{ marginBottom: 3 }}>{T("ฟีดข่าว", "News feed")}</div>
                 <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
-                  <span style={{ fontSize: "var(--fs-lg)", fontWeight: 600 }}>{newsPoints.length}</span>
+                  <span style={{ fontSize: "var(--fs-lg)", fontWeight: 600 }}>
+                    {thaiPoints.length + worldPoints.length}
+                  </span>
                   <span className="dim" style={{ fontSize: "var(--fs-xs)" }}>
-                    {T("รายการบนแผนที่", "items on the map")}
+                    {T("รายการ · ที่ปักอยู่ ", "items · ")}{newsPoints.length}{T(" จุด", " plotted")}
                   </span>
                 </div>
               </div>
 
               <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
-                {!newsPoints.length && (
-                  <div className="dim" style={{ padding: 16, fontSize: "var(--fs-sm)" }}>
-                    {T("ไม่มีข่าวในมุมมองนี้", "No reporting in this view")}
-                  </div>
-                )}
-                {newsPoints.map(p => {
-                  const c = window.newsCardParts ? window.newsCardParts(p, lang) : { head: "", src: "", ago: "", where: "" };
-                  return (
-                    <div key={p.id}
-                      onClick={() => setMapView({ lat: p.lat, lon: p.lon, zoom: 7 })}
-                      title={T("กดเพื่อเลื่อนแผนที่ไปที่จุดนี้", "Click to move the map here")}
-                      style={{
-                        display: "flex", gap: 9, padding: "10px 14px", cursor: "pointer",
-                        borderBottom: "1px solid var(--border-2)",
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-                      <span style={{
-                        flex: "0 0 auto", width: 7, height: 7, borderRadius: "50%",
-                        background: p.color, marginTop: 6,
-                      }} />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "var(--fs-sm)", lineHeight: 1.45 }}>{c.head}</div>
-                        <div className="dim" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
-                          {[c.where, c.src, c.ago].filter(Boolean).join(" · ")}
-                        </div>
-                      </div>
+                {[
+                  { key: "th",    label: T("ในประเทศไทย", "Thailand"),      items: thaiPoints,  live: thaiOnly },
+                  { key: "world", label: T("ต่างประเทศ", "International"),  items: worldPoints, live: !thaiOnly },
+                ].map(group => (
+                  <div key={group.key}>
+                    <div style={{
+                      position: "sticky", top: 0, zIndex: 1,
+                      padding: "7px 14px", fontSize: "var(--fs-xs)", letterSpacing: ".04em",
+                      background: "color-mix(in srgb, var(--surface-2) 78%, transparent)",
+                      backdropFilter: "blur(6px)",
+                      color: group.live ? "var(--accent)" : "var(--text-mute)",
+                      borderBottom: "1px solid color-mix(in srgb, var(--border-2) 45%, transparent)",
+                      display: "flex", justifyContent: "space-between",
+                    }}>
+                      <span>{group.label}{group.live ? " · " + T("กำลังปัก", "on map") : ""}</span>
+                      <span className="mono">{group.items.length}</span>
                     </div>
-                  );
-                })}
+
+                    {!group.items.length && (
+                      <div className="dim" style={{ padding: "10px 14px", fontSize: "var(--fs-xs)" }}>
+                        {T("ไม่มีข่าวในกลุ่มนี้", "nothing in this group")}
+                      </div>
+                    )}
+
+                    {group.items.map(p => {
+                      const c = window.newsCardParts ? window.newsCardParts(p, lang) : { head: "", src: "", ago: "", where: "" };
+                      return (
+                        <div key={p.id}
+                          onClick={() => {
+                            /* ถ้าข่าวอยู่คนละกลุ่มกับที่แผนที่ปักอยู่ ต้องสลับมุมมองก่อน
+                               ไม่งั้นจะบินไปยังจุดที่ไม่มีหมุดให้เห็น */
+                            if (!group.live) setThaiOnly(group.key === "th");
+                            setMapView({ lat: p.lat, lon: p.lon, zoom: 7 });
+                          }}
+                          title={group.live
+                            ? T("กดเพื่อเลื่อนแผนที่ไปที่จุดนี้", "Click to move the map here")
+                            : T("กดเพื่อสลับมุมมองแผนที่แล้วไปที่จุดนี้", "Click to switch the map view and go there")}
+                          style={{
+                            display: "flex", gap: 9, padding: "10px 14px", cursor: "pointer",
+                            opacity: group.live ? 1 : 0.52,
+                            borderBottom: "1px solid color-mix(in srgb, var(--border-2) 40%, transparent)",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "color-mix(in srgb, var(--surface-2) 85%, transparent)";
+                            e.currentTarget.style.opacity = 1;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.opacity = group.live ? 1 : 0.52;
+                          }}>
+                          <span style={{
+                            flex: "0 0 auto", width: 7, height: 7, borderRadius: "50%",
+                            background: p.color, marginTop: 6,
+                          }} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: "var(--fs-sm)", lineHeight: 1.45 }}>{c.head}</div>
+                            <div className="dim" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+                              {[c.where, c.src, c.ago].filter(Boolean).join(" · ")}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
           )}
