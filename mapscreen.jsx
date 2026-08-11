@@ -132,8 +132,17 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     () => (window.extractVesselsFromNews ? window.extractVesselsFromNews(liveNews) : []),
     [liveNews]
   );
+
+  /* ── AIS สดจาก Digitraffic (น่านน้ำฟินแลนด์) ────────────────────
+     เปิดเมื่อผู้ใช้กดเท่านั้น และติดป้ายบอกน่านน้ำไว้ชัด ๆ
+     เรือชุดนี้ "เคลื่อนที่จริง" แต่ไม่ใช่พื้นที่รับผิดชอบของ ศรชล.
+     จึงต้องไม่ปนกับหมุดจากข่าวจนแยกไม่ออกว่าอันไหนคืออะไร        */
+  const [dtOn, setDtOn] = useState(false);
+  const dt = window.useDigitrafficVessels ? window.useDigitrafficVessels(dtOn) : { vessels: [], moving: 0 };
+
   const usingAis = aisVessels.length > 0;
-  const vessels = usingAis ? aisVessels : newsVessels;
+  const vesselSource = dtOn ? "digitraffic" : (usingAis ? "ais" : "news");
+  const vessels = dtOn ? dt.vessels : (usingAis ? aisVessels : newsVessels);
 
   // อ่านข่าวทุกชิ้น → หาพื้นที่จากเนื้อข่าว → ปักเป็นจุดบนแผนที่
   const newsPointsAll = React.useMemo(
@@ -452,9 +461,43 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           )}
         </button>
 
+        {/* AIS สดที่เคลื่อนที่จริง — ระบุน่านน้ำไว้บนปุ่มเลย ไม่ให้เข้าใจผิด
+            ว่าเป็นเรือในพื้นที่ ศรชล. และพาไปดูให้ถึงที่เมื่อเปิด */}
+        <button
+          className={"btn btn-sm " + (dtOn ? "btn-primary" : "btn-ghost")}
+          onClick={() => {
+            const next = !dtOn;
+            setDtOn(next);
+            if (next) {
+              /* ไปที่ปากอ่าวฟินแลนด์ (เส้นทางเข้าเฮลซิงกิ) ที่ zoom 9 ไม่ใช่
+                 ภาพรวมทั้งประเทศ — ที่ zoom 6 หนึ่งพิกเซลกว้างราว 2.4 กม.
+                 เรือ 20 นอตขยับ 300 ม. ต่อรอบ poll จึงไม่ถึงหนึ่งพิกเซล
+                 ดูเหมือนหมุดนิ่งทั้งที่ข้อมูลเปลี่ยนจริง */
+              setMapView({ lat: 59.95, lon: 24.5, zoom: 9 });
+              setRegionLabel(T("อ่าวฟินแลนด์ (AIS สด)", "Gulf of Finland (live AIS)"));
+            }
+          }}
+          title={T("เรือที่เคลื่อนที่จริงจาก Digitraffic — ครอบคลุมน่านน้ำฟินแลนด์เท่านั้น ไม่ใช่อ่าวไทย",
+                   "Real moving vessels from Digitraffic — Finnish waters only, not the Gulf of Thailand")}>
+          <Icon name="ship" size={13} />
+          {T("AIS สด · ฟินแลนด์", "Live AIS · Finland")}
+          {dtOn && (
+            <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
+              {dt.loading && !dt.vessels.length ? "…" : dt.moving + "▸"}
+            </span>
+          )}
+        </button>
+
         <span className="topbar-spacer" />
+        {dtOn && dt.error && (
+          <span className="mono" style={{ fontSize: "var(--fs-xs)", color: "var(--crit)" }}>
+            {T("ดึง AIS ไม่ได้", "AIS fetch failed")}
+          </span>
+        )}
         <span className="mono dim" style={{ fontSize: "var(--fs-xs)" }}>
           {filteredVessels.length} / {vessels.length} {T("ลำ", "vessels")}
+          {vesselSource === "digitraffic" && " · " + T("ฟินแลนด์", "Finland")}
+          {vesselSource === "news" && " · " + T("จากข่าว", "from news")}
         </span>
       </div>
 
