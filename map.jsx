@@ -134,6 +134,31 @@ function esc(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+/* แยกชิ้นส่วนของข่าวสำหรับแสดงผล — ใช้ร่วมกันระหว่างทูลทิปบนแผนที่
+   กับฟีดข่าวด้านข้างในโหมดเต็มจอ ถ้าเขียนแยกกันสองที่ วันหนึ่งจะเพี้ยนคนละแบบ */
+function newsCardParts(p, lang) {
+  const th = lang !== "en";
+  const title = (p.title && (th ? (p.title.th || p.title.en) : (p.title.en || p.title.th))) || "";
+  const where = p.region ? (th ? p.region.th : p.region.en) : "";
+  const dom   = p.domain ? (th ? p.domain.th : p.domain.en) : "";
+
+  /* Google News ต่อท้ายพาดหัวด้วย " - ชื่อสำนักข่าว" ส่วนช่อง outlet
+     กลับเป็นชื่อ query ของเราเอง ("ในประเทศ (Google News)") ซึ่งไม่บอกที่มาจริง
+     สลับกัน: ดึงสำนักข่าวออกจากท้ายพาดหัวมาเป็นแหล่ง แล้วตัดออกจากหัวข้อ */
+  let head = title, src = p.outlet || "";
+  if (/google news/i.test(src)) {
+    const m = /^([\s\S]*\S)\s+-\s+([^-]{2,40})$/.exec(title);
+    if (m) { head = m[1]; src = m[2].trim(); }
+  }
+
+  // "3 ชม.ที่แล้ว" อ่านง่ายกว่า 2026-08-10T18:39:16.000Z ที่ p.time เก็บไว้
+  const ago = (p.item && p.item.ago && (th ? p.item.ago.th : p.item.ago.en))
+    || (window.mdaTimeAgo ? window.mdaTimeAgo(p.time, lang) : "")
+    || "";
+
+  return { head, src, ago, dom, where };
+}
+
 function ageText(sec, th) {
   if (sec < 60) return th ? sec + " วินาทีที่แล้ว" : sec + "s ago";
   const m = Math.round(sec / 60);
@@ -469,23 +494,7 @@ function MapView({
         html: newsHtml(p.color), className: "", iconSize: [11, 11], iconAnchor: [5.5, 5.5],
       });
       const th = lang !== "en";
-      const title = (p.title && (th ? (p.title.th || p.title.en) : (p.title.en || p.title.th))) || "";
-      const where = p.region ? (th ? p.region.th : p.region.en) : "";
-      const dom   = p.domain ? (th ? p.domain.th : p.domain.en) : "";
-
-      /* Google News ต่อท้ายพาดหัวด้วย " - ชื่อสำนักข่าว" ส่วนช่อง outlet
-         กลับเป็นชื่อ query ของเราเอง ("ในประเทศ (Google News)") ซึ่งไม่บอกที่มาจริง
-         สลับกัน: ดึงสำนักข่าวออกจากท้ายพาดหัวมาเป็นแหล่ง แล้วตัดออกจากหัวข้อ */
-      let head = title, src = p.outlet || "";
-      if (/google news/i.test(src)) {
-        const m = /^([\s\S]*\S)\s+-\s+([^-]{2,40})$/.exec(title);
-        if (m) { head = m[1]; src = m[2].trim(); }
-      }
-
-      // "3 ชม.ที่แล้ว" อ่านง่ายกว่า 2026-08-10T18:39:16.000Z ที่ p.time เก็บไว้
-      const ago = (p.item && p.item.ago && (th ? p.item.ago.th : p.item.ago.en))
-        || (window.mdaTimeAgo ? window.mdaTimeAgo(p.time, lang) : "")
-        || "";
+      const { head, src, ago, dom, where } = newsCardParts(p, lang);
 
       const meta = [where, src, ago].filter(Boolean)
         .map(x => `<span>${esc(x)}</span>`).join('<span style="opacity:.4">·</span>');
@@ -585,4 +594,5 @@ Object.assign(window, {
   MapView, projPt, projX, projY, SHIPPING_LANES,
   // เกณฑ์ความสดของตำแหน่ง — หน้าอื่น (legend, แผงรายละเอียดเรือ) ต้องใช้ค่าเดียวกัน
   AIS_FRESH_SEC, AIS_LOST_SEC, ageOpacity, ageText,
+  newsCardParts,   // ฟีดข่าวในโหมดเต็มจอใช้ตัวเดียวกับทูลทิป
 });

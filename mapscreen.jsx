@@ -48,6 +48,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   /* ── โหมดเต็มจอ: ซ่อน UI รอบข้างทั้งหมด เหลือเฉพาะแผนที่ ──
      ใช้เทคนิค FLIP — จำกรอบแผนที่ก่อนสลับโหมด แล้วให้แผนที่ "ค่อย ๆ ขยาย"
      จากตำแหน่งเดิมไปเต็มจอด้วย transform (ลื่นเพราะใช้ GPU) */
+  const FS_FEED_W = 340;                              // ความกว้างฟีดข่าวด้านขวาในโหมดเต็มจอ
   const FS_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";   // ease-out-quint: ออกตัวเร็ว จบนุ่ม
   const FS_MS   = 520;
   const [fullscreen, setFullscreen] = useState(false);
@@ -526,16 +527,84 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
             showLanes={layers.lanes}
             initialCenter={focus ? [focus.lat, focus.lon] : [20, 10]} initialZoom={focus ? 5 : 2} />
 
-          {/* ปุ่มเข้า/ออกโหมดเต็มจอ — ลอยอยู่มุมขวาบนของแผนที่ */}
+          {/* ── ฟีดข่าวแนวตั้งด้านขวา — เฉพาะโหมดเต็มจอ ──────────────
+              เต็มจอเดิมเหลือแต่แผนที่ ต้องเดาเอาจากหมุดว่าเกิดอะไรขึ้นบ้าง
+              rail นี้เอารายการข่าวชุดเดียวกับที่ปักอยู่มาเรียงให้อ่าน
+              (จึงเปลี่ยนตามปุ่มเน้นข่าวไทยด้วย) กดแล้วบินไปที่หมุดนั้น
+              ไม่ใช่เปิดหน้าใหม่ เพราะการเด้งออกจากเต็มจอคือสิ่งที่ไม่ควรเกิด */}
+          {fullscreen && visible.news && (
+            <div style={{
+              position: "absolute", top: 0, right: 0, bottom: 0, width: FS_FEED_W, zIndex: 480,
+              background: "color-mix(in srgb, var(--surface) 92%, transparent)",
+              borderLeft: "1px solid var(--border-2)", backdropFilter: "blur(6px)",
+              display: "flex", flexDirection: "column",
+            }}>
+              <div style={{
+                padding: "12px 14px 10px", borderBottom: "1px solid var(--border-2)", flex: "0 0 auto",
+              }}>
+                <div className="eyebrow" style={{ marginBottom: 3 }}>
+                  {thaiOnly ? T("ข่าวในประเทศไทย", "Thai domestic") : T("ข่าวต่างประเทศ", "International")}
+                </div>
+                <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
+                  <span style={{ fontSize: "var(--fs-lg)", fontWeight: 600 }}>{newsPoints.length}</span>
+                  <span className="dim" style={{ fontSize: "var(--fs-xs)" }}>
+                    {T("รายการบนแผนที่", "items on the map")}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
+                {!newsPoints.length && (
+                  <div className="dim" style={{ padding: 16, fontSize: "var(--fs-sm)" }}>
+                    {T("ไม่มีข่าวในมุมมองนี้", "No reporting in this view")}
+                  </div>
+                )}
+                {newsPoints.map(p => {
+                  const c = window.newsCardParts ? window.newsCardParts(p, lang) : { head: "", src: "", ago: "", where: "" };
+                  return (
+                    <div key={p.id}
+                      onClick={() => setMapView({ lat: p.lat, lon: p.lon, zoom: 7 })}
+                      title={T("กดเพื่อเลื่อนแผนที่ไปที่จุดนี้", "Click to move the map here")}
+                      style={{
+                        display: "flex", gap: 9, padding: "10px 14px", cursor: "pointer",
+                        borderBottom: "1px solid var(--border-2)",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                      <span style={{
+                        flex: "0 0 auto", width: 7, height: 7, borderRadius: "50%",
+                        background: p.color, marginTop: 6,
+                      }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: "var(--fs-sm)", lineHeight: 1.45 }}>{c.head}</div>
+                        <div className="dim" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+                          {[c.where, c.src, c.ago].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ปุ่มเข้า/ออกโหมดเต็มจอ — ลอยอยู่มุมขวาบนของแผนที่
+              ในโหมดเต็มจอต้องขยับมาซ้ายของ rail ไม่งั้นถูกทับ */}
           <button className="btn btn-ghost btn-sm"
             onClick={() => switchFullscreen(!fullscreen)}
             title={fullscreen
               ? T("ออกจากโหมดเต็มจอ (Esc)", "Exit fullscreen (Esc)")
               : T("แสดงแผนที่เต็มจอ", "Fullscreen map")}
             style={{
-              position: "absolute", top: 12, right: 12, zIndex: 500,
+              position: "absolute", top: 12,
+              right: (fullscreen && visible.news) ? FS_FEED_W + 12 : 12,
+              zIndex: 500,
               background: "var(--surface-2)", border: "1px solid var(--border-2)",
               boxShadow: "var(--shadow)",
+              /* .btn ตั้ง transition: all ไว้ ทำให้ปุ่มไถลข้ามจอ 340px
+                 ตอนสลับเต็มจอ — ตำแหน่งของตัวควบคุมควรเปลี่ยนทันที
+                 ให้เหลือเฉพาะ transition ของสีตอน hover */
+              transitionProperty: "background, border-color, color",
             }}>
             <Icon name={fullscreen ? "shrink" : "expand"} size={14} />
             {fullscreen ? T("ออกจากเต็มจอ", "Exit") : T("เต็มจอ", "Fullscreen")}
