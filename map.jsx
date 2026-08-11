@@ -52,6 +52,31 @@ const MAP_STYLE = `
     white-space: nowrap;
   }
   .mda-label::before { display: none !important; }
+
+  /* ── ทูลทิปจุดข่าว ────────────────────────────────────────────────
+     แยกจาก .mda-label เพราะคนละงานกัน — .mda-label เป็นป้ายชื่อเรือสั้น ๆ
+     ฟอนต์ monospace 10px ซึ่งอ่านพาดหัวภาษาไทยยาว ๆ แทบไม่ออก
+     อันนี้เป็นการ์ดข่าว: ฟอนต์ UI ปกติ ขนาดอ่านสบาย และเว้นบรรทัดจริง */
+  .mda-news-tip {
+    background: rgba(10,13,18,0.96) !important;
+    border: 1px solid var(--border-2) !important;
+    border-radius: 9px !important;
+    padding: 0 !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+    font-family: var(--font-ui) !important;
+    white-space: normal !important;
+    max-width: 330px !important;
+    color: var(--text) !important;
+  }
+  .mda-news-tip::before { display: none !important; }
+  .mda-news-tip .nt-in    { padding: 10px 12px; border-left-width: 3px; border-left-style: solid; }
+  .mda-news-tip .nt-dom   { font-size: 10px; font-weight: 700; letter-spacing: .05em;
+                            text-transform: uppercase; margin-bottom: 5px; }
+  .mda-news-tip .nt-title { font-size: 13.5px; line-height: 1.5; color: var(--text); font-weight: 500; }
+  .mda-news-tip .nt-meta  { font-size: 11px; color: var(--text-dim); margin-top: 7px;
+                            display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .mda-news-tip .nt-hint  { font-size: 10px; color: var(--text-mute); margin-top: 7px;
+                            padding-top: 6px; border-top: 1px solid var(--border-2); }
 `;
 
 /* ── Shipping lanes (approximate great-circle waypoints) ── */
@@ -90,6 +115,15 @@ function ageOpacity(sec) {
   if (!(sec > AIS_FRESH_SEC)) return 1;
   if (sec >= AIS_LOST_SEC)    return 0.42;
   return 1 - ((sec - AIS_FRESH_SEC) / (AIS_LOST_SEC - AIS_FRESH_SEC)) * 0.58;
+}
+
+/* พาดหัวข่าวมาจาก RSS ของคนอื่น ไม่ใช่ข้อความที่เราคุมเอง
+   ของเดิมยัดลง innerHTML ตรง ๆ — แท็กหรือเครื่องหมายคำพูดในพาดหัว
+   ทำให้ทูลทิปเพี้ยนได้ และเปิดช่องให้ฉีดมาร์กอัปเข้ามา */
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function ageText(sec, th) {
@@ -426,15 +460,37 @@ function MapView({
       const icon = L.divIcon({
         html: newsHtml(p.color), className: "", iconSize: [11, 11], iconAnchor: [5.5, 5.5],
       });
-      const title = (p.title && (lang === "th" ? (p.title.th || p.title.en) : (p.title.en || p.title.th))) || "";
-      const where = p.region ? (lang === "th" ? p.region.th : p.region.en) : "";
+      const th = lang !== "en";
+      const title = (p.title && (th ? (p.title.th || p.title.en) : (p.title.en || p.title.th))) || "";
+      const where = p.region ? (th ? p.region.th : p.region.en) : "";
+      const dom   = p.domain ? (th ? p.domain.th : p.domain.en) : "";
+
+      /* Google News ต่อท้ายพาดหัวด้วย " - ชื่อสำนักข่าว" ส่วนช่อง outlet
+         กลับเป็นชื่อ query ของเราเอง ("ในประเทศ (Google News)") ซึ่งไม่บอกที่มาจริง
+         สลับกัน: ดึงสำนักข่าวออกจากท้ายพาดหัวมาเป็นแหล่ง แล้วตัดออกจากหัวข้อ */
+      let head = title, src = p.outlet || "";
+      if (/google news/i.test(src)) {
+        const m = /^([\s\S]*\S)\s+-\s+([^-]{2,40})$/.exec(title);
+        if (m) { head = m[1]; src = m[2].trim(); }
+      }
+
+      // "3 ชม.ที่แล้ว" อ่านง่ายกว่า 2026-08-10T18:39:16.000Z ที่ p.time เก็บไว้
+      const ago = (p.item && p.item.ago && (th ? p.item.ago.th : p.item.ago.en))
+        || (window.mdaTimeAgo ? window.mdaTimeAgo(p.time, lang) : "")
+        || "";
+
+      const meta = [where, src, ago].filter(Boolean)
+        .map(x => `<span>${esc(x)}</span>`).join('<span style="opacity:.4">·</span>');
+
       L.marker([p.lat, p.lon], { icon })
         .bindTooltip(
-          `<div style="max-width:250px;white-space:normal;line-height:1.4">
-             <div style="opacity:.65;font-size:9px">${where}${p.outlet ? " · " + p.outlet : ""}</div>
-             <div>${title}</div>
+          `<div class="nt-in" style="border-left-color:${p.color}">
+             ${dom ? `<div class="nt-dom" style="color:${p.color}">${esc(dom)}</div>` : ""}
+             <div class="nt-title">${esc(head)}</div>
+             <div class="nt-meta">${meta}</div>
+             <div class="nt-hint">${th ? "คลิกเพื่อเปิดข่าวเต็ม" : "Click to open the full item"}</div>
            </div>`,
-          { direction: "top", offset: [0, -6], className: "mda-label", sticky: false }
+          { direction: "top", offset: [0, -8], className: "mda-news-tip", sticky: false }
         )
         .on("click", (ev) => { L.DomEvent.stopPropagation(ev); onSelectNews && onSelectNews(p); })
         .addTo(nl);
