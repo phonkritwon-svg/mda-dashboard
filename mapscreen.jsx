@@ -150,23 +150,28 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     [liveNews]
   );
 
-  /* ── โหมดเน้นข่าวในประเทศไทย ────────────────────────────────────
-     กรองเหลือเฉพาะจุดที่เนื้อข่าวชี้ว่าเกิดในราชอาณาจักร
-     ต่างจากปุ่ม "เน้นเพื่อนบ้าน" ที่เพียงดันขึ้นก่อนแต่ยังแสดงทั้งโลก —
-     บนแผนที่การซ่อนของที่ไม่เกี่ยวชัดเจนกว่าการเรียงลำดับ            */
+  /* ── สลับระหว่างข่าวต่างประเทศกับข่าวในประเทศไทย ──────────────────
+     ปุ่มปิด = เห็นเฉพาะข่าวต่างประเทศ · ปุ่มเปิด = เห็นเฉพาะข่าวไทย
+     ไม่ใช่ "ทั้งหมด vs เฉพาะไทย" เพราะข่าวไทยกระจุกอยู่ในกรอบแคบ ๆ
+     พอวางทับภาพรวมทั้งโลกก็จมหายไปกับหมุดอื่น การแยกสองมุมมองออกจากกัน
+     ทำให้แต่ละมุมมองอ่านได้จริง                                        */
   const [thaiOnly, setThaiOnly] = useState(false);
-  const newsPoints = React.useMemo(() => {
-    if (!thaiOnly) return newsPointsAll;
-    return newsPointsAll.filter(p => {
+
+  const [thaiPoints, worldPoints] = React.useMemo(() => {
+    const th = [], other = [];
+    newsPointsAll.forEach(p => {
       const n = p.item || {};
       const hay = [
         p.region && p.region.th, p.region && p.region.en,
         n.raw && n.raw.th, n.raw && n.raw.en,
         n.ai && n.ai.th, n.ai && n.ai.en, n.outlet,
       ].filter(Boolean).join("  ");
-      return window.isThaiDomestic ? window.isThaiDomestic(hay) : true;
+      (window.isThaiDomestic && window.isThaiDomestic(hay) ? th : other).push(p);
     });
-  }, [newsPointsAll, thaiOnly]);
+    return [th, other];
+  }, [newsPointsAll]);
+
+  const newsPoints = thaiOnly ? thaiPoints : worldPoints;
 
   const ofInterest = vessels.filter(v => v.status !== "normal" && v.status !== "friendly");
 
@@ -438,8 +443,9 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           )}
         </div>
 
-        {/* เน้นข่าวในประเทศไทย — กรองจุดข่าวเหลือเฉพาะในราชอาณาจักร
-            แล้วบินไปที่ประเทศไทยให้เลย เพราะกดปุ่มนี้แล้วยังต้องเลื่อนหาเองก็ไม่ครบงาน */}
+        {/* สลับมุมมองข่าว: ปิด = ต่างประเทศ · เปิด = ไทย (พร้อมบินไปที่ไทย)
+            ตัวเลขบนปุ่มบอกจำนวนข่าวไทยที่รออยู่เสมอ แม้ตอนยังไม่กด
+            ไม่งั้นผู้ใช้จะไม่รู้เลยว่ามีอะไรซ่อนอยู่ให้กดดู */}
         <button
           className={"btn btn-sm " + (thaiOnly ? "btn-primary" : "btn-ghost")}
           onClick={() => {
@@ -450,15 +456,16 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
               setRegionLabel(T("ประเทศไทย", "Thailand"));
             }
           }}
-          title={T("แสดงเฉพาะจุดข่าวที่เกิดในประเทศไทย และเลื่อนแผนที่ไปที่ไทย",
-                   "Show only news located inside Thailand and move the map there")}>
+          title={thaiOnly
+            ? T("กำลังแสดงเฉพาะข่าวในประเทศไทย — กดอีกครั้งเพื่อกลับไปดูข่าวต่างประเทศ",
+                "Showing Thai domestic news only — press again for international news")
+            : T("ตอนนี้ซ่อนข่าวไทยอยู่ กดเพื่อแสดงเฉพาะข่าวในประเทศไทยและเลื่อนแผนที่ไปที่ไทย",
+                "Thai news is hidden — press to show it and move the map to Thailand")}>
           <Icon name="pin" size={13} />
           {T("เน้นข่าวไทย", "Thailand only")}
-          {thaiOnly && (
-            <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
-              {newsPoints.length}/{newsPointsAll.length}
-            </span>
-          )}
+          <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
+            {thaiOnly ? thaiPoints.length : "+" + thaiPoints.length}
+          </span>
         </button>
 
         {/* AIS สดที่เคลื่อนที่จริง — ระบุน่านน้ำไว้บนปุ่มเลย ไม่ให้เข้าใจผิด
