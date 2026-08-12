@@ -56,6 +56,13 @@ const LIVE_SOURCES = [
     url: "https://www.khaosod.co.th/crime/feed" },
   { key: "MATICHON", name: "มติชน", tag: "NEWS", color: "#33d6c8", filterMaritime: true,
     url: "https://www.matichon.co.th/region/feed" },
+  /* ไทยรัฐใช้ฟีดข่าวรวม — /rss/news/local ตอบ HTTP error */
+  { key: "THAIRATH", name: "ไทยรัฐ", tag: "NEWS", color: "#5577dd", filterMaritime: true,
+    url: "https://www.thairath.co.th/rss/news" },
+  { key: "PRACHACHAT", name: "ประชาชาติธุรกิจ", tag: "NEWS", color: "#b07cf0", filterMaritime: true,
+    url: "https://www.prachachat.net/feed" },
+  { key: "STANDARD", name: "THE STANDARD", tag: "NEWS", color: "#e3b341", filterMaritime: true,
+    url: "https://thestandard.co/feed/" },
 ];
 
 // Register source entries so SrcChip can look them up
@@ -143,7 +150,11 @@ const TH_MARITIME_RE = new RegExp([
   "ทางทะเล|ในทะเล|กลางทะเล|ชายฝั่ง|น่านน้ำ|อ่าวไทย|อันดามัน",
   "เรือประมง|เรือล่ม|เรือจม|เรืออับปาง|เรือบรรทุก|เรือสินค้า|เรือตรวจการณ์|เรือรบ",
   "ประมง|อวนลาก|อวนครอบ|จับสัตว์น้ำ|ท่าเทียบเรือ|กรมเจ้าท่า|กรมประมง",
-  "ศรชล|กองทัพเรือ|ทัพเรือภาค|ทหารเรือ|ตำรวจน้ำ",
+  /* ภาษาไทยไม่มีช่องว่างคั่นคำ regex จึงไม่มีขอบเขตคำให้ยึด —
+     "ตำรวจน้ำ" ไปตรงกับส่วนหน้าของ "ตำรวจน้ำพอง" (สภ.น้ำพอง ขอนแก่น)
+     ดึงข่าวตำรวจช่วยคนบนสะพานเข้ามาเป็นข่าวทางทะเล จึงต้องกันชื่ออำเภอ
+     ที่ขึ้นต้นด้วย "น้ำ" ออกอย่างเจาะจง */
+  "ศรชล|กองทัพเรือ|ทัพเรือภาค|ทหารเรือ|ตำรวจน้ำ(?!พอง|โสม|ปาด|ยืน|เกลี้ยง|หนาว|ขุ่น|ริน)",
   "น้ำมันรั่ว|มลพิษทางทะเล|เต่าทะเล|พะยูน|ปะการัง",
   "โรฮีนจา|เกาะกูด|เกาะกง|รุกล้ำน่านน้ำ|จมทะเล|ดำน้ำ",
 ].join("|"));
