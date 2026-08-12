@@ -304,6 +304,67 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     pointerEvents: fullscreen ? "none" : "auto",
   };
 
+  /* ปุ่มสองตัวนี้ต้องอยู่ทั้งบนแถบเครื่องมือปกติและลอยบนแผนที่ตอนเต็มจอ
+     (แถบเครื่องมือทั้งแถบถูกซ่อนในโหมดเต็มจอ) จึงเขียนไว้ที่เดียว
+     ไม่งั้นสองชุดจะค่อย ๆ ไม่ตรงกันเมื่อแก้อันใดอันหนึ่ง */
+  const thaiToggleBtn = () => (
+    <button
+      className={"btn btn-sm " + (thaiOnly ? "btn-primary" : "btn-ghost")}
+      onClick={() => {
+        const next = !thaiOnly;
+        setThaiOnly(next);
+        clearTimeout(lockTimer.current);
+        if (next) {
+          setMapView({ lat: 13.0, lon: 101.0, zoom: 5.4, duration: TH_FLY_SEC });
+          setRegionLabel(T("ประเทศไทย", "Thailand"));
+          /* ล็อกกรอบ "หลัง" บินจบ — ถ้าล็อกก่อน minZoom จะดีดซูมขึ้นทันที
+             แล้วอนิเมชันที่ตั้งใจให้ค่อย ๆ เข้าจะกลายเป็นการกระตุกหนึ่งครั้ง */
+          lockTimer.current = setTimeout(
+            () => setLockBounds(TH_LOCK_BOUNDS), TH_FLY_SEC * 1000 + 120);
+        } else {
+          setLockBounds(null);
+        }
+      }}
+      title={thaiOnly
+        ? T("กำลังแสดงเฉพาะข่าวในประเทศไทย — กดอีกครั้งเพื่อกลับไปดูข่าวต่างประเทศ",
+            "Showing Thai domestic news only — press again for international news")
+        : T("ตอนนี้ซ่อนข่าวไทยอยู่ กดเพื่อแสดงเฉพาะข่าวในประเทศไทยและเลื่อนแผนที่ไปที่ไทย",
+            "Thai news is hidden — press to show it and move the map to Thailand")}>
+      <Icon name="pin" size={13} />
+      {T("เน้นข่าวไทย", "Thailand only")}
+      <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
+        {thaiOnly ? thaiPoints.length : "+" + thaiPoints.length}
+      </span>
+    </button>
+  );
+
+  const aisToggleBtn = () => (
+    <button
+      className={"btn btn-sm " + (dtOn ? "btn-primary" : "btn-ghost")}
+      onClick={() => {
+        const next = !dtOn;
+        setDtOn(next);
+        if (next) {
+          /* ไปที่ปากอ่าวฟินแลนด์ (เส้นทางเข้าเฮลซิงกิ) ที่ zoom 9 ไม่ใช่
+             ภาพรวมทั้งย่าน — ที่ zoom 6 หนึ่งพิกเซลกว้างราว 2.4 กม.
+             เรือ 20 นอตขยับ 300 ม. ต่อรอบ poll จึงไม่ถึงหนึ่งพิกเซล
+             ดูเหมือนหมุดนิ่งทั้งที่ข้อมูลเปลี่ยนจริง */
+          setMapView({ lat: 59.95, lon: 24.5, zoom: 9 });
+          setRegionLabel(T("อ่าวฟินแลนด์ (AIS สด)", "Gulf of Finland (live AIS)"));
+        }
+      }}
+      title={T("เรือที่เคลื่อนที่จริงจาก Digitraffic — ครอบคลุมทะเลบอลติกตอนเหนือ ไม่ใช่อ่าวไทย",
+               "Real moving vessels from Digitraffic — northern Baltic, not the Gulf of Thailand")}>
+      <Icon name="ship" size={13} />
+      {T("AIS สด · บอลติก", "Live AIS · Baltic")}
+      {dtOn && (
+        <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
+          {dt.loading && !dt.vessels.length ? "…" : dt.moving + "▸"}
+        </span>
+      )}
+    </button>
+  );
+
   return (
     <div className="screen"
       style={{ height: "100%", display: "flex", flexDirection: "column", paddingBottom: 16 }}>
@@ -452,64 +513,9 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           )}
         </div>
 
-        {/* สลับมุมมองข่าว: ปิด = ต่างประเทศ · เปิด = ไทย (พร้อมบินไปที่ไทย)
-            ตัวเลขบนปุ่มบอกจำนวนข่าวไทยที่รออยู่เสมอ แม้ตอนยังไม่กด
-            ไม่งั้นผู้ใช้จะไม่รู้เลยว่ามีอะไรซ่อนอยู่ให้กดดู */}
-        <button
-          className={"btn btn-sm " + (thaiOnly ? "btn-primary" : "btn-ghost")}
-          onClick={() => {
-            const next = !thaiOnly;
-            setThaiOnly(next);
-            clearTimeout(lockTimer.current);
-            if (next) {
-              setMapView({ lat: 13.0, lon: 101.0, zoom: 5.4, duration: TH_FLY_SEC });
-              setRegionLabel(T("ประเทศไทย", "Thailand"));
-              /* ล็อกกรอบ "หลัง" บินจบ — ถ้าล็อกก่อน minZoom จะดีดซูมขึ้นทันที
-                 แล้วอนิเมชันที่ตั้งใจให้ค่อย ๆ เข้าจะกลายเป็นการกระตุกหนึ่งครั้ง */
-              lockTimer.current = setTimeout(
-                () => setLockBounds(TH_LOCK_BOUNDS), TH_FLY_SEC * 1000 + 120);
-            } else {
-              setLockBounds(null);
-            }
-          }}
-          title={thaiOnly
-            ? T("กำลังแสดงเฉพาะข่าวในประเทศไทย — กดอีกครั้งเพื่อกลับไปดูข่าวต่างประเทศ",
-                "Showing Thai domestic news only — press again for international news")
-            : T("ตอนนี้ซ่อนข่าวไทยอยู่ กดเพื่อแสดงเฉพาะข่าวในประเทศไทยและเลื่อนแผนที่ไปที่ไทย",
-                "Thai news is hidden — press to show it and move the map to Thailand")}>
-          <Icon name="pin" size={13} />
-          {T("เน้นข่าวไทย", "Thailand only")}
-          <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
-            {thaiOnly ? thaiPoints.length : "+" + thaiPoints.length}
-          </span>
-        </button>
-
-        {/* AIS สดที่เคลื่อนที่จริง — ระบุน่านน้ำไว้บนปุ่มเลย ไม่ให้เข้าใจผิด
-            ว่าเป็นเรือในพื้นที่ ศรชล. และพาไปดูให้ถึงที่เมื่อเปิด */}
-        <button
-          className={"btn btn-sm " + (dtOn ? "btn-primary" : "btn-ghost")}
-          onClick={() => {
-            const next = !dtOn;
-            setDtOn(next);
-            if (next) {
-              /* ไปที่ปากอ่าวฟินแลนด์ (เส้นทางเข้าเฮลซิงกิ) ที่ zoom 9 ไม่ใช่
-                 ภาพรวมทั้งประเทศ — ที่ zoom 6 หนึ่งพิกเซลกว้างราว 2.4 กม.
-                 เรือ 20 นอตขยับ 300 ม. ต่อรอบ poll จึงไม่ถึงหนึ่งพิกเซล
-                 ดูเหมือนหมุดนิ่งทั้งที่ข้อมูลเปลี่ยนจริง */
-              setMapView({ lat: 59.95, lon: 24.5, zoom: 9 });
-              setRegionLabel(T("อ่าวฟินแลนด์ (AIS สด)", "Gulf of Finland (live AIS)"));
-            }
-          }}
-          title={T("เรือที่เคลื่อนที่จริงจาก Digitraffic — ครอบคลุมน่านน้ำฟินแลนด์เท่านั้น ไม่ใช่อ่าวไทย",
-                   "Real moving vessels from Digitraffic — Finnish waters only, not the Gulf of Thailand")}>
-          <Icon name="ship" size={13} />
-          {T("AIS สด · ฟินแลนด์", "Live AIS · Finland")}
-          {dtOn && (
-            <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
-              {dt.loading && !dt.vessels.length ? "…" : dt.moving + "▸"}
-            </span>
-          )}
-        </button>
+        {/* ปุ่มสองตัวนี้นิยามไว้ด้านบน ใช้ร่วมกับชุดที่ลอยบนแผนที่ตอนเต็มจอ */}
+        {thaiToggleBtn()}
+        {aisToggleBtn()}
 
         <span className="topbar-spacer" />
         {dtOn && dt.error && (
@@ -657,27 +663,48 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
             </div>
           )}
 
-          {/* ปุ่มเข้า/ออกโหมดเต็มจอ — ลอยอยู่มุมขวาบนของแผนที่
-              ในโหมดเต็มจอต้องขยับมาซ้ายของ rail ไม่งั้นถูกทับ */}
-          <button className="btn btn-ghost btn-sm"
-            onClick={() => switchFullscreen(!fullscreen)}
-            title={fullscreen
-              ? T("ออกจากโหมดเต็มจอ (Esc)", "Exit fullscreen (Esc)")
-              : T("แสดงแผนที่เต็มจอ", "Fullscreen map")}
-            style={{
-              position: "absolute", top: 12,
-              right: (fullscreen && visible.news) ? FS_FEED_W + 12 : 12,
-              zIndex: 500,
-              background: "var(--surface-2)", border: "1px solid var(--border-2)",
-              boxShadow: "var(--shadow)",
-              /* .btn ตั้ง transition: all ไว้ ทำให้ปุ่มไถลข้ามจอ 340px
-                 ตอนสลับเต็มจอ — ตำแหน่งของตัวควบคุมควรเปลี่ยนทันที
-                 ให้เหลือเฉพาะ transition ของสีตอน hover */
-              transitionProperty: "background, border-color, color",
-            }}>
-            <Icon name={fullscreen ? "shrink" : "expand"} size={14} />
-            {fullscreen ? T("ออกจากเต็มจอ", "Exit") : T("เต็มจอ", "Fullscreen")}
-          </button>
+          {/* ── ตัวควบคุมลอยมุมขวาบนของแผนที่ ─────────────────────────
+              รวมปุ่มไว้แถวเดียวกัน ไม่วางแยกมุม เพราะมุมซ้ายบนเป็นที่ของ
+              .map-stat (z-index 800) ซึ่งจะทับปุ่มจนกดไม่ได้
+
+              ตอนเต็มจอ แถบเครื่องมือด้านบนถูกซ่อนทั้งแถบ ปุ่มเน้นข่าวไทย
+              กับ AIS สดจึงหายไปด้วย ทั้งที่เป็นสองปุ่มที่อยากใช้ตอนดูเต็มจอ
+              ที่สุด — ยกมาไว้ในแถวนี้เฉพาะตอนเต็มจอ                      */}
+          <div style={{
+            position: "absolute", top: 12,
+            right: (fullscreen && visible.news) ? FS_FEED_W + 12 : 12,
+            zIndex: 810,   // ต้องสูงกว่า .map-hud (800) ไม่งั้นถูก HUD บัง
+            display: "flex", gap: 8, alignItems: "center",
+            /* .btn ตั้ง transition: all ไว้ ทำให้ชุดปุ่มไถลข้ามจอ 340px
+               ตอนสลับเต็มจอ — ตำแหน่งของตัวควบคุมควรเปลี่ยนทันที */
+            transitionProperty: "none",
+          }}>
+            {fullscreen && (
+              <div style={{
+                display: "flex", gap: 8, alignItems: "center", padding: 5,
+                background: "color-mix(in srgb, var(--surface-2) 88%, transparent)",
+                border: "1px solid var(--border-2)", borderRadius: 9,
+                boxShadow: "var(--shadow)", backdropFilter: "blur(6px)",
+              }}>
+                {thaiToggleBtn()}
+                {aisToggleBtn()}
+              </div>
+            )}
+
+            <button className="btn btn-ghost btn-sm"
+              onClick={() => switchFullscreen(!fullscreen)}
+              title={fullscreen
+                ? T("ออกจากโหมดเต็มจอ (Esc)", "Exit fullscreen (Esc)")
+                : T("แสดงแผนที่เต็มจอ", "Fullscreen map")}
+              style={{
+                background: "var(--surface-2)", border: "1px solid var(--border-2)",
+                boxShadow: "var(--shadow)",
+                transitionProperty: "background, border-color, color",
+              }}>
+              <Icon name={fullscreen ? "shrink" : "expand"} size={14} />
+              {fullscreen ? T("ออกจากเต็มจอ", "Exit") : T("เต็มจอ", "Fullscreen")}
+            </button>
+          </div>
 
           {/* top-left stats */}
           <div className="map-hud map-stat">
