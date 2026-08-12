@@ -37,6 +37,7 @@ ALLOWED_HOSTS = {
     "www.thairath.co.th", "thairath.co.th",
     "www.prachachat.net", "prachachat.net",
     "thestandard.co", "www.thestandard.co",
+    "md.go.th", "www.md.go.th",                       # กรมเจ้าท่า
     "globalfishingwatch.org", "www.globalfishingwatch.org",
     "thediplomat.com", "www.thediplomat.com",
     "amti.csis.org", "news.usni.org", "www.navalnews.com",

@@ -63,6 +63,25 @@ const LIVE_SOURCES = [
     url: "https://www.prachachat.net/feed" },
   { key: "STANDARD", name: "THE STANDARD", tag: "NEWS", color: "#e3b341", filterMaritime: true,
     url: "https://thestandard.co/feed/" },
+
+  /* ── หน่วยงานทางการ ─────────────────────────────────────────────
+     กรมเจ้าท่ามี RSS จริง และมีของที่หาจากที่อื่นไม่ได้ คือประกาศชาวเรือ
+     ("ให้ระมัดระวังการเดินเรือ") ซึ่งเป็นแหล่งทางการโดยตรง
+     แต่ 9 ใน 10 ของฟีดเป็นประกาศจัดซื้อจัดจ้าง จึงต้อง dropProcurement
+     มิฉะนั้นจะผ่านตัวกรองทางทะเลหมดเพราะมีคำว่า "กรมเจ้าท่า" ในทุกหัวข้อ */
+  { key: "MD", name: "กรมเจ้าท่า", tag: "GOV", color: "#4d9bf0",
+    filterMaritime: true, dropProcurement: true,
+    url: "https://md.go.th/feed/" },
+
+  /* กรมประมงไม่มี RSS — ตรวจแล้วทั้ง fisheries.go.th, www.fisheries.go.th
+     และ www4.fisheries.go.th ไม่ประกาศ rel=alternate และ /rss กับ /feed
+     คืน HTML ธรรมดา จึงต้องอ้อมผ่าน Google News แทน
+     แลกกับการไม่มีรูปและได้ลิงก์ redirect เหมือนฟีด THNEWS อื่น ๆ */
+  { key: "THNEWS", name: "ในประเทศ (Google News)", tag: "NEWS", color: "#46c976",
+    url: "https://news.google.com/rss/search?q=" + encodeURIComponent(
+      "(\"กรมประมง\" OR \"ประมงจังหวัด\" OR \"ศูนย์ควบคุมการแจ้งเรือ\") "
+      + "(ตรวจ OR จับกุม OR ปฏิบัติการ OR ประกาศ OR ผิดกฎหมาย) when:14d")
+      + "&hl=th&gl=TH&ceid=TH:th" },
 ];
 
 // Register source entries so SrcChip can look them up
@@ -159,6 +178,12 @@ const TH_MARITIME_RE = new RegExp([
   "โรฮีนจา|เกาะกูด|เกาะกง|รุกล้ำน่านน้ำ|จมทะเล|ดำน้ำ",
 ].join("|"));
 
+/* ฟีดของหน่วยราชการมีประกาศจัดซื้อจัดจ้างปนมาเป็นส่วนใหญ่ (กรมเจ้าท่า 9 ใน 10)
+   ซึ่งผ่านตัวกรองทางทะเลเพราะมีคำว่า "กรมเจ้าท่า" อยู่ในหัวข้อทุกฉบับ
+   ต้องคัดออกด้วยรูปแบบเอกสารจัดซื้อ ไม่ใช่ด้วยหัวข้อเนื้อหา */
+const TH_PROCUREMENT_RE =
+  /ประกาศผู้ชนะ|ผู้ชนะการเสนอราคา|ประกวดราคา|สอบราคา|เสนอราคา|จัดซื้อ|จัดจ้าง|ราคากลาง|ขายทอดตลาด|ร่างขอบเขตของงาน|\bTOR\b/;
+
 async function fetchOneFeed(src) {
   const url = RSS2JSON_BASE + encodeURIComponent(src.url);
   const ctrl = new AbortController();
@@ -171,6 +196,9 @@ async function fetchOneFeed(src) {
     if (src.filterMaritime) {
       items = items.filter(it =>
         TH_MARITIME_RE.test((it.title || "") + " " + stripHtml(it.description || "")));
+    }
+    if (src.dropProcurement) {
+      items = items.filter(it => !TH_PROCUREMENT_RE.test(it.title || ""));
     }
     return items.map((item, i) => makeLiveItem(src, item, i));
   } catch {
