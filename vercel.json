@@ -9,6 +9,9 @@
     "api/chat.py": {
       "maxDuration": 30
     },
+    "api/rss.py": {
+      "maxDuration": 25
+    },
     "api/cron-news.py": {
       "maxDuration": 60
     }

@@ -39,6 +39,23 @@ const LIVE_SOURCES = [
     url: "https://news.google.com/rss/search?q=" + encodeURIComponent(
       "(ศรชล OR \"กองทัพเรือ\" OR \"ตำรวจน้ำ\" OR \"กรมเจ้าท่า\") "
       + "(ปฏิบัติการ OR ตรวจการณ์ OR จับกุม) when:14d") + "&hl=th&gl=TH&ceid=TH:th" },
+
+  /* ── สำนักข่าวไทยโดยตรง ─────────────────────────────────────────
+     เหตุผลที่ต้องมีทั้งที่ Google News ครอบคลุมกว่า: Google News ให้
+     ลิงก์ redirect ของตัวเองแทน URL บทความ และไม่ส่งรูปมาเลยสักชิ้น
+     (ตรวจแล้ว 40/40 ไม่มีรูป) ทั้งยังถอดหา URL จริงไม่ได้ เพราะหน้า
+     interstitial แปลงด้วย JS ฝั่งไคลเอนต์
+
+     ฟีดตรงของสำนักข่าวให้ URL จริงและมีรูปครบทุกชิ้น แลกกับการที่เป็น
+     ข่าวรวมทุกหมวด จึงต้องผ่าน filterMaritime ก่อน
+     วัดจริง: ผ่านตัวกรองราว 5% ของฟีด — ได้ข่าวไทยมีรูปวันละไม่กี่ชิ้น
+     ไม่ใช่ทุกชิ้น แต่ดีกว่าศูนย์                                      */
+  { key: "KHAOSOD", name: "ข่าวสด", tag: "NEWS", color: "#e05c20", filterMaritime: true,
+    url: "https://www.khaosod.co.th/around-thailand/feed" },
+  { key: "KHAOSOD", name: "ข่าวสด", tag: "NEWS", color: "#e05c20", filterMaritime: true,
+    url: "https://www.khaosod.co.th/crime/feed" },
+  { key: "MATICHON", name: "มติชน", tag: "NEWS", color: "#33d6c8", filterMaritime: true,
+    url: "https://www.matichon.co.th/region/feed" },
 ];
 
 // Register source entries so SrcChip can look them up
@@ -48,7 +65,11 @@ if (window.MDA_DATA && window.MDA_DATA.sources) {
   });
 }
 
-const RSS2JSON_BASE = "https://api.rss2json.com/v1/api.json?rss_url=";
+/* อ่าน RSS ผ่านเซิร์ฟเวอร์ของเราเอง (api/rss.py) ไม่ใช่ api.rss2json.com
+   ของเดิมเป็นบริการฟรีของบุคคลที่สามที่จำกัดอัตราการเพิ่มฟีดใหม่ — พอเติม
+   แหล่งข่าวไทยเข้าไปสามฟีด ทุกฟีดใหม่ตอบ 429 ทันที ฟีดข่าวทั้งระบบจึงขึ้น
+   อยู่กับโควตาของคนอื่น · ตัวเราเองยังคืนข่าวครบกว่าด้วย (rss2json ตัดเหลือ 10) */
+const RSS2JSON_BASE = "/api/rss?url=";
 const CACHE_KEY     = "MDA_LIVE_NEWS_v2";
 const LASTFETCH_KEY = "MDA_LAST_FETCH";
 const REFRESH_MS    = 30 * 60 * 1000; // 30 minutes
@@ -111,6 +132,22 @@ function makeLiveItem(src, item, index) {
   };
 }
 
+/* ── ตัวกรองความเกี่ยวข้องทางทะเล (เฉพาะฟีดข่าวทั่วไปของไทย) ─────────
+   ฟีดสำนักข่าวไทยเป็นข่าวรวมทุกหมวด วัดจริงแล้วมีเนื้อหาทางทะเลราว 5%
+   ถ้ารับหมดแดชบอร์ดจะกลายเป็นหน้าอ่านข่าวทั่วไป จึงต้องมีจุดยึดทางทะเล
+   อย่างน้อยหนึ่งคำ — ตั้งใจไม่ใส่คำกว้างอย่าง "ลักลอบ" หรือ "เกาะ" ลอย ๆ
+   เพราะทดสอบแล้วดึงข่าวลักลอบนำเข้าหมูแช่แข็งกับข่าวภูเก็ตทั่วไปเข้ามาด้วย
+
+   ยังหลุดรอดบ้างเป็นเรื่องปกติ — คัดแคบเกินไปจะเสียข่าวจริงมากกว่าที่ได้ */
+const TH_MARITIME_RE = new RegExp([
+  "ทางทะเล|ในทะเล|กลางทะเล|ชายฝั่ง|น่านน้ำ|อ่าวไทย|อันดามัน",
+  "เรือประมง|เรือล่ม|เรือจม|เรืออับปาง|เรือบรรทุก|เรือสินค้า|เรือตรวจการณ์|เรือรบ",
+  "ประมง|อวนลาก|อวนครอบ|จับสัตว์น้ำ|ท่าเทียบเรือ|กรมเจ้าท่า|กรมประมง",
+  "ศรชล|กองทัพเรือ|ทัพเรือภาค|ทหารเรือ|ตำรวจน้ำ",
+  "น้ำมันรั่ว|มลพิษทางทะเล|เต่าทะเล|พะยูน|ปะการัง",
+  "โรฮีนจา|เกาะกูด|เกาะกง|รุกล้ำน่านน้ำ|จมทะเล|ดำน้ำ",
+].join("|"));
+
 async function fetchOneFeed(src) {
   const url = RSS2JSON_BASE + encodeURIComponent(src.url);
   const ctrl = new AbortController();
@@ -119,7 +156,12 @@ async function fetchOneFeed(src) {
     const res = await fetch(url, { signal: ctrl.signal });
     const j   = await res.json();
     if (j.status !== "ok" || !Array.isArray(j.items)) return [];
-    return j.items.map((item, i) => makeLiveItem(src, item, i));
+    let items = j.items;
+    if (src.filterMaritime) {
+      items = items.filter(it =>
+        TH_MARITIME_RE.test((it.title || "") + " " + stripHtml(it.description || "")));
+    }
+    return items.map((item, i) => makeLiveItem(src, item, i));
   } catch {
     return [];
   } finally {

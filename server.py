@@ -56,6 +56,7 @@ API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 sys.path.insert(0, str(Path(__file__).parent / "api"))
 import analyze as analyze_mod   # noqa: E402
 import chat as chat_mod         # noqa: E402
+import rss as rss_mod           # noqa: E402
 
 # ais.py อยู่ที่ root ไม่ใช่ใน api/ เพราะไม่ใช่ serverless function — มันเปิด
 # WebSocket ค้างไว้ ซึ่ง serverless ทำไม่ได้ · ถ้าวางใน api/ Vercel จะพยายาม
@@ -161,8 +162,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return http.server.SimpleHTTPRequestHandler.end_headers(self)
 
     def do_GET(self):
-        if self.path.split("?")[0] == "/api/vessels":
+        route = self.path.split("?")[0]
+        if route == "/api/vessels":
             self._json(ais_mod.snapshot())
+            return
+        if route == "/api/rss":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                self._json(rss_mod.handle((q.get("url") or [""])[0]))
+            except Exception as e:
+                self._json({"status": "error", "message": str(e)[:200], "items": []})
             return
         return http.server.SimpleHTTPRequestHandler.do_GET(self)
 
