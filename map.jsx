@@ -278,7 +278,7 @@ function focusHtml() {
 function MapView({
   vessels = [], events = [], newsPoints = [], selected, onSelect, onSelectEvent, onSelectNews, lang,
   showLabels = false, showTracks = true, showEvents = true, showNews = true, sweep = false,
-  showLanes = true, focus = null, view = null,
+  showLanes = true, focus = null, view = null, lockBounds = null,
   zoomable = false, initialCenter = [20, 10], initialZoom = 2,
 }) {
   const containerRef = React.useRef(null);
@@ -578,8 +578,35 @@ function MapView({
   React.useEffect(() => {
     const map = mapRef.current;
     if (!map || !view || typeof view.lat !== "number") return;
-    map.flyTo([view.lat, view.lon], view.zoom || 5, { duration: 1.1 });
+    // ผู้เรียกกำหนดความเร็วได้ — โหมดเน้นข่าวไทยอยากได้จังหวะช้ากว่าปกติ
+    map.flyTo([view.lat, view.lon], view.zoom || 5,
+      { duration: typeof view.duration === "number" ? view.duration : 1.1 });
   }, [view]);
+
+  /* ── ล็อกแผนที่ไว้ในกรอบที่กำหนด ───────────────────────────────
+     ใช้ตอนเน้นข่าวไทย: เลื่อน/ซูมออกนอกภูมิภาคไม่ได้ กันหลุดไปดูทั้งโลก
+     ทั้งที่กำลังกรองเหลือแต่ข่าวไทย — มุมมองกับข้อมูลจะได้ตรงกัน
+
+     ตั้ง minZoom ตามกรอบด้วย มิฉะนั้นจะซูมออกจนเห็นทั้งโลกได้
+     แล้ว maxBounds จะเด้งกลับไปมาแทนที่จะกันไว้เฉย ๆ                */
+  React.useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!lockBounds) {
+      map.setMinZoom(2);
+      map.setMaxBounds(L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180)));
+      return;
+    }
+
+    const b = L.latLngBounds(
+      L.latLng(lockBounds[0][0], lockBounds[0][1]),
+      L.latLng(lockBounds[1][0], lockBounds[1][1]));
+    // เผื่อขอบรอบกรอบไว้เล็กน้อย ไม่ให้หมุดริมสุดชนขอบจนเลื่อนดูไม่ได้
+    map.setMaxBounds(b.pad(0.12));
+    const fit = map.getBoundsZoom(b);
+    map.setMinZoom(Math.max(2, fit - 1));
+  }, [lockBounds]);
 
   return (
     <div className="map-wrap" style={{ position: "relative", height: "100%", width: "100%" }}>

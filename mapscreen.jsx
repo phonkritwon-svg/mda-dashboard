@@ -158,6 +158,14 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
      ทำให้แต่ละมุมมองอ่านได้จริง                                        */
   const [thaiOnly, setThaiOnly] = useState(false);
 
+  /* กรอบล็อกตอนเน้นข่าวไทย — ครอบไทยทั้งประเทศ อ่าวไทย อันดามัน
+     และน่านน้ำเพื่อนบ้านที่ข่าวไทยมักอ้างถึง กว้างพอให้หมุดทุกจุดอยู่ในกรอบ */
+  const TH_LOCK_BOUNDS = [[3.0, 93.0], [22.0, 110.0]];
+  const TH_FLY_SEC = 2.6;                 // ช้ากว่าการกระโดดพื้นที่ปกติ (1.1) ให้ดูนุ่ม
+  const [lockBounds, setLockBounds] = useState(null);
+  const lockTimer = React.useRef(null);
+  React.useEffect(() => () => clearTimeout(lockTimer.current), []);
+
   const [thaiPoints, worldPoints] = React.useMemo(() => {
     const th = [], other = [];
     newsPointsAll.forEach(p => {
@@ -452,9 +460,16 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           onClick={() => {
             const next = !thaiOnly;
             setThaiOnly(next);
+            clearTimeout(lockTimer.current);
             if (next) {
-              setMapView({ lat: 13.2, lon: 100.9, zoom: 5 });
+              setMapView({ lat: 13.0, lon: 101.0, zoom: 5.4, duration: TH_FLY_SEC });
               setRegionLabel(T("ประเทศไทย", "Thailand"));
+              /* ล็อกกรอบ "หลัง" บินจบ — ถ้าล็อกก่อน minZoom จะดีดซูมขึ้นทันที
+                 แล้วอนิเมชันที่ตั้งใจให้ค่อย ๆ เข้าจะกลายเป็นการกระตุกหนึ่งครั้ง */
+              lockTimer.current = setTimeout(
+                () => setLockBounds(TH_LOCK_BOUNDS), TH_FLY_SEC * 1000 + 120);
+            } else {
+              setLockBounds(null);
             }
           }}
           title={thaiOnly
@@ -519,6 +534,7 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
           }}>
           <MapView vessels={filteredVessels} events={scopedEvents} lang={lang}
             selected={selected} onSelect={setSelected} focus={focus} view={mapView}
+            lockBounds={lockBounds}
             onSelectEvent={(e) => onNav("incident", { id: e.id })}
             newsPoints={newsPoints} showNews={visible.news}
             onSelectNews={(p) => onNav("newsDetail", { item: p.item })}
