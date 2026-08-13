@@ -347,14 +347,27 @@ function extractEventsFromNews(newsArr) {
       ago:      (n.ago && (n.ago.th || n.ago.en)) ? n.ago : evAgo(n.time),
       region:   { th: geo.th, en: geo.en },
       area:     { th: geo.th, en: geo.en },
-      title:    { th: th || en, en: en || th },
+      /* ตัด " - ชื่อสำนักข่าว" ที่ Google News ต่อท้ายออกจากพาดหัว —
+         ชื่อสำนักข่าวย้ายไปอยู่ช่อง source แล้ว ปล่อยไว้จะซ้ำสองที่ */
+      title:    (() => {
+        const cut = (s) => (window.splitGoogleNewsOutlet
+          ? window.splitGoogleNewsOutlet(s, n.outlet).head : s);
+        return { th: cut(th || en), en: cut(en || th) };
+      })(),
       summary:  { th: sth || sum, en: sum || sth },
       lat:      geo.lat,
       lon:      geo.lon,
       vessel:   null,
       conf:     n.credibility || 3,
       tags:     [],
-      source:   { outlet: n.outlet || "", url: n.url || "" },
+      /* ใช้สำนักข่าวจริงที่แยกออกจากท้ายพาดหัว ไม่ใช่ชื่อ query ของเรา
+         มิฉะนั้นหน้ารายละเอียดจะขึ้นที่มาว่า "ในประเทศ (Google News)" */
+      source:   {
+        outlet: (window.splitGoogleNewsOutlet
+          ? window.splitGoogleNewsOutlet(en || th, n.outlet).outlet
+          : (n.outlet || "")),
+        url: n.url || "",
+      },
       resolved: false,
       origin:   "news",                     // แยกจาก "cron"/"manual" ได้ที่ปลายทาง
       /* ข่าวไม่มีช่อง publishedAt — มีแต่ n.time (ISO สำหรับข่าวสด)

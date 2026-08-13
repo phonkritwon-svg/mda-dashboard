@@ -146,14 +146,11 @@ function newsCardParts(p, lang) {
   const where = p.region ? (th ? p.region.th : p.region.en) : "";
   const dom   = p.domain ? (th ? p.domain.th : p.domain.en) : "";
 
-  /* Google News ต่อท้ายพาดหัวด้วย " - ชื่อสำนักข่าว" ส่วนช่อง outlet
-     กลับเป็นชื่อ query ของเราเอง ("ในประเทศ (Google News)") ซึ่งไม่บอกที่มาจริง
-     สลับกัน: ดึงสำนักข่าวออกจากท้ายพาดหัวมาเป็นแหล่ง แล้วตัดออกจากหัวข้อ */
-  let head = title, src = p.outlet || "";
-  if (/google news/i.test(src)) {
-    const m = /^([\s\S]*\S)\s+-\s+([^-]{2,40})$/.exec(title);
-    if (m) { head = m[1]; src = m[2].trim(); }
-  }
+  // ตรรกะแยกสำนักข่าวอยู่ที่ components.jsx — ใช้ร่วมกับหน้ารายละเอียดเหตุการณ์
+  const split = window.splitGoogleNewsOutlet
+    ? window.splitGoogleNewsOutlet(title, p.outlet)
+    : { head: title, outlet: p.outlet || "" };
+  const head = split.head, src = split.outlet;
 
   // "3 ชม.ที่แล้ว" อ่านง่ายกว่า 2026-08-10T18:39:16.000Z ที่ p.time เก็บไว้
   const ago = (p.item && p.item.ago && (th ? p.item.ago.th : p.item.ago.en))

@@ -348,6 +348,21 @@ function isThaiDomestic(text) {
   return TH_RE.test(text || "");
 }
 
+/* ── แยกชื่อสำนักข่าวจริงออกจากพาดหัวของ Google News ────────────────
+   Google News ต่อท้ายพาดหัวด้วย " - ชื่อสำนักข่าว" ส่วนช่อง outlet ของรายการ
+   กลับเป็นชื่อ query ของเราเอง ("ในประเทศ (Google News)") ซึ่งไม่บอกที่มาจริง
+   สลับกัน: ดึงสำนักข่าวจากท้ายพาดหัวมาเป็นแหล่ง แล้วตัดออกจากหัวข้อ
+
+   อยู่ที่ components.jsx เพราะทั้งทูลทิปบนแผนที่ ฟีดข่าวข้างเต็มจอ และ
+   หน้ารายละเอียดเหตุการณ์ ต้องแสดงที่มาให้ตรงกัน — เขียนแยกกันเมื่อไร
+   ก็จะมีหน้าใดหน้าหนึ่งขึ้นว่า "ในประเทศ (Google News)" ค้างอยู่          */
+function splitGoogleNewsOutlet(title, outlet) {
+  const t = title || "";
+  if (!/google news/i.test(outlet || "")) return { head: t, outlet: outlet || "" };
+  const m = /^([\s\S]*\S)\s+-\s+([^-]{2,40})$/.exec(t);
+  return m ? { head: m[1], outlet: m[2].trim() } : { head: t, outlet: outlet || "" };
+}
+
 // คืนประเทศโฟกัสที่ข้อความนี้ตรง (null = ไม่ตรง)
 function focusCountryOf(text) {
   if (!text) return null;
@@ -399,4 +414,5 @@ Object.assign(window, {
   TimeScopeBar, timeWindow, inTimeWindow,
   FOCUS_COUNTRIES, FOCUS_RE, focusCountryOf, focusPartition, FocusToggle, FocusGroupLabel,
   TH_RE, TH_PROVINCE_RE, isThaiDomestic,
+  splitGoogleNewsOutlet,
 });

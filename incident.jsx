@@ -334,6 +334,18 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
               <Icon name="clock" size={13} />
               {T("รายงานเมื่อ", "Reported")} {e.time} ({tx(e.ago, lang)} {T("ที่แล้ว", "ago")})
             </span>
+            {/* ลิงก์ข่าวต้นฉบับ — เหตุการณ์เกือบทั้งหมดอนุมานมาจากข่าวและพก
+                source.url มาด้วยอยู่แล้ว แต่หน้านี้ไม่เคยแสดงเลย ผู้ใช้จึง
+                ตรวจสอบที่มาไม่ได้ ซึ่งขัดกับหลักของแดชบอร์ดทั้งระบบ */}
+            {e.source && e.source.url && (
+              <a className="row" style={{ gap: 5, color: "var(--accent)" }}
+                href={e.source.url} target="_blank" rel="noopener noreferrer"
+                title={T("เปิดข่าวต้นฉบับในแท็บใหม่", "Open the original article in a new tab")}>
+                <Icon name="link" size={13} />
+                {T("ข่าวต้นฉบับ", "Original article")}
+                {e.source.outlet ? " · " + e.source.outlet : ""}
+              </a>
+            )}
           </div>
         </div>
         <div className="row">
@@ -396,7 +408,29 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
               </a>
             }>
             <div className="feed">
-              {relatedNews.length ? relatedNews.map(n => (
+              {/* ข่าวที่เหตุการณ์นี้ถูกสร้างขึ้นมาจาก — ต้องมาก่อนเสมอ
+                  เดิมแผงนี้อ่านจาก linkedInc อย่างเดียว ซึ่งเลิกใช้ไปพร้อมกับ
+                  การถอดเหตุการณ์สมมติออก จึงขึ้น "ยังไม่มีข่าวที่เชื่อมโยง"
+                  แทบทุกครั้ง ทั้งที่ต้นทางของเหตุการณ์อยู่ในมือแล้ว */}
+              {e.source && e.source.url && (
+                <a className="feed-row news-row" style={{ display: "block", cursor: "pointer" }}
+                  href={e.source.url} target="_blank" rel="noopener noreferrer">
+                  <div className="nhead">
+                    {e.srcKey && <SrcChip srcKey={e.srcKey} withName lang={lang} />}
+                    <Badge kind="ok">{T("ต้นทางเหตุการณ์", "Origin")}</Badge>
+                    <span className="topbar-spacer"></span>
+                    <span className="mute mono" style={{ fontSize: "var(--fs-xs)" }}>
+                      {e.source.outlet || ""}
+                    </span>
+                  </div>
+                  <div className="nsum">{tx(e.title, lang)}</div>
+                  <div className="dim row" style={{ gap: 5, fontSize: "var(--fs-xs)", marginTop: 4 }}>
+                    <Icon name="link" size={12} />{T("เปิดข่าวต้นฉบับ", "Open original article")}
+                  </div>
+                </a>
+              )}
+
+              {relatedNews.map(n => (
                 <div key={n.id} className="feed-row news-row" style={{ cursor: "pointer" }}
                   onClick={() => onNav("osint")}>
                   <div className="nhead">
@@ -407,7 +441,9 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
                   </div>
                   <div className="nsum">{tx(n.raw, lang)}</div>
                 </div>
-              )) : (
+              ))}
+
+              {!relatedNews.length && !(e.source && e.source.url) && (
                 <div className="empty">{T("ยังไม่มีข่าวที่เชื่อมโยง", "No linked OSINT yet")}</div>
               )}
             </div>
