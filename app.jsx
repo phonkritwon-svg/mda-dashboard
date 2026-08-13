@@ -93,8 +93,24 @@ async function buildAppUser(session) {
   const username = (prof && prof.username)  || meta.username  || (session.user.email || "").split("@")[0];
   const rank     = (prof && prof.rank)      || meta.rank      || "";
   const role     = (prof && prof.role)      || meta.role      || "Operator";
-  const avatar   = window.initialsOf ? window.initialsOf(name) : name.slice(0, 2);
-  return { user: username, name, rank, role, avatar };
+  const avatar   = initialsOf(name);
+  return { user: username, name, rank, role, avatar, fromSession: true };
+}
+
+/* ตัวตนเริ่มต้นเมื่อไม่มี session — ใช้แทนหน้าเข้าสู่ระบบที่ถอดออกไป
+   แดชบอร์ดเปิดใช้ได้ทันทีโดยไม่ต้องล็อกอิน ถ้ามี session ของ Supabase อยู่จริง
+   ข้อมูลผู้ใช้จะถูกเขียนทับด้วยโปรไฟล์จริง (และได้ปุ่มออกจากระบบกลับมา) */
+const DEFAULT_USER = {
+  user: "operator", name: "เจ้าหน้าที่เฝ้าระวัง", rank: "", role: "Watch Officer",
+  avatar: "ศร", fromSession: false,
+};
+
+// ย่อชื่อเป็นตัวอักษรสำหรับ avatar — เดิมอยู่ใน login.jsx ที่ถอดออกไปแล้ว
+function initialsOf(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "??";
+  if (parts.length === 1) return parts[0].slice(0, 2);
+  return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
 }
 
 // สลับธีมเร็วจากแถบบน — เมนูเล็กพร้อมตัวอย่างสีพื้นหลัง
@@ -154,8 +170,8 @@ function App() {
   const [notifOpen, setNotifOpen] = useStateA(false);
   const [searchOpen, setSearchOpen] = useStateA(false);
   const [toast, setToast] = useStateA(null);
-  const [currentUser, setCurrentUser] = useStateA(null);
-  const [authReady, setAuthReady] = useStateA(false);
+  // ไม่มีหน้าเข้าสู่ระบบแล้ว — เริ่มที่ตัวตนเริ่มต้นเสมอ ไม่ต้องรอ authReady
+  const [currentUser, setCurrentUser] = useStateA(DEFAULT_USER);
   const lang = t.language;
   const T = (th, en) => (lang === "th" ? th : en);
 
@@ -184,20 +200,22 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // ---- Supabase Auth session ----
+  /* ---- Supabase Auth session (ไม่บังคับแล้ว) ----
+     หน้าเข้าสู่ระบบถูกถอดออก แอปจึงเข้าใช้ได้เลยด้วย DEFAULT_USER
+     แต่ยังฟัง session ไว้ เผื่อมีคนล็อกอินค้างจากก่อนหน้า — จะได้เห็นชื่อจริง
+     และมีปุ่มออกจากระบบให้ ไม่ใช่โดนขังอยู่กับตัวตนเริ่มต้น
+     ออกจากระบบแล้วกลับไปที่ DEFAULT_USER ไม่ใช่ null เพราะไม่มีหน้า login รับ */
   useEffectA(() => {
     const SB = window.MDA_SB;
-    if (!SB) { setAuthReady(true); return; }   // ไม่มี Supabase → ไปหน้า login (demo ยังใช้ได้)
+    if (!SB) return;
     let sub = null;
     (async () => {
       try {
         const { data: { session } } = await SB.auth.getSession();
         if (session) setCurrentUser(await buildAppUser(session));
       } catch (e) { /* ignore */ }
-      setAuthReady(true);
       const res = SB.auth.onAuthStateChange(async (_event, sess) => {
-        if (sess) setCurrentUser(await buildAppUser(sess));
-        else setCurrentUser(null);
+        setCurrentUser(sess ? await buildAppUser(sess) : DEFAULT_USER);
       });
       sub = res.data.subscription;
     })();
@@ -251,25 +269,8 @@ function App() {
     brief:     <window.DailyBrief {...screenProps} />,
   };
 
-  // ---- Auth gate: ยังไม่ login → แสดงหน้าเข้าสู่ระบบ/สมัคร ----
-  if (!currentUser) {
-    const LS = window.LoginScreen;
-    if (!authReady || !LS) {
-      return <div style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center",
-        background: "var(--bg)", color: "var(--text-dim)", fontFamily: "var(--font-ui)" }}>
-        {T("กำลังโหลด…", "Loading…")}
-      </div>;
-    }
-    return (
-      <window.LangCtx.Provider value={lang}>
-        <LS onLogin={(u) => {
-          setCurrentUser(u);
-          showToast(T("ยินดีต้อนรับ ", "Welcome ") + (u.rank ? u.rank + " " : "") + u.name, "ok");
-        }} />
-        <Toast msg={toast && toast.msg} kind={toast && toast.kind} />
-      </window.LangCtx.Provider>
-    );
-  }
+  /* ด่านเข้าสู่ระบบถูกถอดออกตามคำขอ — แดชบอร์ดเปิดใช้ได้ทันที
+     currentUser จึงไม่มีวันเป็น null อีก (เริ่มที่ DEFAULT_USER เสมอ) */
 
   return (
     <window.LangCtx.Provider value={lang}>
@@ -324,12 +325,19 @@ function App() {
               onClick={() => { setSearchOpen(true); setNotifOpen(false); }}>
               <Icon name="search" size={16} />
             </div>
-            <div className="avatar" title={currentUser.rank + " " + currentUser.name + "\n" + currentUser.role + "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")"}
-              style={{ cursor: "pointer" }}
+            {/* ป้ายตัวตน — เสนอ "ออกจากระบบ" เฉพาะเมื่อมี session จริงเท่านั้น
+                ไม่มีหน้า login แล้ว การให้กดออกจากตัวตนเริ่มต้นจึงไม่มีความหมาย */}
+            <div className="avatar"
+              title={[currentUser.rank, currentUser.name].filter(Boolean).join(" ")
+                + "\n" + currentUser.role
+                + (currentUser.fromSession
+                    ? "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")" : "")}
+              style={{ cursor: currentUser.fromSession ? "pointer" : "default" }}
               onClick={async () => {
+                if (!currentUser.fromSession) return;
                 if (window.confirm(T("ออกจากระบบ?", "Sign out?") + " (" + currentUser.name + ")")) {
                   try { if (window.MDA_SB) await window.MDA_SB.auth.signOut(); } catch (e) { /* ignore */ }
-                  setCurrentUser(null);
+                  setCurrentUser(DEFAULT_USER);
                 }
               }}>
               {currentUser.avatar || currentUser.name.charAt(0)}
