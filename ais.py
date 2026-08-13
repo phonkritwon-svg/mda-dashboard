@@ -166,6 +166,10 @@ def _run(api_key):
             while True:
                 raw = ws.recv()
                 if not raw:
+                    # ปิดแบบสุภาพ ไม่โยน exception — ต้องบันทึกเหตุเอง
+                    # มิฉะนั้นหน้าเว็บจะไม่มีทางรู้ว่าสตรีมหยุดไปแล้ว
+                    _state["error"] = "สตรีมถูกปิดโดยเซิร์ฟเวอร์"
+                    print("[MDA] AIS: เซิร์ฟเวอร์ปิดสตรีม · ต่อใหม่ใน", backoff, "วิ")
                     break
                 if not _state["connected"]:
                     _state["connected"] = True
@@ -188,6 +192,11 @@ def _run(api_key):
             else:
                 print("[MDA] AIS: หลุดการเชื่อมต่อ —", msg[:120], "· ต่อใหม่ใน", backoff, "วิ")
         finally:
+            # ทุกทางออกจาก try แปลว่าไม่มีข้อมูลไหลแล้ว — ต้องล้างสถานะที่นี่
+            # ไม่ใช่ใน except อย่างเดียว เพราะการปิดแบบสุภาพ (recv คืนค่าว่าง)
+            # ไม่ผ่าน except เลย ถ้าปล่อยไว้ connected จะค้างเป็น True ตลอดช่วงที่
+            # สตรีมตายอยู่ และ backoff จะไม่ถูกรีเซ็ตอีกเลยเพราะ False→True ไม่เกิด
+            _state["connected"] = False
             try:
                 if ws is not None:
                     ws.close()

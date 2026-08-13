@@ -4,8 +4,51 @@
 function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
   const T = (th, en) => lang === "th" ? th : en;
 
+  /* เหตุการณ์ที่กำลังดู — คำนวณแบบทนค่าว่างได้ เพราะ hook ทั้งหมดต้องถูกเรียก
+     ก่อนถึง early return ของ empty state เสมอ
+     data.events โตขึ้นแบบอะซิงก์ (Supabase + เหตุการณ์ที่อนุมานจากฟีดข่าว)
+     ถ้า return ก่อนเรียก hook เหมือนเดิม พอข่าวชุดแรกมาถึงขณะเปิดหน้านี้ค้างไว้
+     จำนวน hook จะเปลี่ยนจาก 0 เป็น 6 กลางคัน React จะโยน
+     "Rendered more hooks than during the previous render" แล้วจอขาว        */
+  const events = (data.events && data.events.length) ? data.events : null;
+  const id = events ? ((initial && initial.id) || events[0].id) : null;
+  const e = events ? (events.find(x => x.id === id) || events[0]) : null;
+  const idx = events ? Math.max(0, events.findIndex(x => x.id === e.id)) : 0;
+
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignee, setAssignee] = useState("");
+  const [escalated, setEscalated] = useState(false);
+  const [tasked, setTasked] = useState(false);
+  const [addOfficerOpen, setAddOfficerOpen] = useState(false);
+
+  /* สถานะเหล่านี้ผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ
+     ก่อนหน้านี้ไม่มีทางสลับเหตุการณ์จึงไม่เคยเห็นปัญหา — พอสลับได้แล้ว
+     ป้าย "ยกระดับแล้ว" กับชื่อผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป */
+  React.useEffect(() => {
+    setEscalated(false);
+    setTasked(false);
+    setAssignee("");
+    setAssignOpen(false);
+  }, [e && e.id]);
+  const [newOfficer, setNewOfficer] = useState({ rank: "น.ต.", firstName: "", lastName: "", role: "" });
+
+  /* รายชื่อเจ้าหน้าที่ — ต้องอยู่เหนือ early return เช่นเดียวกับ hook อื่น
+     (ค่าตั้งต้นอ่านครั้งเดียวตอน mount จึงไม่แพงแม้อยู่บนสุด)               */
+  const DEFAULT_OFFICERS = [
+    { id: "O1", name: "น.ต. ธนาธร สุขชัย",   role: T("นักวิเคราะห์ข่าว", "Intel Analyst") },
+    { id: "O2", name: "น.ต. วิมล ศรีรัตน์",   role: T("เจ้าหน้าที่เฝ้าระวัง", "Watch Officer") },
+    { id: "O3", name: "พ.จ.อ. สมชาย บุญมี",   role: T("หัวหน้าชุดปฏิบัติการ", "Ops Team Lead") },
+    { id: "O4", name: "น.ท. กฤษณา พลอยแก้ว", role: T("ผู้บังคับการชุด", "Duty OIC") },
+  ];
+  const [officers, setOfficers] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("mda_officers") || "null");
+      return saved && saved.length ? saved : DEFAULT_OFFICERS;
+    } catch (err) { return DEFAULT_OFFICERS; }
+  });
+
   // ยังไม่มีเหตุการณ์ในฐานข้อมูล → empty state + ปุ่มเพิ่ม
-  if (!data.events || !data.events.length) {
+  if (!events) {
     return (
       <div className="screen">
         <div className="page-head">
@@ -24,10 +67,6 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
     );
   }
 
-  const events = data.events;
-  const id = (initial && initial.id) || events[0].id;
-  const e = events.find(x => x.id === id) || events[0];
-  const idx = Math.max(0, events.findIndex(x => x.id === e.id));
   const go = (i) => {
     const t = events[Math.max(0, Math.min(events.length - 1, i))];
     if (t && t.id !== e.id) onNav("incident", { id: t.id });
@@ -38,41 +77,11 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
   const timeline = e.timeline || data.incTimeline;
   const recs = e.recs || data.recommendations;
 
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignee, setAssignee] = useState("");
-  const [escalated, setEscalated] = useState(false);
-  const [tasked, setTasked] = useState(false);
-  const [addOfficerOpen, setAddOfficerOpen] = useState(false);
-
-  /* สถานะเหล่านี้ผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ
-     ก่อนหน้านี้ไม่มีทางสลับเหตุการณ์จึงไม่เคยเห็นปัญหา — พอสลับได้แล้ว
-     ป้าย "ยกระดับแล้ว" กับชื่อผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป */
-  React.useEffect(() => {
-    setEscalated(false);
-    setTasked(false);
-    setAssignee("");
-    setAssignOpen(false);
-  }, [e.id]);
-  const [newOfficer, setNewOfficer] = useState({ rank: "น.ต.", firstName: "", lastName: "", role: "" });
-
   const fmtPos = (lat, lon) => {
     const la = Math.abs(lat).toFixed(1) + "°" + (lat >= 0 ? "N" : "S");
     const lo = Math.abs(lon).toFixed(1) + "°" + (lon >= 0 ? "E" : "W");
     return la + " " + lo;
   };
-
-  const DEFAULT_OFFICERS = [
-    { id: "O1", name: "น.ต. ธนาธร สุขชัย",   role: T("นักวิเคราะห์ข่าว", "Intel Analyst") },
-    { id: "O2", name: "น.ต. วิมล ศรีรัตน์",   role: T("เจ้าหน้าที่เฝ้าระวัง", "Watch Officer") },
-    { id: "O3", name: "พ.จ.อ. สมชาย บุญมี",   role: T("หัวหน้าชุดปฏิบัติการ", "Ops Team Lead") },
-    { id: "O4", name: "น.ท. กฤษณา พลอยแก้ว", role: T("ผู้บังคับการชุด", "Duty OIC") },
-  ];
-  const [officers, setOfficers] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("mda_officers") || "null");
-      return saved && saved.length ? saved : DEFAULT_OFFICERS;
-    } catch (err) { return DEFAULT_OFFICERS; }
-  });
 
   const saveOfficers = (list) => {
     setOfficers(list);

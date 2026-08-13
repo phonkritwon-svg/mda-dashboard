@@ -91,7 +91,9 @@ const MDA_GEO_REGIONS = [
   { re: /\bphuket\b|ภูเก็ต/i,                                     th: "ภูเก็ต",           en: "Phuket",           lat: 7.88,  lon: 98.39 },
   { re: /\bkrabi\b|กระบี่/i,                                      th: "กระบี่",           en: "Krabi",            lat: 8.09,  lon: 98.91 },
   { re: /phang ?nga|พังงา|เขาหลัก/i,                              th: "พังงา",            en: "Phang Nga",        lat: 8.45,  lon: 98.53 },
-  { re: /\btrang\b|ตรัง/i,                                        th: "ตรัง",             en: "Trang",            lat: 7.56,  lon: 99.61 },
+  /* กัน "Nha Trang" (เวียดนาม) ออก — \btrang\b ตรงกับคำหลังของชื่อนั้นเต็ม ๆ
+     ข่าวเหตุทางทะเลนอกฝั่งญาจางจะถูกปักลงตรัง ผิดไปคนละฝั่งคาบสมุทร ~900 กม. */
+  { re: /(?<!nha[ -])\btrang\b|ตรัง/i,                            th: "ตรัง",             en: "Trang",            lat: 7.56,  lon: 99.61 },
 
   /* กรุงเทพฯ–ปริมณฑล–ภาคกลาง */
   { re: /bangkok|กรุงเทพ|กทม\.?|จอมทอง|หนองแขม|บางมด|พระราม 2|ดอนเมือง|สุวรรณภูมิ|suvarnabhumi/i,
@@ -257,12 +259,21 @@ function extractVesselsFromNews(newsArr) {
    "สหภาพแรงงานบุกโจมตีท่าเรือ" กลายเป็นเหตุวิกฤตทางความมั่นคงไปด้วย
    จึงบังคับให้คู่กับเป้าหมายหรืออาวุธเสมอ                                */
 const EV_SEV_CRIT = /\b(attacked|missile|drone strike|explosion|killed|sunk|sinking|hijack|under fire|ballistic|opened fire)\b|attack on (a )?(ship|vessel|tanker|port)|โจมตีเรือ|โจมตีท่าเรือ|ขีปนาวุธ|ระเบิด|เสียชีวิต|จมลง|อับปาง|จี้เรือ|ยิงใส่/i;
-const EV_SEV_HIGH = /\b(seiz|detain|collision|capsiz|distress|piracy|pirate|smuggl|illegal fishing|incursion|intercept|boarded|sabotage)\b|ยึดเรือ|ควบคุมตัว|ชนกัน|พลิกคว่ำ|ขอความช่วยเหลือ|โจรสลัด|ลักลอบ|ประมงผิดกฎหมาย|รุกล้ำ|สกัดกั้น|ก่อวินาศกรรม/i;
+/* ไม่ปิดท้ายกลุ่มอังกฤษด้วย \b — รายการนี้เป็น "รากคำ" ไม่ใช่คำเต็ม
+   ถ้าใส่ \b ปิดท้าย seiz/capsiz/smuggl จะไม่มีวันตรงกับอะไรเลย (ไม่มีคำว่า
+   "seiz" ในภาษาอังกฤษ) และ detain/intercept จะไม่จับ detained/intercepted
+   ผลคือ "Navy seized a trawler" ตกไปเป็น medium หรือถูกทิ้งทั้งชิ้น
+   เปิดท้ายไว้จึงครอบ seized · seizure · capsized · smuggling ตามที่ตั้งใจ */
+const EV_SEV_HIGH = /\b(seiz|detain|collision|capsiz|distress|piracy|pirate|smuggl|illegal fishing|incursion|intercept|boarded|sabotage)|ยึดเรือ|ควบคุมตัว|ชนกัน|พลิกคว่ำ|ขอความช่วยเหลือ|โจรสลัด|ลักลอบ|ประมงผิดกฎหมาย|รุกล้ำ|สกัดกั้น|ก่อวินาศกรรม/i;
 
 /* ข่าวที่ "พูดถึง" ภัยแต่ไม่ใช่เหตุการณ์ — จัดซื้อ งบประมาณ ต่อเรือ ซ้อมรบ
    ทดลองอาวุธ ข่าวธุรกิจ ล้วนเต็มไปด้วยคำว่าโดรน ขีปนาวุธ เรือรบ
-   ถ้าไม่กันออก แผงเฝ้าระวังจะเต็มไปด้วยข่าวจัดซื้อจนของจริงจมหาย        */
-const EV_NOT_INCIDENT = /\b(order|orders|ordered|contract|tender|procure|procurement|budget|billion|cost|deliver(y|ed)|christen|keel|shipyard|exercise|drill|trial|prototype|concept|unveil|explores?|study|report says)\b|คำสั่งซื้อ|สัญญา|งบประมาณ|จัดซื้อ|จัดหา|ต่อเรือ|อู่ต่อเรือ|ซ้อมรบ|ทดสอบ|ทดลอง|ต้นแบบ|เปิดตัว|ผลการศึกษา|พันล้าน/i;
+   ถ้าไม่กันออก แผงเฝ้าระวังจะเต็มไปด้วยข่าวจัดซื้อจนของจริงจมหาย
+
+   "สัญญา" ต้องกัน "สัญญาณ" ออกด้วย lookahead — ภาษาไทยไม่มีขอบเขตคำ
+   ถ้าปล่อยไว้ พาดหัวอย่าง "เรือประมงปิดสัญญาณ AIS" หรือ "รับสัญญาณขอความ
+   ช่วยเหลือ" จะถูกทิ้งเป็นข่าวจัดซื้อ ทั้งที่เป็นเหตุการณ์ที่ต้องเฝ้าระวังที่สุด */
+const EV_NOT_INCIDENT = /\b(order|orders|ordered|contract|tender|procure|procurement|budget|billion|cost|deliver(y|ed)|christen|keel|shipyard|exercise|drill|trial|prototype|concept|unveil|explores?|study|report says)\b|คำสั่งซื้อ|สัญญา(?!ณ)|งบประมาณ|จัดซื้อ|จัดหา|ต่อเรือ|อู่ต่อเรือ|ซ้อมรบ|ทดสอบ|ทดลอง|ต้นแบบ|เปิดตัว|ผลการศึกษา|พันล้าน/i;
 
 /* หมวดก่อการร้ายต้องมี "ตัวแสดงหรืออาวุธ" ไม่ใช่แค่คำว่าโจมตี
    ของฝั่ง cron ใส่ attack|struck ไว้ในหมวดนี้ด้วย ผลคือข่าวอะไรก็ตามที่มี
@@ -346,7 +357,13 @@ function extractEventsFromNews(newsArr) {
       source:   { outlet: n.outlet || "", url: n.url || "" },
       resolved: false,
       origin:   "news",                     // แยกจาก "cron"/"manual" ได้ที่ปลายทาง
-      publishedAt: n.publishedAt || null,
+      /* ข่าวไม่มีช่อง publishedAt — มีแต่ n.time (ISO สำหรับข่าวสด)
+         ถ้าปล่อยเป็น null ตัวกรองช่วงเวลาจะทิ้งเหตุการณ์กลุ่มนี้ทั้งหมด
+         (inTimeWindow คืน false เมื่อแปลงวันที่ไม่ได้) พอผู้ใช้เลือก "24 ชม."
+         แผงก็ว่างเปล่าอีกครั้ง ซึ่งคือปัญหาที่ฟีเจอร์นี้ตั้งใจแก้พอดี
+         รับเฉพาะรูปแบบ ISO — ข่าวตั้งต้นเก็บเป็น "07:30" ซึ่งไม่ใช่วันที่ */
+      publishedAt: n.publishedAt
+        || (/^\d{4}-\d{2}-\d{2}/.test(String(n.time || "")) ? n.time : null),
       newsItem: n,                          // ให้หน้ารายละเอียดย้อนกลับไปที่ข่าวต้นทางได้
     });
   });

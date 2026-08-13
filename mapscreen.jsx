@@ -613,8 +613,16 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
                         <div key={p.id}
                           onClick={() => {
                             /* ถ้าข่าวอยู่คนละกลุ่มกับที่แผนที่ปักอยู่ ต้องสลับมุมมองก่อน
-                               ไม่งั้นจะบินไปยังจุดที่ไม่มีหมุดให้เห็น */
-                            if (!group.live) setThaiOnly(group.key === "th");
+                               ไม่งั้นจะบินไปยังจุดที่ไม่มีหมุดให้เห็น
+
+                               และต้องปลดล็อกกรอบไทยด้วย มิฉะนั้น maxBounds/minZoom
+                               ที่ตั้งไว้ตอนเน้นข่าวไทยจะดึงแผนที่กลับ จุดต่างประเทศ
+                               (เช่นทะเลแดง) อยู่นอกกรอบ บินไปเท่าไรก็ไม่ถึง */
+                            if (!group.live) {
+                              setThaiOnly(group.key === "th");
+                              clearTimeout(lockTimer.current);
+                              setLockBounds(null);
+                            }
                             setMapView({ lat: p.lat, lon: p.lon, zoom: 7 });
                           }}
                           title={group.live

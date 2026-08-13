@@ -138,7 +138,14 @@ function feedImage(item) {
 }
 
 function makeLiveItem(src, item, index) {
-  const idRaw = src.key + "_" + (item.pubDate || Date.now()).toString().replace(/\W/g, "").slice(0, 16) + "_" + index;
+  /* id ต้องผูกกับ "ตัวบทความ" ไม่ใช่ลำดับในฟีด
+     ตอนนี้มีห้าฟีดใช้ key "THNEWS" ร่วมกัน ถ้าใช้ key+เวลา+ลำดับ บทความสองชิ้น
+     ที่เผยแพร่นาทีเดียวกันและอยู่ลำดับเดียวกันคนละฟีดจะได้ id ชนกัน
+     ชิ้นหนึ่งจะทับอีกชิ้นตอน merge (Map by id) และ React จะเจอ key ซ้ำ
+     ใช้แฮชของลิงก์เป็นตัวหลัก แล้วค่อยถอยไปใช้เวลา+ลำดับเมื่อไม่มีลิงก์ */
+  const idRaw = item.link
+    ? src.key + "_" + contentHash(item.link) + "_" + contentHash(item.link.slice(-40))
+    : src.key + "_" + (item.pubDate || Date.now()).toString().replace(/\W/g, "").slice(0, 16) + "_" + index;
   return {
     id: "live_" + idRaw,
     image:       feedImage(item),
@@ -331,8 +338,23 @@ async function fetchAllLiveNews() {
   const results = await Promise.allSettled(LIVE_SOURCES.map(fetchOneFeed));
   const items = [];
   results.forEach(r => { if (r.status === "fulfilled") items.push(...r.value); });
-  items.sort((a, b) => new Date(b.time) - new Date(a.time));
-  return aiSummarizeTh(items);
+
+  /* ตัดบทความซ้ำด้วย URL — query ของ THNEWS ทั้งห้าชุดตั้งใจให้คาบเกี่ยวกัน
+     (เช่น "ลักลอบ" อยู่ทั้งชุดประมงและชุดยาเสพติด) ข่าวจับกุมชิ้นเดียวจึงกลับมา
+     จากหลายฟีด ถ้าไม่ตัดออก จะโผล่ซ้ำในฟีด ปักซ้ำบนแผนที่ และกลายเป็น
+     เหตุการณ์สองรายการใน extractEventsFromNews
+     เก็บชิ้นแรกที่เจอ — ฟีดเรียงตาม LIVE_SOURCES ลำดับจึงคาดเดาได้ */
+  const byUrl = new Map();
+  const deduped = items.filter(n => {
+    const k = (n.url || "").trim();
+    if (!k || k === "#") return true;          // ไม่มีลิงก์ให้เทียบ → ปล่อยผ่าน
+    if (byUrl.has(k)) return false;
+    byUrl.set(k, true);
+    return true;
+  });
+
+  deduped.sort((a, b) => new Date(b.time) - new Date(a.time));
+  return aiSummarizeTh(deduped);
 }
 
 /* ---- localStorage cache (offline fallback) ---- */

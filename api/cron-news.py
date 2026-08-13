@@ -293,7 +293,11 @@ REGIONS = [
 ]
 
 SEV_CRIT = re.compile(r"\b(attack|attacked|missile|drone strike|explosion|struck|killed|sunk|sinking|hijack|seized|under fire|ballistic)\b", re.I)
-SEV_HIGH = re.compile(r"\b(seiz|detain|collision|capsiz|distress|piracy|pirate|smuggl|illegal fishing|incursion|intercept|boarded|sabotage|cable)\b", re.I)
+# ไม่ปิดท้ายด้วย \b — รายการนี้เป็น "รากคำ" ไม่ใช่คำเต็ม ปิดท้ายแล้ว seiz/capsiz/
+# smuggl จะไม่มีวันตรงกับอะไร (ไม่มีคำว่า "seiz") และ detain/intercept จะไม่จับ
+# detained/intercepted · เปิดท้ายไว้จึงครอบ seized · capsized · smuggling
+# (บั๊กเดียวกันกับ EV_SEV_HIGH ใน events-feed.jsx — แก้พร้อมกันให้ยังตรงกัน)
+SEV_HIGH = re.compile(r"\b(seiz|detain|collision|capsiz|distress|piracy|pirate|smuggl|illegal fishing|incursion|intercept|boarded|sabotage|cable)", re.I)
 
 THREAT_CATS = [
     ("SEARCH & RESCUE",     re.compile(r"rescue|distress|capsiz|sinking|missing|overboard|search and rescue", re.I)),

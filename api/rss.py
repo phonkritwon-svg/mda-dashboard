@@ -17,6 +17,7 @@ Vercel serverless:  GET /api/rss?url=<feed>
 from http.server import BaseHTTPRequestHandler
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -108,11 +109,34 @@ def parse_feed(xml_bytes):
     return items
 
 
+def _host_ok(url):
+    return (urllib.parse.urlparse(url).hostname or "").lower() in ALLOWED_HOSTS
+
+
+class _AllowlistedRedirect(urllib.request.HTTPRedirectHandler):
+    """ตรวจ allow-list ซ้ำทุกครั้งที่ถูก redirect
+
+    ตรวจแค่ URL ตั้งต้นไม่พอ — urllib ตาม redirect ให้อัตโนมัติ และโฮสต์ที่เรา
+    อนุญาตบางตัวก็เป็นตัว redirect เองอยู่แล้ว (news.google.com/rss/articles/…
+    เด้งไปเว็บสำนักข่าวปลายทาง) ปล่อยไว้จะกลายเป็นทางอ้อมให้ยิงโฮสต์อะไรก็ได้
+    ผ่านโดเมนของเรา ซึ่งคือสิ่งเดียวกับที่ ALLOWED_HOSTS ตั้งใจกัน
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _host_ok(newurl):
+            raise urllib.error.HTTPError(
+                newurl, code, "redirect to a host that is not allowed", headers, fp)
+        return urllib.request.HTTPRedirectHandler.redirect_request(
+            self, req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_AllowlistedRedirect())
+
+
 def handle(url):
     if not url:
         return {"status": "error", "message": "missing url", "items": []}
-    host = (urllib.parse.urlparse(url).hostname or "").lower()
-    if host not in ALLOWED_HOSTS:
+    if not _host_ok(url):
         # ปฏิเสธเงียบ ๆ ไม่บอกว่าอนุญาตโฮสต์ไหนบ้าง
         return {"status": "error", "message": "host not allowed", "items": []}
 
@@ -120,7 +144,7 @@ def handle(url):
         "User-Agent": UA,
         "Accept": "application/rss+xml, application/xml, text/xml, */*",
     })
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+    with _OPENER.open(req, timeout=TIMEOUT) as r:
         raw = r.read(3_000_000)
     return {"status": "ok", "items": parse_feed(raw)}
 
