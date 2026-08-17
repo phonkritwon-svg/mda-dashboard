@@ -443,8 +443,10 @@ function MapView({
       if (showLabels) {
         // ป้ายถาวรบอกความเก่าด้วย มิฉะนั้นเปิดโหมดป้ายแล้วยังไม่รู้ว่าหมุดไหนค้าง
         const stale = typeof v.ageSec === "number" && v.ageSec >= AIS_LOST_SEC;
+        /* bindTooltip กับสตริงถือว่าเป็น HTML — ชื่อเรือมาจากภายนอกทั้งสองทาง
+           (ช่อง ShipName ของ AIS และชื่อที่สกัดจากพาดหัวข่าว) จึงต้อง escape */
         marker.bindTooltip(
-          (v.name || v.id) + (stale ? (th ? " · ค้าง " : " · stale ") + ageText(v.ageSec, th) : ""),
+          esc((v.name || v.id) + (stale ? (th ? " · ค้าง " : " · stale ") + ageText(v.ageSec, th) : "")),
           { permanent: true, direction: "right", offset: [10, 0], className: "mda-label" }
         );
       }
@@ -562,9 +564,11 @@ function MapView({
     const icon = L.divIcon({ html: focusHtml(), className: "", iconSize: [22, 22], iconAnchor: [11, 11] });
     const m = L.marker([focus.lat, focus.lon], { icon, zIndexOffset: 1000 }).addTo(map);
     if (focus.label || focus.title) {
+      /* focus.title คือพาดหัวข่าวดิบจาก RSS (ส่งมาจาก news-detail.jsx และ
+         osint.jsx) ยัดลง innerHTML ตรง ๆ ไม่ได้ — แท็กในพาดหัวจะถูกรัน */
       m.bindPopup(
-        '<div style="font-weight:600;margin-bottom:2px">' + (focus.label || "") + "</div>" +
-        '<div style="font-size:11px;opacity:0.8">' + (focus.title || "") + "</div>"
+        '<div style="font-weight:600;margin-bottom:2px">' + esc(focus.label || "") + "</div>" +
+        '<div style="font-size:11px;opacity:0.8">' + esc(focus.title || "") + "</div>"
       ).openPopup();
     }
     const t = setTimeout(() => map.flyTo([focus.lat, focus.lon], Math.max(map.getZoom(), 5), { duration: 1.2 }), 250);
