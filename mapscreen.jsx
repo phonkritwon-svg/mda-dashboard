@@ -134,15 +134,25 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     [liveNews]
   );
 
-  /* ── AIS สดจาก Digitraffic (น่านน้ำฟินแลนด์) ────────────────────
-     เปิดเมื่อผู้ใช้กดเท่านั้น และติดป้ายบอกน่านน้ำไว้ชัด ๆ
-     เรือชุดนี้ "เคลื่อนที่จริง" แต่ไม่ใช่พื้นที่รับผิดชอบของ ศรชล.
-     จึงต้องไม่ปนกับหมุดจากข่าวจนแยกไม่ออกว่าอันไหนคืออะไร        */
-  const [dtOn, setDtOn] = useState(false);
-  const dt = window.useDigitrafficVessels ? window.useDigitrafficVessels(dtOn) : { vessels: [], moving: 0 };
+  /* ── เลือกแหล่งหมุดเรือแบบชัดเจน ────────────────────────────────
+     เดิมเป็นการเดาให้: ถ้า AISStream มีเรือก็ใช้ AIS ไม่มีก็ถอยไปใช้ข่าว
+     และปุ่มบอลติกมาทับทั้งหมด ผลคือเมื่อ AIS ทำงาน หมุดจากข่าวจะเข้าไม่ถึงเลย
+     และผู้ใช้ไม่มีทางรู้ว่ากำลังดูอะไรอยู่จนกว่าจะอ่าน HUD
 
-  const usingAis = aisVessels.length > 0;
-  const vesselSource = dtOn ? "digitraffic" : (usingAis ? "ais" : "news");
+     ตอนนี้เป็นตัวเลือกสามทางที่กดได้: ข่าว · AIS อาเซียน · AIS บอลติก
+     srcPick = null คือยังไม่เลือกเอง ให้ระบบเลือกตามที่มีจริง            */
+  const aisReady = aisVessels.length > 0;
+  const [srcPick, setSrcPick] = useState(null);
+  const vesselSource = srcPick || (aisReady ? "ais" : "news");
+  const usingAis = vesselSource === "ais";
+  const dtOn     = vesselSource === "digitraffic";
+
+  /* AIS บอลติก (Digitraffic) — ดึงเฉพาะเมื่อถูกเลือกจริง
+     hook ต้องถูกเรียกทุกครั้งตามกฎ hook แต่รับ enabled เป็น false ได้ */
+  const dt = window.useDigitrafficVessels
+    ? window.useDigitrafficVessels(dtOn)
+    : { vessels: [], moving: 0 };
+
   const vessels = dtOn ? dt.vessels : (usingAis ? aisVessels : newsVessels);
 
   // อ่านข่าวทุกชิ้น → หาพื้นที่จากเนื้อข่าว → ปักเป็นจุดบนแผนที่
@@ -338,32 +348,64 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
     </button>
   );
 
-  const aisToggleBtn = () => (
-    <button
-      className={"btn btn-sm " + (dtOn ? "btn-primary" : "btn-ghost")}
-      onClick={() => {
-        const next = !dtOn;
-        setDtOn(next);
-        if (next) {
-          /* ไปที่ปากอ่าวฟินแลนด์ (เส้นทางเข้าเฮลซิงกิ) ที่ zoom 9 ไม่ใช่
-             ภาพรวมทั้งย่าน — ที่ zoom 6 หนึ่งพิกเซลกว้างราว 2.4 กม.
-             เรือ 20 นอตขยับ 300 ม. ต่อรอบ poll จึงไม่ถึงหนึ่งพิกเซล
-             ดูเหมือนหมุดนิ่งทั้งที่ข้อมูลเปลี่ยนจริง */
-          setMapView({ lat: 59.95, lon: 24.5, zoom: 9 });
-          setRegionLabel(T("อ่าวฟินแลนด์ (AIS สด)", "Gulf of Finland (live AIS)"));
-        }
-      }}
-      title={T("เรือที่เคลื่อนที่จริงจาก Digitraffic — ครอบคลุมทะเลบอลติกตอนเหนือ ไม่ใช่อ่าวไทย",
-               "Real moving vessels from Digitraffic — northern Baltic, not the Gulf of Thailand")}>
-      <Icon name="ship" size={13} />
-      {T("AIS สด · บอลติก", "Live AIS · Baltic")}
-      {dtOn && (
-        <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
-          {dt.loading && !dt.vessels.length ? "…" : dt.moving + "▸"}
-        </span>
-      )}
-    </button>
-  );
+  /* ── ตัวเลือกแหล่งหมุดเรือ ─────────────────────────────────────
+     สามแหล่งมีความหมายต่างกันมาก จึงต้องกดเลือกเองได้ ไม่ใช่ให้ระบบสลับเงียบ ๆ
+       ข่าว        — ตำแหน่งโดยประมาณจากเนื้อข่าว ไม่ใช่เรือที่ติดตามจริง
+       AIS อาเซียน — AISStream ครอบอ่าวไทย/อันดามัน/ทะเลจีนใต้/มะละกา (เรือจริง)
+       AIS บอลติก  — Digitraffic เรือจริงแต่คนละซีกโลก ใช้เทียบ/สาธิต
+     แต่ละตัวพาแผนที่ไปที่น่านน้ำของมันเลย เพราะเลือกแล้วยังต้องเลื่อนหาเอง
+     ก็ไม่ครบงาน — และหมุดจะไม่อยู่ในจอถ้าค้างอยู่คนละภูมิภาค            */
+  const vesselSourceBtns = () => {
+    const opts = [
+      { key: "news", icon: "feed", label: T("จากข่าว", "From news"),
+        count: newsVessels.length,
+        title: T("ตำแหน่งโดยประมาณที่สกัดจากเนื้อข่าว — ไม่ใช่เรือที่ติดตามด้วย AIS",
+                 "Approximate positions inferred from reporting — not AIS-tracked vessels") },
+      { key: "ais", icon: "ship", label: T("AIS · อาเซียน", "AIS · ASEAN"),
+        count: aisVessels.length, dot: aisReady,
+        view: { lat: 6.5, lon: 103.0, zoom: 6 },
+        region: T("อ่าวไทย–มะละกา (AIS สด)", "Gulf of Thailand–Malacca (live AIS)"),
+        title: T("เรือจริงจาก AISStream — ครอบอ่าวไทย อันดามัน ทะเลจีนใต้ และมะละกา",
+                 "Real vessels from AISStream — Gulf of Thailand, Andaman, South China Sea, Malacca") },
+      { key: "digitraffic", icon: "ship", label: T("AIS · บอลติก", "AIS · Baltic"),
+        count: dtOn ? dt.vessels.length : null,
+        view: { lat: 59.95, lon: 24.5, zoom: 9 },
+        region: T("อ่าวฟินแลนด์ (AIS สด)", "Gulf of Finland (live AIS)"),
+        title: T("เรือจริงจาก Digitraffic — ทะเลบอลติกตอนเหนือ ไม่ใช่พื้นที่ ศรชล.",
+                 "Real vessels from Digitraffic — northern Baltic, outside Thai-MECC's area") },
+    ];
+    return (
+      <div className="row" style={{ gap: 4 }}>
+        {opts.map(o => {
+          const on = vesselSource === o.key;
+          return (
+            <button key={o.key} title={o.title}
+              className={"btn btn-sm " + (on ? "btn-primary" : "btn-ghost")}
+              onClick={() => {
+                setSrcPick(o.key);
+                if (o.view) { setMapView(o.view); setRegionLabel(o.region); }
+              }}>
+              <Icon name={o.icon} size={13} />{o.label}
+              {o.dot && !on && (
+                <span style={{
+                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                  background: "var(--ok)", marginLeft: 4,
+                }} title={T("มีข้อมูลสดพร้อมใช้", "live data available")} />
+              )}
+              {on && o.count !== null && (
+                <span className="mono" style={{ opacity: 0.75, marginLeft: 4 }}>
+                  {o.key === "digitraffic" && dt.loading && !dt.vessels.length ? "…" : o.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ชื่อเดิม — ชุดปุ่มลอยในโหมดเต็มจอเรียกใช้ตัวนี้
+  const aisToggleBtn = vesselSourceBtns;
 
   return (
     <div className="screen"
