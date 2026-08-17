@@ -786,8 +786,12 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
             </div>
           </div>
 
-          {/* legend */}
-          <div className="map-hud map-legend">
+          {/* legend — โหมดเต็มจอมีความสูงทั้งจอให้ใช้ ไม่ใช่แค่ความสูงแผง
+              เพดาน 46vh ที่ตั้งไว้กันตำนานชนแถบสถิติจึงแคบเกินจำเป็นตรงนั้น
+              และทำให้คำอธิบายจุดข่าวท้ายรายการถูกตัดหายไปโดยไม่มีอะไรบอก
+              เต็มจอเว้นที่ให้แถบสถิติด้านบน (~65px) กับขอบล่างแล้วใช้ที่เหลือทั้งหมด */}
+          <div className="map-hud map-legend"
+            style={fullscreen ? { maxHeight: "calc(100vh - 150px)" } : null}>
             {Object.entries(window.VTYPE).map(([k, vt]) => (
               <div className="legend-row" key={k}>
                 <span className="sym">
