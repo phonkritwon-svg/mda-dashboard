@@ -449,6 +449,10 @@ body {
   left: 12px; bottom: 12px; background: rgba(7,10,15,0.82); backdrop-filter: blur(6px);
   border:1px solid var(--border); border-radius: 8px; padding: 9px 11px; font-size: var(--fs-xs);
   display:flex; flex-direction:column; gap:6px;
+  /* 9 ประเภทเรือ + 9 ด้านภัยคุกคาม ทำให้ตำนานสูงเกินครึ่งจอ และเพราะยึด
+     bottom ไว้ มันจะโตขึ้นบนไปชนแถบสถิติมุมซ้ายบนเมื่อหน้าต่างเตี้ย
+     คุมเพดานแล้วให้เลื่อนดูข้างในแทน */
+  max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
 }
 [data-theme="light"] .map-legend { background: rgba(255,255,255,0.88); }
 .legend-row { display:flex; align-items:center; gap:7px; color: var(--text-dim); }

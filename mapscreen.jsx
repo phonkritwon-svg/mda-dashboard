@@ -816,14 +816,48 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
               </span>
               {T("ขาดสัญญาณ / ตำแหน่งค้าง", "Signal lost / stale")}
             </div>
-            <div className="legend-row">
-              <span className="sym">
-                <svg width="12" height="12" viewBox="0 0 12 12">
-                  <circle cx="6" cy="6" r="5" fill="#5fb0c9" opacity="0.22" />
-                  <circle cx="6" cy="6" r="2.5" fill="#5fb0c9" />
-                </svg>
-              </span>
-              {T("จุดข่าว", "News")}
+            {/* ── จุดข่าว: สีบอกด้านภัยคุกคาม ─────────────────────────
+                เดิมมีแถวเดียวสีฟ้าคงที่ ซึ่งไม่ตรงกับที่วาดจริง — จุดข่าว
+                ใช้สีตามด้านภัยคุกคาม 9 ด้านของ ศรชล. ส่วนสีฟ้าเป็นแค่ค่า
+                สำรองเมื่อจับด้านไม่ได้ คนอ่านแผนที่จึงไม่มีทางรู้ว่าสีหมายถึงอะไร
+
+                วางเป็นตารางสองคอลัมน์ ไม่ใช่แถวละบรรทัด เพราะ 9 ด้านต่อท้าย
+                ประเภทเรืออีก 9 แถวจะทำให้ legend สูงเกินครึ่งจอ            */}
+            <div style={{
+              marginTop: 3, paddingTop: 6,
+              borderTop: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
+            }}>
+              <div className="dim" style={{ fontSize: 9, letterSpacing: ".06em", marginBottom: 5 }}>
+                {T("จุดข่าว — สีตามด้านภัยคุกคาม", "News dots — by threat domain")}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 10px" }}>
+                {(window.MDA_THREAT_DOMAINS || []).map(d => (
+                  <div key={d.key} className="legend-row" style={{ gap: 5 }}
+                    title={lang === "th" ? d.th : d.en}>
+                    <span className="sym" style={{ width: 12 }}>
+                      {/* วงกลมทึบ + วงกระเพื่อมจาง — รูปเดียวกับ newsHtml() บนแผนที่ */}
+                      <svg width="11" height="11" viewBox="0 0 12 12">
+                        <circle cx="6" cy="6" r="5" fill={d.color} opacity="0.22" />
+                        <circle cx="6" cy="6" r="2.5" fill={d.color} />
+                      </svg>
+                    </span>
+                    <span style={{
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      maxWidth: 108,
+                    }}>{lang === "th" ? d.th : d.en}</span>
+                  </div>
+                ))}
+                <div className="legend-row" style={{ gap: 5 }}
+                  title={T("ข่าวที่จับด้านภัยคุกคามไม่ได้", "Reporting with no domain matched")}>
+                  <span className="sym" style={{ width: 12 }}>
+                    <svg width="11" height="11" viewBox="0 0 12 12">
+                      <circle cx="6" cy="6" r="5" fill="#5fb0c9" opacity="0.22" />
+                      <circle cx="6" cy="6" r="2.5" fill="#5fb0c9" />
+                    </svg>
+                  </span>
+                  <span>{T("ไม่ระบุด้าน", "Unclassified")}</span>
+                </div>
+              </div>
             </div>
           </div>
 
