@@ -114,14 +114,16 @@ function MapScreen({ data, lang, onNav, initial, showToast, addEvent }) {
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [visible, setVisible] = useState({
-    cargo: true, tanker: true, fishing: true, navy: true, unknown: true, dark: true,
+    cargo: true, tanker: true, fishing: true, navy: true, passenger: true, tug: true,
+    other: true, unknown: true, dark: true,
     incidents: true,   // จุดเหตุการณ์จากข่าวบนแผนที่
     news: true,        // จุดข่าวทั้งหมดที่ระบุพื้นที่ได้
   });
   const [layers, setLayers] = useState({ tracks: true, labels: false, sweep: true, lanes: true });
   const toggle = (k) => setLayers(l => ({ ...l, [k]: !l[k] }));
   const toggleVis = (k) => setVisible(s => ({ ...s, [k]: !s[k] }));
-  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val, unknown: val, dark: val, incidents: val, news: val });
+  const setAllVis = (val) => setVisible({ cargo: val, tanker: val, fishing: val, navy: val,
+    passenger: val, tug: val, other: val, unknown: val, dark: val, incidents: val, news: val });
 
   const { news: liveNews } = window.useNewsUpdater(data.news);
 

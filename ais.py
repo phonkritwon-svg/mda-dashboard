@@ -53,17 +53,28 @@ def ship_type_to_kind(t):
         t = int(t)
     except (TypeError, ValueError):
         return "unknown"
+
+    # ตาราง ITU-R M.1371 — ครอบให้ครบ ไม่ปล่อยรหัสที่รู้ความหมายแล้วตกเป็น unknown
+    # ของเดิมคืน unknown ให้ 20-29, 31-34, 36-37, 40-59, 90-99 ทั้งที่รับรหัสมาแล้ว
+    # ทำให้เรือ 3 ใน 4 ลำขึ้นว่าไม่ทราบประเภททั้งที่ข้อมูลอยู่ในมือ
     if t == 30:
-        return "fishing"                    # 30 = ประมง
+        return "fishing"                        # 30 ประมง
+    if t in (31, 32, 52):
+        return "tug"                            # ลากจูง · เรือลาก
     if t in (35, 51, 55):
-        return "navy"                       # ทหาร · ค้นหาช่วยเหลือ · บังคับใช้กฎหมาย
-    if 60 <= t <= 69:
-        return "cargo"                      # เรือโดยสาร — แสดงรวมกับเรือสินค้า
+        return "navy"                           # ทหาร · ค้นหาช่วยเหลือ · บังคับใช้กฎหมาย
+    if 40 <= t <= 49 or 60 <= t <= 69:
+        # 40-49 เรือความเร็วสูง (ส่วนใหญ่คือเรือเฟอร์รี) · 60-69 เรือโดยสาร
+        # แยกจากเรือสินค้าเพราะมีคนอยู่บนเรือ — สำคัญกว่าเมื่อเกิดเหตุต้องช่วยเหลือ
+        return "passenger"
     if 70 <= t <= 79:
         return "cargo"
     if 80 <= t <= 89:
         return "tanker"
-    return "unknown"
+    if (20 <= t <= 29) or t in (33, 34, 36, 37, 50, 53, 54, 56, 57, 58, 59) or (90 <= t <= 99):
+        # รู้ว่าเป็นอะไร แต่ไม่เข้าหมวดที่แผนที่แยกสี — ยังดีกว่าบอกว่าไม่ทราบ
+        return "other"
+    return "unknown"                            # 0 หรือรหัสนอกตาราง = ไม่ได้ระบุจริง ๆ
 
 
 def _put(mmsi, patch):
@@ -104,7 +115,9 @@ def _handle(msg):
 
     elif mtype == "ShipStaticData":
         sd = (msg.get("Message") or {}).get("ShipStaticData") or {}
-        patch = {"type": ship_type_to_kind(sd.get("Type"))}
+        # เก็บรหัสดิบไว้ด้วย — ใช้ตรวจว่าที่ขึ้น "ไม่ทราบประเภท" คือไม่ได้รับข้อมูล
+        # หรือรับมาแล้วแต่เราแปลงไม่ได้ สองกรณีนี้แก้ไม่เหมือนกัน
+        patch = {"type": ship_type_to_kind(sd.get("Type")), "typeRaw": sd.get("Type")}
         if sd.get("Name"):
             patch["name"] = sd["Name"].strip()
         if sd.get("ImoNumber"):

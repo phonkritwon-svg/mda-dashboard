@@ -33,9 +33,13 @@ function dtShipKind(t) {
   const n = parseInt(t, 10);
   if (!isFinite(n)) return "unknown";
   if (n === 30) return "fishing";
+  if (n === 31 || n === 32 || n === 52) return "tug";
   if (n === 35 || n === 51 || n === 55) return "navy";
-  if (n >= 60 && n <= 79) return "cargo";
+  if ((n >= 40 && n <= 49) || (n >= 60 && n <= 69)) return "passenger";
+  if (n >= 70 && n <= 79) return "cargo";
   if (n >= 80 && n <= 89) return "tanker";
+  if ((n >= 20 && n <= 29) || (n >= 90 && n <= 99)
+      || [33, 34, 36, 37, 50, 53, 54, 56, 57, 58, 59].indexOf(n) >= 0) return "other";
   return "unknown";
 }
 
