@@ -181,7 +181,8 @@ function SearchPalette({ open, onClose, lang, data, onNav }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
+      // 920: เหนือแผนที่เต็มจอ (890) · ต่ำกว่า Toast (999)
+      position: "fixed", inset: 0, zIndex: 920,
       background: "rgba(0,0,0,0.65)",
       display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 72,
     }} onClick={onClose}>

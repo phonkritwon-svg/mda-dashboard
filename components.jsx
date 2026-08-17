@@ -362,6 +362,21 @@ function isThaiDomestic(text) {
    อยู่ที่ components.jsx เพราะทั้งทูลทิปบนแผนที่ ฟีดข่าวข้างเต็มจอ และ
    หน้ารายละเอียดเหตุการณ์ ต้องแสดงที่มาให้ตรงกัน — เขียนแยกกันเมื่อไร
    ก็จะมีหน้าใดหน้าหนึ่งขึ้นว่า "ในประเทศ (Google News)" ค้างอยู่          */
+/* ── กล่องซ้อนทับต้อง render ที่ document.body เสมอ ────────────────────
+   z-index อย่างเดียวไม่พอ: element ที่มี transform / filter / contain
+   จะสร้าง stacking context ใหม่ และ position:fixed ที่อยู่ข้างในจะถูกขัง
+   อยู่ในบริบทนั้น แข่ง z-index ได้แค่กับพี่น้องในกล่องเดียวกัน
+
+   ของจริงที่เจอ: แถบเครื่องมือหน้าแผนที่ตั้ง translateY(-6px) ตอนเข้าเต็มจอ
+   กล่อง "เพิ่มเหตุการณ์" ที่อยู่ใต้แถบนั้นจึงโดนแผนที่ (z 890) ทับ
+   แม้จะตั้ง z 920 ให้แล้วก็ตาม
+
+   portal ยกออกไปนอกทุกบริบท ทำให้ z-index มีความหมายตามที่เขียนจริง ๆ */
+function ModalPortal({ children }) {
+  if (!window.ReactDOM || !window.ReactDOM.createPortal) return children;  // กันพลาดถ้า ReactDOM ยังไม่พร้อม
+  return window.ReactDOM.createPortal(children, document.body);
+}
+
 function splitGoogleNewsOutlet(title, outlet) {
   const t = title || "";
   if (!/google news/i.test(outlet || "")) return { head: t, outlet: outlet || "" };
@@ -420,5 +435,5 @@ Object.assign(window, {
   TimeScopeBar, timeWindow, inTimeWindow,
   FOCUS_COUNTRIES, FOCUS_RE, focusCountryOf, focusPartition, FocusToggle, FocusGroupLabel,
   TH_RE, TH_PROVINCE_RE, isThaiDomestic,
-  splitGoogleNewsOutlet,
+  splitGoogleNewsOutlet, ModalPortal,
 });

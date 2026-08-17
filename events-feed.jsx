@@ -680,8 +680,13 @@ function AddEventModal({ open, onClose, lang, addEvent, showToast }) {
     }
   };
 
+  /* ModalPortal ยกกล่องออกไป render ที่ document.body — จำเป็น ไม่ใช่ทางเลือก
+     เพราะแถบเครื่องมือหน้าแผนที่ตั้ง transform ไว้ตอนเข้าเต็มจอ ซึ่งสร้าง
+     stacking context ขังกล่องนี้ไว้ข้างใน z-index เท่าไรก็ไม่ชนะแผนที่
+     z 920: เหนือแผนที่เต็มจอ (890) · ต่ำกว่า Toast (999) ให้ข้อความยืนยันยังเห็น */
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.6)",
+    <window.ModalPortal>
+    <div style={{ position: "fixed", inset: 0, zIndex: 920, background: "rgba(0,0,0,0.6)",
       display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div style={{ width: 460, maxWidth: "92vw", background: "var(--surface-2)",
         border: "1px solid var(--border-2)", borderRadius: 12, overflow: "hidden",
@@ -770,6 +775,7 @@ function AddEventModal({ open, onClose, lang, addEvent, showToast }) {
         </div>
       </div>
     </div>
+    </window.ModalPortal>
   );
 }
 

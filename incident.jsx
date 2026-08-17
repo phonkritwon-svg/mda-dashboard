@@ -142,7 +142,8 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
       {/* Assign Modal */}
       {assignOpen && (
         <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
+          // 920: เหนือแผนที่เต็มจอ (890) · ต่ำกว่า Toast (999)
+          position: "fixed", inset: 0, zIndex: 920,
           background: "rgba(0,0,0,0.6)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }} onClick={() => setAssignOpen(false)}>
