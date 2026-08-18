@@ -415,3 +415,15 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+
+# GitHub Actions (.github/workflows/daily-news.yml) รันไฟล์นี้เป็นสคริปต์ตรง ๆ
+# ไม่ได้ผ่าน handler ข้างบน — ถ้าไม่มีบล็อกนี้ ไฟล์จะแค่ประกาศฟังก์ชันแล้วจบ
+# ด้วย exit code 0 ทำให้ workflow ขึ้นเขียวทุกวันโดยไม่ได้ดูดข่าวเลยสักข่าว
+if __name__ == "__main__":
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise SystemExit("missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY env")
+    result, status_code = run()
+    print(json.dumps(result, ensure_ascii=False))
+    # ต้องคืน exit code ที่ไม่ใช่ 0 เมื่อพัง ไม่งั้น workflow จะรายงานสำเร็จทั้งที่ล้มเหลว
+    raise SystemExit(0 if status_code == 200 else 1)
