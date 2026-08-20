@@ -18,8 +18,28 @@ ENV: AISSTREAM_API_KEY  (ขอฟรีที่ https://aisstream.io/authentic
 
 import json
 import os
+import sys
 import threading
 import time
+
+
+def _log(*parts):
+    """พิมพ์ log โดยไม่ให้ encoding ของคอนโซลฆ่าเธรด
+
+    คอนโซล Windows เป็น cp1252 ข้อความไทยจึงโยน UnicodeEncodeError
+    prints ด้านล่างอยู่ใน except ของลูปต่อใหม่ ถ้าปล่อยให้ข้อยกเว้นหลุด
+    ออกไป ลูปจะจบและเธรด AIS ตายถาวรตั้งแต่การเชื่อมต่อล้มครั้งแรก —
+    เท่ากับไม่มีการต่อใหม่อีกเลยทั้งที่โค้ด backoff เขียนไว้ครบ
+    """
+    msg = " ".join(str(x) for x in parts)
+    try:
+        print(msg)
+    except Exception:
+        try:
+            sys.stdout.buffer.write(msg.encode("utf-8", "replace") + b"\n")
+            sys.stdout.buffer.flush()
+        except Exception:
+            pass
 
 # ── พื้นที่ที่ติดตาม (ครอบคลุมน่านน้ำไทยและอาเซียน + ช่องแคบสำคัญ) ──
 # รูปแบบ [[lat_ใต้, lon_ตะวันตก], [lat_เหนือ, lon_ตะวันออก]]
@@ -174,7 +194,7 @@ def _run(api_key):
             # ถ้าตั้ง connected=True ตรงนี้ หน้าเว็บจะขึ้นเขียวทั้งที่ไม่มีข้อมูลไหลเลย
             _state["error"] = None
             _state["since"] = time.time()
-            print("[MDA] AIS: เปิดช่องสัญญาณแล้ว รอข้อมูลชุดแรก…")
+            _log("[MDA] AIS: เปิดช่องสัญญาณแล้ว รอข้อมูลชุดแรก…")
 
             while True:
                 raw = ws.recv()
@@ -182,12 +202,12 @@ def _run(api_key):
                     # ปิดแบบสุภาพ ไม่โยน exception — ต้องบันทึกเหตุเอง
                     # มิฉะนั้นหน้าเว็บจะไม่มีทางรู้ว่าสตรีมหยุดไปแล้ว
                     _state["error"] = "สตรีมถูกปิดโดยเซิร์ฟเวอร์"
-                    print("[MDA] AIS: เซิร์ฟเวอร์ปิดสตรีม · ต่อใหม่ใน", backoff, "วิ")
+                    _log("[MDA] AIS: เซิร์ฟเวอร์ปิดสตรีม · ต่อใหม่ใน", backoff, "วิ")
                     break
                 if not _state["connected"]:
                     _state["connected"] = True
                     backoff = 3          # รีเซ็ตเมื่อ "ได้ข้อมูลจริง" เท่านั้น
-                    print("[MDA] AIS: ได้รับข้อมูลแล้ว — คีย์ใช้งานได้")
+                    _log("[MDA] AIS: ได้รับข้อมูลแล้ว — คีย์ใช้งานได้")
                 try:
                     _handle(json.loads(raw))
                 except Exception:
@@ -200,10 +220,10 @@ def _run(api_key):
             # ถ้าถอยแค่ระดับเดิมจะยิงซ้ำจนหน้าต่างลงโทษไม่มีวันหมด
             if "429" in msg:
                 backoff = max(backoff, 120)
-                print("[MDA] AIS: ถูกจำกัดอัตรา (429) — ต่อถี่เกินไป "
+                _log("[MDA] AIS: ถูกจำกัดอัตรา (429) — ต่อถี่เกินไป "
                       "หรือมีอีกโปรเซสถือคีย์เดียวกันอยู่ · รอ", backoff, "วิ")
             else:
-                print("[MDA] AIS: หลุดการเชื่อมต่อ —", msg[:120], "· ต่อใหม่ใน", backoff, "วิ")
+                _log("[MDA] AIS: หลุดการเชื่อมต่อ —", msg[:120], "· ต่อใหม่ใน", backoff, "วิ")
         finally:
             # ทุกทางออกจาก try แปลว่าไม่มีข้อมูลไหลแล้ว — ต้องล้างสถานะที่นี่
             # ไม่ใช่ใน except อย่างเดียว เพราะการปิดแบบสุภาพ (recv คืนค่าว่าง)
@@ -231,7 +251,7 @@ def start(api_key=None):
         import websocket  # noqa: F401
     except ImportError:
         _state["error"] = "ยังไม่ได้ติดตั้ง websocket-client (pip install websocket-client)"
-        print("[MDA] AIS:", _state["error"])
+        _log("[MDA] AIS:", _state["error"])
         return False
     _state["started"] = True
     threading.Thread(target=_run, args=(key,), daemon=True).start()
