@@ -20,6 +20,7 @@ import re
 import hashlib
 import urllib.request
 import urllib.parse
+import urllib.error
 
 ITEMS_PER_FEED    = 4    # ดึงกี่ข่าวต่อแหล่ง
 FEED_TIMEOUT      = 6    # วินาที ต่อการดึง 1 feed
@@ -252,8 +253,36 @@ def upsert_table(table, rows):
             "Content-Type":  "application/json",
             "Prefer":        "resolution=merge-duplicates,return=minimal",
         })
-    with urllib.request.urlopen(req, timeout=25) as r:
-        return r.status
+    try:
+        with urllib.request.urlopen(req, timeout=25) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        # PostgREST อธิบายสาเหตุไว้ใน body เสมอ (code/message/details) แต่ urllib
+        # ทิ้งมันไปเหลือแค่ "HTTP Error 500" ซึ่งบอกไม่ได้ว่าคอลัมน์ผิด สิทธิ์ไม่พอ
+        # หรือ id ซ้ำในชุดเดียวกัน — สามอย่างนี้แก้คนละทางโดยสิ้นเชิง
+        try:
+            detail = e.read().decode("utf-8", "replace")[:400]
+        except Exception:
+            detail = "(no body)"
+        raise RuntimeError("supabase %s %s: %s" % (table, e.code, detail)) from None
+
+
+def dedupe_by_id(rows):
+    """เก็บแถวแรกของแต่ละ id — คำสั่ง upsert เดียวมี id ซ้ำไม่ได้
+
+    ฟีดหลายชุดใช้ key เดียวกัน (THNEWS 4 คิวรี, DIP 2 ฟีด) และคิวรี Google News
+    ทับซ้อนกันมาก ข่าวเดียวกันจึงโผล่ได้หลายรอบในการดึงครั้งเดียว พอ id เป็น
+    hash ของลิงก์ สองแถวนั้นจะมี id เท่ากัน
+
+    PostgreSQL ปฏิเสธทั้งคำสั่งด้วย 21000 "ON CONFLICT DO UPDATE command cannot
+    affect row a second time" แล้ว PostgREST แปลงเป็น HTTP 500 ผลคือข่าว
+    ทั้งชุดไม่เข้าเลย ไม่ใช่แค่แถวที่ซ้ำ — คอมเมนต์ที่ SOURCES เขียนไว้ว่า
+    "ถูกรวมด้วย hash ของลิงก์" อธิบายเจตนา แต่การรวมไม่เคยเกิดขึ้นจริง
+    """
+    seen = {}
+    for r in rows:
+        seen.setdefault(r["id"], r)
+    return list(seen.values())
 
 
 def upsert(rows):
@@ -367,11 +396,12 @@ def run():
         return {"ok": False, "reason": "no_articles"}, 502
     arts = translate_all(arts)
     translated = sum(1 for a in arts if a.get("title_th"))
-    rows = [to_row(a) for a in arts]
+    rows = dedupe_by_id([to_row(a) for a in arts])
     status = upsert(rows)
 
     # สร้างเหตุการณ์จากข่าวภัยสูงที่ระบุพื้นที่ได้
-    event_rows = [r for r in (to_event_row(a) for a in arts) if r]
+    # id ของเหตุการณ์ก็เป็น hash ของลิงก์เหมือนกัน จึงซ้ำได้ด้วยเหตุผลเดียวกัน
+    event_rows = dedupe_by_id([r for r in (to_event_row(a) for a in arts) if r])
     events_status = None
     if event_rows:
         try:
