@@ -5,8 +5,12 @@
 ```
 หน้าเว็บ (static: index.html + *.jsx คอมไพล์ในเบราว์เซอร์ด้วย Babel)
    │
-   ├─→ Supabase  (ตาราง news / events / profiles + Auth)   ← เรียกตรงจากเบราว์เซอร์
-   ├─→ Digitraffic REST (ตำแหน่งเรือ AIS จริง)              ← เรียกตรง เปิด CORS
+   ├─→ Supabase  (news / events / profiles / vessels + Auth)  ← เรียกตรงจากเบราว์เซอร์
+   ├─→ Digitraffic REST (เรือ AIS บอลติก)                    ← เรียกตรง เปิด CORS
+   │
+   ├─→ GitHub Actions
+   │      daily-news.yml   ดูดข่าวเข้า Supabase (รายวัน)
+   │      ais-vessels.yml  เก็บตำแหน่งเรือ AIS อาเซียนเข้า Supabase (ทุก 30 นาที)
    │
    └─→ Vercel Python serverless functions
           /api/summarize   แปล/ย่อข่าวเป็นไทย
@@ -41,9 +45,9 @@ header `Authorization: Bearer <ค่า>` ก่อนรัน และ Verce
 
 ### ตัวที่ **ไม่ต้อง** ใส่บน Vercel
 
-- **`AISSTREAM_API_KEY`** — `ais.py` ต่อ AISStream ด้วย WebSocket ซึ่ง serverless ถือ connection
-  ค้างไม่ได้ บน production หน้าเว็บจึงเรียก Digitraffic REST ตรงแทน (ดู `ais-live.jsx`)
-  คีย์นี้ใช้เฉพาะตอนรัน `python server.py` ในเครื่อง
+- **`AISSTREAM_API_KEY`** — serverless ถือ WebSocket ค้างไม่ได้ คีย์นี้จึงไม่มีประโยชน์บน Vercel
+  แต่ **ต้องใส่ใน GitHub Secrets** เพราะ `ais_collect.py` ใช้ (ดูหัวข้อ AIS ท้ายไฟล์)
+  ตอนรัน `python server.py` ในเครื่องก็ใช้คีย์นี้จาก `.env`
 - **Supabase URL + anon key ฝั่งหน้าเว็บ** — hardcode อยู่ใน `supabase-client.js` แล้ว
   anon key เป็นคีย์สาธารณะโดยการออกแบบ ปลอดภัยเพราะเปิด RLS ไว้ (ดู `supabase-rls.sql`)
 
@@ -103,9 +107,52 @@ python server.py
 |---|---|
 | `supabase/schema.sql` | ตาราง `news`, `profiles` |
 | `supabase/events.sql` | ตาราง `events` |
+| `supabase/vessels.sql` | ตาราง `vessels` + RLS (ตำแหน่งเรือ AIS) |
 | `supabase-rls.sql` | **นโยบาย RLS ทุกตาราง — ต้องรันแล้วเท่านั้น anon key ถึงจะปลอดภัย** |
 | `supabase/news_write_policy.sql`<br>`supabase/lock_write_policy.sql` | สิทธิ์เขียน |
 | `supabase/realtime_enable.sql` | เปิด realtime |
 
 รันผ่าน Supabase → **SQL Editor** ตรวจสถานะด้วยคิวรีท้ายไฟล์ `supabase-rls.sql`
 — `rls_enabled` ต้องเป็น `true` ทุกตาราง
+
+---
+
+## AIS — เรืออาเซียนขึ้นบนเว็บจริงได้อย่างไร
+
+### ทำไมต้องอ้อมผ่าน Supabase
+
+`ais.py` เปิด WebSocket ค้างไว้แล้วสะสมตำแหน่งเรือในหน่วยความจำ ซึ่ง serverless
+ทำไม่ได้ — Vercel function มีอายุไม่กี่วินาทีและไม่แชร์หน่วยความจำกัน
+
+> ⚠️ `/api/vessels` **ไม่เคยมีอยู่บน Vercel** — มีแต่ใน `server.py` สำหรับรันในเครื่อง
+> บนลิงก์จริงจึงไม่เคยมีเรือขึ้นเลยนับตั้งแต่แรก
+
+### ทางแก้ที่ใช้อยู่
+
+```
+GitHub Actions (ทุก 30 นาที)
+   └─ ais_collect.py — เปิดสตรีม ~50 วิ → upsert ลงตาราง vessels
+                                       ↓
+หน้าเว็บ — useLiveVessels() อ่านจาก Supabase ทุก 60 วิ
+```
+
+ตำแหน่งเก่าได้ถึง ~30 นาที เหมาะกับภาพรวมสถานการณ์ ไม่ใช่การติดตามเรือแบบวินาทีต่อวินาที
+ถ้าต้องการสดจริง ต้องย้าย `ais.py` ไปรันเป็น worker ถาวรบน host ที่ถือ process ได้
+
+หน้าเว็บเลือกแหล่งเอง: ยิง `/api/vessels` ก่อน ถ้าติด (รันในเครื่อง) ใช้ค่าจากสตรีมสด
+ถ้า 404 (บน Vercel) อ่านจาก Supabase แทน — ตรวจครั้งเดียวตอนเริ่มแล้วจำไว้
+
+### ติดตั้งครั้งแรก
+
+1. Supabase → SQL Editor → รัน `supabase/vessels.sql` ทั้งไฟล์
+2. GitHub → Settings → Secrets → Actions → เพิ่ม `AISSTREAM_API_KEY`
+   (ต้องมี `SUPABASE_URL` กับ `SUPABASE_SERVICE_ROLE_KEY` อยู่แล้วด้วย)
+3. Actions → **AIS Vessels Collect** → **Run workflow** ทดสอบรอบแรก
+
+### ถ้า workflow ล้มด้วย 429
+
+AISStream ให้ **1 connection ต่อคีย์** ถ้ามีอีกโปรเซสถือคีย์เดียวกันอยู่
+(เช่น `python server.py` ที่เปิดค้างไว้ในเครื่อง) หรือต่อถี่เกินไป จะโดน 429 ทั้งสองฝั่ง
+— ปิดตัวที่ค้างอยู่ก่อนแล้วรอหน้าต่างลงโทษหมด
+
+`concurrency` ใน workflow กันสองรอบทับกันไว้แล้ว แต่กันโปรเซสนอก GitHub ไม่ได้

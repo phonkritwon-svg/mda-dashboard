@@ -1,0 +1,44 @@
+name: AIS Vessels Collect
+
+# ทุก 30 นาที — ถี่กว่านี้จะกินโควตา Actions ของแผนฟรีเกินตัว
+# (รอบละ ~1.5 นาที × 48 รอบ/วัน ≈ 2,160 นาที/เดือน จากโควตา 2,000 ยังพอดีตัว
+#  ถ้าเกินให้ขยับเป็น */45 หรือ 0,30 * * * *)
+#
+# ⚠ ตารางเวลาของ GitHub Actions เป็น best-effort อาจคลาดไปหลายนาทีในช่วงที่คนใช้เยอะ
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+# กันไม่ให้สองรอบทับกัน — AISStream ให้ 1 connection ต่อคีย์
+# ถ้ารอบใหม่เปิดสตรีมขณะรอบเก่ายังถือไว้ จะโดน 429 ทั้งคู่
+concurrency:
+  group: ais-vessels
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ติดตั้งตรงนี้แทนที่จะใส่ใน requirements.txt เพราะไฟล์นั้น Vercel
+      # ใช้ build ทุก serverless function — ไม่มีเหตุผลให้ทุกฟังก์ชันแบก
+      # websocket-client ที่ไม่ได้ใช้
+      - name: Install websocket-client
+        run: pip install websocket-client
+
+      - name: Collect AIS positions
+        env:
+          AISSTREAM_API_KEY:         ${{ secrets.AISSTREAM_API_KEY }}
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          COLLECT_SECONDS: "50"
+        run: python ais_collect.py

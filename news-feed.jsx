@@ -562,30 +562,121 @@ function useNewsUpdater(baseNews) {
 }
 
 /* ============================================================
-   AIS สด — ดึงตำแหน่งเรือจริงจากเซิร์ฟเวอร์ (/api/vessels)
-   เซิร์ฟเวอร์เป็นผู้ถือ AISSTREAM_API_KEY และเปิด WebSocket ค้างไว้
-   หน้าเว็บแค่มาดึงภาพรวมล่าสุดทุก 15 วินาที → หมุดขยับตามเรือจริง
+   AIS สด — ตำแหน่งเรือจริงในอ่าวไทย/อันดามัน/ทะเลจีนใต้/มะละกา
+
+   มีสองแหล่งที่ให้ข้อมูลชุดเดียวกัน เลือกอัตโนมัติตามที่รันอยู่:
+
+     /api/vessels  มีเฉพาะตอนรัน python server.py ในเครื่อง — server.py ถือ
+                   WebSocket ของ AISStream ไว้เอง ข้อมูลจึงสดที่สุด
+     Supabase      ตาราง vessels ที่ GitHub Actions เก็บมาพักไว้ทุก ~30 นาที
+                   เป็นทางเดียวที่ใช้ได้บนเว็บจริง เพราะ serverless ถือ
+                   WebSocket ค้างไม่ได้ และ /api/vessels ไม่เคยมีอยู่บน Vercel
+
+   ตรวจแหล่งครั้งเดียวตอนเริ่มแล้วจำไว้ ไม่ยิง /api/vessels ซ้ำทุกรอบเพื่อรับ
+   404 เปล่า ๆ บน production
    ============================================================ */
-const AIS_POLL_MS = 15000;
+const AIS_POLL_MS     = 60000;  // ข้อมูลเปลี่ยนทุก ~30 นาที ไม่ต้องถี่กว่านี้
+const AIS_MAX_AGE_MIN = 90;     // ยอมให้ตัวเก็บพลาดได้ 2 รอบก่อนถือว่าข้อมูลตาย
+
+/* ตาราง vessels ใช้ snake_case ส่วนหมุดบนแผนที่ใช้ camelCase แบบเดียวกับ
+   ais-live.jsx (Digitraffic) — สองแหล่งต้องคืนรูปร่างเดียวกัน ไม่งั้นเรือ
+   ลำเดียวกันจะแสดงผลต่างกันเมื่อผู้ใช้สลับแหล่ง */
+function vesselRowToVessel(r) {
+  const t = new Date(r.updated_at).getTime();
+  const ageSec = isNaN(t) ? 0 : Math.max(0, Math.round((Date.now() - t) / 1000));
+  return {
+    id:      r.id,
+    mmsi:    r.mmsi,
+    name:    r.name || ("MMSI " + r.mmsi),
+    lat:     r.lat,
+    lon:     r.lon,
+    course:  r.course || 0,
+    sp:      r.sp || 0,
+    heading: r.heading,
+    navStat: r.nav_stat,
+    type:    r.type || "unknown",
+    typeRaw: r.type_raw,
+    imo:     r.imo || null,
+    dest:    r.dest || "",
+    ageSec:  ageSec,
+    flag:    "",
+    status:  "normal",
+  };
+}
+
+async function fetchVesselsFromSupabase() {
+  const SB = window.MDA_SB;
+  if (!SB) return { vessels: [], error: "ยังไม่ได้เชื่อมต่อ Supabase" };
+  const sinceISO = new Date(Date.now() - AIS_MAX_AGE_MIN * 60000).toISOString();
+  try {
+    const { data, error } = await SB
+      .from("vessels").select("*")
+      .gte("updated_at", sinceISO)
+      .order("updated_at", { ascending: false })
+      .limit(1000);
+    if (error) return { vessels: [], error: error.message };
+    return { vessels: (data || []).map(vesselRowToVessel), error: null };
+  } catch (e) {
+    return { vessels: [], error: String(e && e.message || e) };
+  }
+}
 
 function useLiveVessels() {
   const [vessels, setVessels] = React.useState([]);
   const [ais, setAis] = React.useState({ connected: false, error: null, count: 0 });
+  const source = React.useRef(null);   // null = ยังไม่ได้ตรวจ | "server" | "supabase"
 
   React.useEffect(() => {
     let alive = true;
-    const pull = async () => {
-      try {
-        const res = await fetch("/api/vessels", { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const j = await res.json();
-        if (!alive) return;
-        setAis({ connected: !!j.connected, error: j.error || null, count: j.count || 0 });
-        setVessels(Array.isArray(j.vessels) ? j.vessels : []);
-      } catch (e) {
-        if (alive) setAis(a => ({ ...a, connected: false, error: "เชื่อมต่อเซิร์ฟเวอร์ AIS ไม่ได้" }));
-      }
+
+    const fromServer = async () => {
+      const res = await fetch("/api/vessels", { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
     };
+
+    const applyServer = (j) => {
+      setAis({ connected: !!j.connected, error: j.error || null, count: j.count || 0 });
+      setVessels(Array.isArray(j.vessels) ? j.vessels : []);
+    };
+
+    const pull = async () => {
+      if (source.current === null) {
+        // ตรวจครั้งเดียว: มีเซิร์ฟเวอร์ AIS ในเครื่องอยู่หรือเปล่า
+        try {
+          const j = await fromServer();
+          source.current = "server";
+          if (alive) applyServer(j);
+          return;
+        } catch (e) {
+          source.current = "supabase";
+        }
+      }
+
+      if (source.current === "server") {
+        try {
+          const j = await fromServer();
+          if (alive) applyServer(j);
+        } catch (e) {
+          if (alive) setAis(a => ({ ...a, connected: false,
+            error: "เชื่อมต่อเซิร์ฟเวอร์ AIS ในเครื่องไม่ได้" }));
+        }
+        return;
+      }
+
+      const res = await fetchVesselsFromSupabase();
+      if (!alive) return;
+      setVessels(res.vessels);
+      setAis({
+        connected: res.vessels.length > 0,
+        // ว่างเพราะอ่านไม่ได้ กับว่างเพราะยังไม่มีใครเก็บ ต้องแยกให้ออก
+        // ไม่งั้นหมุดหายแล้วไม่มีใครรู้ว่าต้องไปแก้ตรงไหน
+        error: res.error || (res.vessels.length ? null
+          : "ยังไม่มีข้อมูลเรือในคลัง — ตัวเก็บ AIS (GitHub Actions) อาจยังไม่ได้รัน"),
+        count: res.vessels.length,
+      });
+    };
+
     pull();
     const id = setInterval(pull, AIS_POLL_MS);
     return () => { alive = false; clearInterval(id); };
