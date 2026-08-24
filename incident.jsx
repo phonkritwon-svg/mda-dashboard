@@ -1,8 +1,13 @@
 /* ============================================================
    Screen: Incident Detail / Threat Assessment
    ============================================================ */
-function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
+function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser }) {
   const T = (th, en) => lang === "th" ? th : en;
+
+  /* สิทธิ์มอบหมายงาน — admin กับผู้บัญชาการเท่านั้น
+     ซ่อนปุ่มเฉย ๆ ไม่ใช่การบังคับสิทธิ์ ตัวบังคับจริงอยู่ที่ RLS ฝั่ง Supabase
+     (ดู supabase/roles.sql) ที่นี่แค่ไม่ยื่นปุ่มที่กดไปก็ไม่ผ่านให้เกะกะ */
+  const canAssign = window.can(currentUser, "assign");
 
   /* เหตุการณ์ที่กำลังดู — คำนวณแบบทนค่าว่างได้ เพราะ hook ทั้งหมดต้องถูกเรียก
      ก่อนถึง early return ของ empty state เสมอ
@@ -350,9 +355,18 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent }) {
           </div>
         </div>
         <div className="row">
-          <button className="btn btn-ghost btn-sm" onClick={() => setAssignOpen(true)}>
-            <Icon name="flag" size={14} />{T("มอบหมาย", "Assign")}
-          </button>
+          {canAssign ? (
+            <button className="btn btn-ghost btn-sm" onClick={() => setAssignOpen(true)}>
+              <Icon name="flag" size={14} />{T("มอบหมาย", "Assign")}
+            </button>
+          ) : (
+            <span className="dim" style={{ fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 6 }}
+              title={T("ต้องเป็นผู้บัญชาการหรือผู้ดูแลระบบจึงจะมอบหมายงานได้",
+                       "Only a commander or administrator can assign")}>
+              <Icon name="flag" size={13} style={{ opacity: 0.45 }} />
+              {T("มอบหมายงานไม่ได้", "Assigning not permitted")}
+            </span>
+          )}
           <button
             className={"btn btn-sm " + (escalated ? "btn-ghost" : "btn-primary")}
             onClick={escalated ? null : handleEscalate}

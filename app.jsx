@@ -92,18 +92,14 @@ async function buildAppUser(session) {
   const name     = (prof && prof.full_name) || meta.full_name || meta.username || "ผู้ใช้";
   const username = (prof && prof.username)  || meta.username  || (session.user.email || "").split("@")[0];
   const rank     = (prof && prof.rank)      || meta.rank      || "";
-  const role     = (prof && prof.role)      || meta.role      || "Operator";
+  /* role อ่านจากตาราง profiles เท่านั้น ไม่แตะ user_metadata
+     เพราะ metadata เป็นค่าที่ฝั่งเบราว์เซอร์เขียนได้ — ใช้ตัดสินสิทธิ์ไม่ได้
+     อ่านโปรไฟล์ไม่สำเร็จ → normRole คืน "user" ซึ่งเป็นสิทธิ์ต่ำสุด
+     พังแบบปิดประตูดีกว่าพังแบบเปิดประตู */
+  const role     = window.normRole(prof && prof.role);
   const avatar   = initialsOf(name);
   return { user: username, name, rank, role, avatar, fromSession: true };
 }
-
-/* ตัวตนเริ่มต้นเมื่อไม่มี session — ใช้แทนหน้าเข้าสู่ระบบที่ถอดออกไป
-   แดชบอร์ดเปิดใช้ได้ทันทีโดยไม่ต้องล็อกอิน ถ้ามี session ของ Supabase อยู่จริง
-   ข้อมูลผู้ใช้จะถูกเขียนทับด้วยโปรไฟล์จริง (และได้ปุ่มออกจากระบบกลับมา) */
-const DEFAULT_USER = {
-  user: "operator", name: "เจ้าหน้าที่เฝ้าระวัง", rank: "", role: "Watch Officer",
-  avatar: "ศร", fromSession: false,
-};
 
 // ย่อชื่อเป็นตัวอักษรสำหรับ avatar — เดิมอยู่ใน login.jsx ที่ถอดออกไปแล้ว
 function initialsOf(name) {
@@ -170,8 +166,12 @@ function App() {
   const [notifOpen, setNotifOpen] = useStateA(false);
   const [searchOpen, setSearchOpen] = useStateA(false);
   const [toast, setToast] = useStateA(null);
-  // ไม่มีหน้าเข้าสู่ระบบแล้ว — เริ่มที่ตัวตนเริ่มต้นเสมอ ไม่ต้องรอ authReady
-  const [currentUser, setCurrentUser] = useStateA(DEFAULT_USER);
+  /* บังคับเข้าสู่ระบบ — ไม่มี session ไม่เห็นอะไรเลย
+     currentUser = null แปลว่า "ยังไม่ล็อกอิน" ไม่ใช่ "ยังไม่รู้"
+     สองสถานะนี้ต้องแยกกัน ไม่งั้นหน้า login จะแวบขึ้นมาหนึ่งเฟรม
+     ทุกครั้งที่รีเฟรชทั้งที่ session ยังอยู่ — authReady คือตัวแยก */
+  const [currentUser, setCurrentUser] = useStateA(null);
+  const [authReady, setAuthReady] = useStateA(false);
   const lang = t.language;
   const T = (th, en) => (lang === "th" ? th : en);
 
@@ -200,22 +200,25 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  /* ---- Supabase Auth session (ไม่บังคับแล้ว) ----
-     หน้าเข้าสู่ระบบถูกถอดออก แอปจึงเข้าใช้ได้เลยด้วย DEFAULT_USER
-     แต่ยังฟัง session ไว้ เผื่อมีคนล็อกอินค้างจากก่อนหน้า — จะได้เห็นชื่อจริง
-     และมีปุ่มออกจากระบบให้ ไม่ใช่โดนขังอยู่กับตัวตนเริ่มต้น
-     ออกจากระบบแล้วกลับไปที่ DEFAULT_USER ไม่ใช่ null เพราะไม่มีหน้า login รับ */
+  /* ---- Supabase Auth session (บังคับ) ----
+     ไม่มี session → แสดงหน้า login (เดิมเปิดเข้าใช้ได้เลยด้วยตัวตนเริ่มต้น)
+     ออกจากระบบแล้วกลับไป null เพื่อให้เด้งกลับหน้า login ทันที
+
+     authReady ถูกตั้งเป็น true หลังตรวจ session รอบแรกเสร็จเท่านั้น
+     ระหว่างนั้นแสดงหน้าจอรอ ไม่ใช่หน้า login — ไม่งั้นคนที่ล็อกอินค้างอยู่
+     จะเห็นฟอร์มกะพริบขึ้นมาทุกครั้งที่รีเฟรช */
   useEffectA(() => {
     const SB = window.MDA_SB;
-    if (!SB) return;
+    if (!SB) { setAuthReady(true); return; }   // ไม่มี Supabase → ล็อกอินไม่ได้ ต้องบอกให้รู้
     let sub = null;
     (async () => {
       try {
         const { data: { session } } = await SB.auth.getSession();
         if (session) setCurrentUser(await buildAppUser(session));
-      } catch (e) { /* ignore */ }
+      } catch (e) { /* ไม่มี session ที่ใช้ได้ — ตกไปหน้า login */ }
+      setAuthReady(true);
       const res = SB.auth.onAuthStateChange(async (_event, sess) => {
-        setCurrentUser(sess ? await buildAppUser(sess) : DEFAULT_USER);
+        setCurrentUser(sess ? await buildAppUser(sess) : null);
       });
       sub = res.data.subscription;
     })();
@@ -254,7 +257,8 @@ function App() {
   );
 
   const data = Object.assign({}, window.MDA_DATA, { events: mergedEvents });
-  const screenProps = { data, lang, onNav, showToast, addEvent };
+  // currentUser ส่งลงไปทุกจอ เพื่อให้เช็คสิทธิ์ด้วย window.can(user, "…") ได้
+  const screenProps = { data, lang, onNav, showToast, addEvent, currentUser };
 
   // ---- การแจ้งเตือนจริง: เด้งเมื่อมีข่าว/เหตุการณ์ใหม่เข้าฟีด ----
   const { notifications, unread: notifUnread, markAllSeen } = window.useNotifications(feedNews);
@@ -269,8 +273,25 @@ function App() {
     brief:     <window.DailyBrief {...screenProps} />,
   };
 
-  /* ด่านเข้าสู่ระบบถูกถอดออกตามคำขอ — แดชบอร์ดเปิดใช้ได้ทันที
-     currentUser จึงไม่มีวันเป็น null อีก (เริ่มที่ DEFAULT_USER เสมอ) */
+  /* ── ด่านเข้าสู่ระบบ ──────────────────────────────────────
+     ต้องอยู่หลัง hooks ทุกตัว ห้ามย้ายขึ้นไปข้างบน — return ก่อนเรียก hook
+     จะทำให้จำนวน hook ต่อ render ไม่คงที่ แล้ว React จะพัง */
+  if (!authReady) {
+    return (
+      <div style={{
+        position: "fixed", inset: 0, background: "var(--bg)", color: "var(--text-dim)",
+        display: "grid", placeItems: "center", fontFamily: "var(--font-ui)",
+        fontSize: "var(--fs-sm)", gap: 10,
+      }}>
+        <div className="row" style={{ gap: 9 }}>
+          <Icon name="refresh" size={16} style={{ animation: "sweep 0.9s linear infinite" }} />
+          {T("กำลังตรวจสอบสิทธิ์...", "Checking your session...")}
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) return <window.LoginScreen />;
 
   return (
     <window.LangCtx.Provider value={lang}>
@@ -325,19 +346,17 @@ function App() {
               onClick={() => { setSearchOpen(true); setNotifOpen(false); }}>
               <Icon name="search" size={16} />
             </div>
-            {/* ป้ายตัวตน — เสนอ "ออกจากระบบ" เฉพาะเมื่อมี session จริงเท่านั้น
-                ไม่มีหน้า login แล้ว การให้กดออกจากตัวตนเริ่มต้นจึงไม่มีความหมาย */}
+            {/* ป้ายตัวตน — ตอนนี้ต้องล็อกอินเสมอ จึงกดออกจากระบบได้ทุกกรณี
+                แสดง role เป็นชื่อไทยไม่ใช่ค่าดิบใน DB ("ผู้บัญชาการ" ไม่ใช่ "commander") */}
             <div className="avatar"
               title={[currentUser.rank, currentUser.name].filter(Boolean).join(" ")
-                + "\n" + currentUser.role
-                + (currentUser.fromSession
-                    ? "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")" : "")}
-              style={{ cursor: currentUser.fromSession ? "pointer" : "default" }}
+                + "\n" + window.roleLabel(currentUser.role, lang)
+                + "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")"}
+              style={{ cursor: "pointer" }}
               onClick={async () => {
-                if (!currentUser.fromSession) return;
                 if (window.confirm(T("ออกจากระบบ?", "Sign out?") + " (" + currentUser.name + ")")) {
                   try { if (window.MDA_SB) await window.MDA_SB.auth.signOut(); } catch (e) { /* ignore */ }
-                  setCurrentUser(DEFAULT_USER);
+                  setCurrentUser(null);   // → เด้งกลับหน้า login
                 }
               }}>
               {currentUser.avatar || currentUser.name.charAt(0)}

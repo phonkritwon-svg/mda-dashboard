@@ -137,12 +137,55 @@ python server.py
 | `supabase/schema.sql` | ตาราง `news`, `profiles` |
 | `supabase/events.sql` | ตาราง `events` |
 | `supabase/vessels.sql` | ตาราง `vessels` + RLS (ตำแหน่งเรือ AIS) |
+| `supabase/roles.sql` | **สิทธิ์ผู้ใช้ 3 ระดับ + ปิดช่องยกระดับสิทธิ์ตัวเอง** (ดูหัวข้อ "ผู้ใช้และสิทธิ์") |
 | `supabase-rls.sql` | **นโยบาย RLS ทุกตาราง — ต้องรันแล้วเท่านั้น anon key ถึงจะปลอดภัย** |
 | `supabase/news_write_policy.sql`<br>`supabase/lock_write_policy.sql` | สิทธิ์เขียน |
 | `supabase/realtime_enable.sql` | เปิด realtime |
 
 รันผ่าน Supabase → **SQL Editor** ตรวจสถานะด้วยคิวรีท้ายไฟล์ `supabase-rls.sql`
 — `rls_enabled` ต้องเป็น `true` ทุกตาราง
+
+---
+
+## ผู้ใช้และสิทธิ์
+
+เข้าเว็บต้องล็อกอินเสมอ ไม่มี session = ไม่เห็นอะไรเลย และ**ไม่มีปุ่มสมัครใช้งาน** —
+บัญชีถูกสร้างโดยผู้ดูแลระบบเท่านั้น
+
+| role | ป้ายในหน้าเว็บ | ทำอะไรได้ |
+|---|---|---|
+| `admin` | ผู้ดูแลระบบ | เข้าถึงได้ทั้งหมด + เปลี่ยน role ของคนอื่น |
+| `commander` | ผู้บัญชาการ | มอบหมายงานได้ |
+| `user` | ผู้ใช้งาน | มอบหมายงานไม่ได้ (ค่าเริ่มต้นของบัญชีใหม่) |
+
+### ติดตั้งครั้งแรก
+
+1. Supabase → **SQL Editor** → รัน `supabase/roles.sql` ทั้งไฟล์
+2. Supabase → **Authentication → Providers → Email** → ปิด **Enable sign-ups**
+   (ขั้นนี้คือตัวปิดการสมัครเองจริง ๆ การไม่มีปุ่มในหน้าเว็บกันได้แค่คนที่ไม่เปิด devtools)
+3. สร้าง admin คนแรก: **Authentication → Users → Add user** ใส่อีเมล+รหัสผ่าน
+   แล้วกลับไป SQL Editor รันบรรทัดท้ายไฟล์ `roles.sql` โดยแก้อีเมลให้ตรง
+
+### เพิ่มผู้ใช้ใหม่
+
+**Authentication → Users → Add user** → บัญชีใหม่ได้ `role = 'user'` อัตโนมัติ
+ถ้าจะเลื่อนเป็นผู้บัญชาการ:
+
+```sql
+update public.profiles set role = 'commander'
+ where id = (select id from auth.users where email = 'someone@example.com');
+```
+
+### ทำไมต้องบังคับสิทธิ์ที่ฐานข้อมูล ไม่ใช่แค่ซ่อนปุ่ม
+
+`login.jsx` ซ่อนปุ่ม "มอบหมาย" เมื่อ role เป็น `user` — นั่นคือเรื่องของหน้าตา ไม่ใช่ความปลอดภัย
+ใครเปิด devtools ก็เรียกฟังก์ชันเองได้ ตัวบังคับจริงอยู่ใน `supabase/roles.sql`:
+
+- trigger `handle_new_user()` **ไม่อ่าน role จาก metadata อีกแล้ว** — ของเดิมอ่าน ซึ่งแปลว่า
+  ใครแก้ payload ตอน `signUp()` ก็ตั้งตัวเองเป็น admin ได้ตั้งแต่วินาทีแรก
+- trigger `profiles_guard_role` กันการแก้คอลัมน์ `role` โดยคนที่ไม่ใช่ admin — policy
+  `profiles_update_own` เดิมยอมให้แก้แถวตัวเองทุกคอลัมน์ รวม `role` ด้วย
+- `check (role in ('admin','commander','user'))` กันค่าพิมพ์ผิดที่จะกลายเป็นสิทธิ์กำกวม
 
 ---
 
