@@ -134,7 +134,9 @@ function Osint({ data, lang, onNav }) {
     window.useNewsUpdater(data.news);
 
   // ── เน้นเพื่อนบ้าน (กัมพูชา/พม่า/มาเลเซีย) — ดันขึ้นก่อน แต่ยังเห็นทั่วโลก ──
-  const [focusOn, setFocusOn] = useState(true);
+  // ตั้งใจให้เริ่มที่ปิด: ฟีดเปิดมาเป็นลำดับเวลาปกติ แล้วค่อยกดเปิดเองจาก FocusToggle
+  // (จอแผนที่กับเหตุการณ์มีตรรกะเน้นเพื่อนบ้านแยกของตัวเอง ไม่ได้ผูกกับค่านี้)
+  const [focusOn, setFocusOn] = useState(false);
 
   // ── ช่วงเวลาที่สนใจ (time scope) ──────────────────────────────
   const [scope, setScope]             = useState({ key: "all", from: "", to: "" });
