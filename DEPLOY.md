@@ -44,7 +44,8 @@
 | `CRON_SECRET` | ควรใส่ | `api/cron-news.py` | สุ่มสตริงยาว ๆ เอง เช่น `openssl rand -hex 32` |
 
 > `api/cron-news.py` **ไม่ได้ใช้ `ANTHROPIC_API_KEY`** — มันแปลด้วย Google Translate อย่างเดียว
-> (`.github/workflows/daily-news.yml` ยังส่งตัวแปรนี้เข้าไปอยู่ ไม่เสียหาย แต่ไม่มีผล)
+> `.github/workflows/daily-news.yml` เคยส่งตัวแปรนี้เข้าไปโดยไม่มีใครอ่าน ถอดออกแล้ว
+> ถ้าจะเพิ่มกลับ ต้องแก้ `cron-news.py` ให้ใช้จริงก่อน ไม่งั้นมันแค่ทำให้เข้าใจผิด
 
 **`CRON_SECRET` ทำอะไร** — ถ้าไม่ตั้ง ใครก็ยิง `/api/cron-news` ให้ทำงานได้ ถ้าตั้งไว้ ฟังก์ชันจะเช็ก
 header `Authorization: Bearer <ค่า>` ก่อนรัน และ Vercel จะแนบ header นี้ให้ cron ของตัวเองอัตโนมัติ
