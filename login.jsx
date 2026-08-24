@@ -64,8 +64,30 @@ function isValidEmail(e) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((e || "").trim());
 }
 
-const RANKS = ["พล.ร.อ.", "พล.ร.ท.", "พล.ร.ต.", "น.อ.", "น.ท.", "น.ต.",
-               "ร.อ.", "ร.ท.", "ร.ต.", "จ.อ.", "พันจ่า", "จ่า", "พลทหาร", "พลเรือน"];
+/* ยศทหารเรือ เรียงจากชั้นผู้น้อยขึ้นไป
+   value = ตัวย่อ เพราะเป็นค่าที่ถูกเก็บลง profiles.rank แล้วเอาไปต่อหน้าชื่อ
+   ในป้ายตัวตนมุมขวาบน ("น.ต. สมชาย ใจดี") ส่วนชื่อเต็มในวงเล็บมีไว้ให้เลือกถูก
+   ไม่ใช่ทุกคนแยก จ.ต. กับ พ.จ.ต. ออกจากกันได้จากตัวย่อล้วน ๆ */
+const RANK_OTHER = "__other__";
+
+const RANKS = [
+  { v: "จ.ต.",    full: "จ่าตรี" },
+  { v: "จ.ท.",    full: "จ่าโท" },
+  { v: "จ.อ.",    full: "จ่าเอก" },
+  { v: "พ.จ.ต.",  full: "พันจ่าตรี" },
+  { v: "พ.จ.ท.",  full: "พันจ่าโท" },
+  { v: "พ.จ.อ.",  full: "พันจ่าเอก" },
+  { v: "ร.ต.",    full: "เรือตรี" },
+  { v: "ร.ท.",    full: "เรือโท" },
+  { v: "ร.อ.",    full: "เรือเอก" },
+  { v: "น.ต.",    full: "นาวาตรี" },
+  { v: "น.ท.",    full: "นาวาโท" },
+  { v: "น.อ.",    full: "นาวาเอก" },
+  { v: "พล.ร.ต.", full: "พลเรือตรี" },
+  { v: "พล.ร.ท.", full: "พลเรือโท" },
+  { v: "พล.ร.อ.", full: "พลเรือเอก" },
+  { v: "พลฯ",     full: "พลทหาร" },
+];
 
 function LoginScreen() {
   const [lang, setLang] = React.useState("th");
@@ -74,6 +96,7 @@ function LoginScreen() {
   const [mode, setMode]         = React.useState("login");   // "login" | "register"
   const [fullname, setFullname] = React.useState("");
   const [rank, setRank]         = React.useState("");
+  const [rankOther, setRankOther] = React.useState("");   // ใช้เมื่อเลือก "อื่น ๆ"
   const [username, setUsername] = React.useState("");
   const [email, setEmail]       = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -148,6 +171,8 @@ function LoginScreen() {
   const handleRegister = async () => {
     if (!fullname.trim())     return setError(T("กรุณากรอกชื่อ-นามสกุล", "Please enter your full name"));
     if (!rank)                return setError(T("กรุณาเลือกยศ / ตำแหน่ง", "Please select your rank"));
+    if (rank === RANK_OTHER && !rankOther.trim())
+      return setError(T("กรุณาระบุยศ / ตำแหน่ง", "Please specify your rank"));
     if (username.trim().length < 4)
       return setError(T("ชื่อผู้ใช้ต้องมีอย่างน้อย 4 ตัวอักษร", "Username must be at least 4 characters"));
     if (!isValidEmail(email)) return setError(T("กรุณากรอกอีเมลให้ถูกต้อง", "Please enter a valid email"));
@@ -166,7 +191,8 @@ function LoginScreen() {
         options: { data: {
           username:  username.trim(),
           full_name: fullname.trim(),
-          rank,
+          // เลือก "อื่น ๆ" → เก็บสิ่งที่พิมพ์เอง ไม่ใช่ค่า sentinel
+          rank: rank === RANK_OTHER ? rankOther.trim() : rank,
         } },
       });
       err = res.error; data = res.data;
@@ -297,9 +323,21 @@ function LoginScreen() {
                 <select value={rank} onChange={e => setRank(e.target.value)}
                   style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}>
                   <option value="">{T("-- เลือกยศ --", "-- Select rank --")}</option>
-                  {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
+                  {RANKS.map(r => (
+                    <option key={r.v} value={r.v}>{r.v} ({r.full})</option>
+                  ))}
+                  <option value={RANK_OTHER}>{T("อื่น ๆ (โปรดระบุ)", "Other (please specify)")}</option>
                 </select>
               </div>
+
+              {rank === RANK_OTHER && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={labelStyle}>{T("ระบุยศ / ตำแหน่ง", "Specify rank / position")}</label>
+                  <input type="text" value={rankOther} onChange={e => setRankOther(e.target.value)}
+                    placeholder={T("เช่น พลเรือน, ที่ปรึกษา", "e.g. civilian, adviser")}
+                    onKeyDown={onEnter} autoFocus style={inputStyle} />
+                </div>
+              )}
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>{T("ชื่อผู้ใช้", "Username")}</label>
                 <input type="text" value={username} onChange={e => setUsername(e.target.value)}
