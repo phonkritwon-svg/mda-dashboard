@@ -242,6 +242,10 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                     const on = selectable && assignee === u.email;
                     return (
                       <div key={g.cat + "|" + u.name}
+                        /* navy-units.js เก็บเฉพาะหน่วยที่มีอีเมลแล้ว สาขา
+                           selectable=false จึงไม่ควรเกิด — เก็บไว้เป็นตาข่าย
+                           เผื่อมีคนแก้ไฟล์ข้อมูลแล้วใส่หน่วยที่ไม่มีอีเมลเข้ามา
+                           ดีกว่าปล่อยให้สร้าง mailto: ที่ไม่มีผู้รับ */
                         title={selectable ? u.email
                           : T("หน่วยงานนี้ไม่ได้เผยแพร่อีเมลไว้บนเว็บกองทัพเรือ",
                               "This unit publishes no email address")}
