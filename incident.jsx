@@ -4,10 +4,30 @@
 function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser }) {
   const T = (th, en) => lang === "th" ? th : en;
 
-  /* สิทธิ์มอบหมายงาน — admin กับผู้บัญชาการเท่านั้น
+  /* สิทธิ์สั่งการ — คุมสามปุ่มพร้อมกัน: มอบหมาย · ยกระดับ · สั่งการปฏิบัติ
+     ได้แก่ admin, ผู้บัญชาการ และยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป)
+
      ซ่อนปุ่มเฉย ๆ ไม่ใช่การบังคับสิทธิ์ ตัวบังคับจริงอยู่ที่ RLS ฝั่ง Supabase
      (ดู supabase/roles.sql) ที่นี่แค่ไม่ยื่นปุ่มที่กดไปก็ไม่ผ่านให้เกะกะ */
-  const canAssign = window.can(currentUser, "assign");
+  const canAct = window.can(currentUser, "command");
+
+  /* ป้ายแทนปุ่มเมื่อยศไม่ถึง — ใช้ข้อความเดียวกันทั้งสามจุด
+     ถ้าเขียนแยกกันสามที่ วันที่เงื่อนไขเปลี่ยนจะแก้ไม่ครบแล้วผู้ใช้เจอคำอธิบาย
+     ที่ขัดกันเองในหน้าเดียว */
+  const RankDenied = ({ icon, block }) => (
+    <span className="dim"
+      title={T("สั่งการได้เฉพาะผู้ดูแลระบบ ผู้บัญชาการ หรือยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป)",
+               "Limited to administrators, commanders, and commissioned ranks (ร.ต. and above)")}
+      style={{
+        fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 6,
+        ...(block ? { justifyContent: "center", width: "100%", marginTop: 12,
+                      padding: "8px 0", border: "1px dashed var(--border-2)",
+                      borderRadius: 7, boxSizing: "border-box" } : {}),
+      }}>
+      <Icon name={icon} size={13} style={{ opacity: 0.45 }} />
+      {T("ยศของคุณไม่ตรงกับเงื่อนไข", "Your rank does not meet the requirement")}
+    </span>
+  );
 
   /* เหตุการณ์ที่กำลังดู — คำนวณแบบทนค่าว่างได้ เพราะ hook ทั้งหมดต้องถูกเรียก
      ก่อนถึง early return ของ empty state เสมอ
@@ -355,25 +375,21 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
           </div>
         </div>
         <div className="row">
-          {canAssign ? (
+          {canAct ? (
             <button className="btn btn-ghost btn-sm" onClick={() => setAssignOpen(true)}>
               <Icon name="flag" size={14} />{T("มอบหมาย", "Assign")}
             </button>
-          ) : (
-            <span className="dim" style={{ fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 6 }}
-              title={T("ต้องเป็นผู้บัญชาการหรือผู้ดูแลระบบจึงจะมอบหมายงานได้",
-                       "Only a commander or administrator can assign")}>
-              <Icon name="flag" size={13} style={{ opacity: 0.45 }} />
-              {T("มอบหมายงานไม่ได้", "Assigning not permitted")}
-            </span>
-          )}
-          <button
-            className={"btn btn-sm " + (escalated ? "btn-ghost" : "btn-primary")}
-            onClick={escalated ? null : handleEscalate}
-            style={{ opacity: escalated ? 0.6 : 1 }}>
-            <Icon name="shield" size={14} />
-            {escalated ? T("ยกระดับแล้ว", "Escalated") : T("ยกระดับ", "Escalate")}
-          </button>
+          ) : <RankDenied icon="flag" />}
+
+          {canAct ? (
+            <button
+              className={"btn btn-sm " + (escalated ? "btn-ghost" : "btn-primary")}
+              onClick={escalated ? null : handleEscalate}
+              style={{ opacity: escalated ? 0.6 : 1 }}>
+              <Icon name="shield" size={14} />
+              {escalated ? T("ยกระดับแล้ว", "Escalated") : T("ยกระดับ", "Escalate")}
+            </button>
+          ) : <RankDenied icon="shield" />}
         </div>
       </div>
 
@@ -535,13 +551,15 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                 </div>
               ))}
             </div>
-            <button
-              className={"btn btn-sm " + (tasked ? "btn-ghost" : "btn-primary")}
-              style={{ width: "100%", marginTop: 12, opacity: tasked ? 0.7 : 1 }}
-              onClick={tasked ? null : handleTask}>
-              <Icon name={tasked ? "check" : "target"} size={14} />
-              {tasked ? T("ส่งคำสั่งแล้ว", "Tasking Sent") : T("สั่งการปฏิบัติ", "Task an asset")}
-            </button>
+            {canAct ? (
+              <button
+                className={"btn btn-sm " + (tasked ? "btn-ghost" : "btn-primary")}
+                style={{ width: "100%", marginTop: 12, opacity: tasked ? 0.7 : 1 }}
+                onClick={tasked ? null : handleTask}>
+                <Icon name={tasked ? "check" : "target"} size={14} />
+                {tasked ? T("ส่งคำสั่งแล้ว", "Tasking Sent") : T("สั่งการปฏิบัติ", "Task an asset")}
+              </button>
+            ) : <RankDenied icon="target" block />}
           </Panel>
         </div>
       </div>

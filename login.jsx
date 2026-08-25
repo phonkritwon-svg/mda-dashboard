@@ -43,18 +43,38 @@ function roleLabel(r, lang) {
    ไม่กระจาย if (role === "admin") ไว้ตามไฟล์ ไม่งั้นวันที่กติกาเปลี่ยน
    จะต้องไล่แก้ทุกจุดแล้วตกหล่นแน่นอน
 
-   ตอนนี้มีรายการเดียวคือ assign ตามที่ระบุมา — ตั้งใจไม่ใส่สิทธิ์ที่ยัง
-   ไม่มีใครเรียกใช้ ตารางสิทธิ์ที่มีบรรทัดตายอยู่จะทำให้อ่านแล้วเข้าใจผิด
-   ว่าระบบบังคับอะไรบางอย่างอยู่ทั้งที่ไม่ได้บังคับ */
+   ตอนนี้มีรายการเดียวคือ command — คุมสามปุ่มในหน้าเหตุการณ์พร้อมกัน:
+   มอบหมาย · ยกระดับ · สั่งการปฏิบัติ ทั้งสามเป็นการสั่งการเหมือนกัน
+   จึงใช้เงื่อนไขเดียว ไม่แยกเป็นสามสิทธิ์ให้หลุดกันคนละทาง */
 const ROLE_CAN = {
-  admin:     { assign: true  },
-  commander: { assign: true  },
-  user:      { assign: false },
+  admin:     { command: true  },
+  commander: { command: true  },
+  user:      { command: false },
 };
+
+/* ยศชั้นสัญญาบัตร — ได้สิทธิ์สั่งการเท่ากับผู้บัญชาการ แม้ role จะเป็น user
+   ร.ต. ขึ้นไปถึง พล.ร.อ. ส่วนชั้นประทวน (จ.*, พ.จ.*), พลฯ และ "อื่น ๆ" ไม่ได้
+
+   ⚠ ยศเป็นค่าที่ผู้ใช้เลือกเองตอนสมัคร ไม่มีการตรวจสอบ — ใครเลือก "พล.ร.อ."
+     ก็ได้สิทธิ์นี้ทันที ต่างจาก role ที่ admin เท่านั้นให้ได้ ถ้าต้องการให้
+     ยศมีน้ำหนักจริงต้องให้ admin ยืนยันยศก่อน (ดู DEPLOY.md) */
+const OFFICER_RANKS = [
+  "ร.ต.", "ร.ท.", "ร.อ.",
+  "น.ต.", "น.ท.", "น.อ.",
+  "พล.ร.ต.", "พล.ร.ท.", "พล.ร.อ.",
+];
+
+/* เทียบแบบตรงตัวเท่านั้น ห้ามใช้ indexOf บนสตริง — "พล.ร.ต." มี "ร.ต." อยู่ข้างใน
+   ถ้าเทียบแบบ substring ชั้นประทวนที่พิมพ์อะไรมาใกล้เคียงก็จะหลุดเข้ามาได้ */
+function isOfficerRank(rank) {
+  return OFFICER_RANKS.indexOf(String(rank || "").trim()) >= 0;
+}
 
 function can(user, action) {
   const perms = ROLE_CAN[normRole(user && user.role)];
-  return !!(perms && perms[action]);
+  if (perms && perms[action]) return true;
+  if (action === "command" && isOfficerRank(user && user.rank)) return true;
+  return false;
 }
 
 
@@ -447,4 +467,5 @@ function LoginScreen() {
   );
 }
 
-Object.assign(window, { LoginScreen, MDA_ROLES, ROLE_LABEL, normRole, roleLabel, can });
+Object.assign(window, { LoginScreen, MDA_ROLES, ROLE_LABEL, OFFICER_RANKS,
+                        normRole, roleLabel, isOfficerRank, can });
