@@ -27,6 +27,13 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "density": "regular"
 }/*EDITMODE-END*/;
 
+/* เมนูของ admin — แยกจาก NAV เพราะไม่ได้แสดงให้ทุกคน
+   ต่อท้ายเสมอ ไม่แทรกกลาง ไม่งั้นตำแหน่งเมนูอื่นจะขยับตามสิทธิ์ของคนที่ล็อกอิน
+   ซึ่งทำให้คนที่ใช้ทั้งสองบัญชีกดผิดเมนูประจำ */
+const NAV_ADMIN = [
+  { key: "admin", icon: "settings", th: "จัดการผู้ใช้", en: "Users" },
+];
+
 const NAV = [
   { key: "dashboard", icon: "dashboard", th: "ภาพรวม",   en: "Overview" },
   { key: "map",       icon: "radar",     th: "แผนที่",    en: "Map" },
@@ -271,6 +278,7 @@ function App() {
     chat:      <window.ChatScreen {...screenProps} />,
     incident:  <window.Incident   {...screenProps} initial={route.payload} />,
     brief:     <window.DailyBrief {...screenProps} />,
+    admin:     <window.AdminUsers {...screenProps} />,
   };
 
   /* ── ด่านเข้าสู่ระบบ ──────────────────────────────────────
@@ -366,7 +374,7 @@ function App() {
 
         {/* SIDEBAR */}
         <div className="sidebar">
-          {NAV.map(n => (
+          {NAV.concat(window.can(currentUser, "manageUsers") ? NAV_ADMIN : []).map(n => (
             <div key={n.key}
               className={"nav-item" + (route.screen === n.key ? " active" : "")}
               title={T(n.th, n.en)}
@@ -394,7 +402,12 @@ function App() {
         {/* MAIN */}
         <div className="main"
           key={route.screen + (route.payload ? JSON.stringify(route.payload) : "")}>
-          {screens[route.screen]}
+          {/* กันการค้างอยู่ที่จอ admin หลังถูกลดสิทธิ์ — ถ้า role เปลี่ยนระหว่าง
+              เปิดหน้าค้างไว้ onAuthStateChange จะอัปเดต currentUser แต่ route
+              ยังชี้ที่ "admin" อยู่ ต้องเด้งกลับเอง ไม่ใช่ปล่อยให้เรนเดอร์ต่อ */}
+          {(route.screen === "admin" && !window.can(currentUser, "manageUsers"))
+            ? screens.dashboard
+            : screens[route.screen]}
         </div>
 
         {/* NOTIFICATION PANEL */}

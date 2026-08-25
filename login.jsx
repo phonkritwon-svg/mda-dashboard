@@ -43,13 +43,17 @@ function roleLabel(r, lang) {
    ไม่กระจาย if (role === "admin") ไว้ตามไฟล์ ไม่งั้นวันที่กติกาเปลี่ยน
    จะต้องไล่แก้ทุกจุดแล้วตกหล่นแน่นอน
 
-   ตอนนี้มีรายการเดียวคือ command — คุมสามปุ่มในหน้าเหตุการณ์พร้อมกัน:
-   มอบหมาย · ยกระดับ · สั่งการปฏิบัติ ทั้งสามเป็นการสั่งการเหมือนกัน
-   จึงใช้เงื่อนไขเดียว ไม่แยกเป็นสามสิทธิ์ให้หลุดกันคนละทาง */
+   command      คุมสามปุ่มในหน้าเหตุการณ์พร้อมกัน: มอบหมาย · ยกระดับ · สั่งการปฏิบัติ
+                ทั้งสามเป็นการสั่งการเหมือนกัน จึงใช้เงื่อนไขเดียว ไม่แยกเป็นสามสิทธิ์
+                ให้หลุดกันคนละทาง — ยศชั้นสัญญาบัตรก็ได้สิทธิ์นี้ (ดู isOfficerRank)
+
+   manageUsers  หน้าจัดการผู้ใช้ — เปลี่ยน role/ยศ ของคนอื่น admin เท่านั้น
+                ยศไม่ช่วยตรงนี้ ไม่งั้นคนที่พิมพ์ยศตัวเองว่า "พล.ร.อ." ตอนสมัคร
+                จะแต่งตั้ง admin ได้เอง ซึ่งพังทั้งระบบสิทธิ์ */
 const ROLE_CAN = {
-  admin:     { command: true  },
-  commander: { command: true  },
-  user:      { command: false },
+  admin:     { command: true,  manageUsers: true  },
+  commander: { command: true,  manageUsers: false },
+  user:      { command: false, manageUsers: false },
 };
 
 /* ยศชั้นสัญญาบัตร — ได้สิทธิ์สั่งการเท่ากับผู้บัญชาการ แม้ role จะเป็น user
@@ -468,4 +472,4 @@ function LoginScreen() {
 }
 
 Object.assign(window, { LoginScreen, MDA_ROLES, ROLE_LABEL, OFFICER_RANKS,
-                        normRole, roleLabel, isOfficerRank, can });
+                        RANKS, RANK_OTHER, normRole, roleLabel, isOfficerRank, can });
