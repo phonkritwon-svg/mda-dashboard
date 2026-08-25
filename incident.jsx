@@ -44,7 +44,7 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   const [assignee, setAssignee] = useState("");
   const [escalated, setEscalated] = useState(false);
   const [tasked, setTasked] = useState(false);
-  const [addOfficerOpen, setAddOfficerOpen] = useState(false);
+  const [unitQuery, setUnitQuery] = useState("");
 
   /* สถานะเหล่านี้ผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ
      ก่อนหน้านี้ไม่มีทางสลับเหตุการณ์จึงไม่เคยเห็นปัญหา — พอสลับได้แล้ว
@@ -55,22 +55,29 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
     setAssignee("");
     setAssignOpen(false);
   }, [e && e.id]);
-  const [newOfficer, setNewOfficer] = useState({ rank: "น.ต.", firstName: "", lastName: "", role: "" });
 
-  /* รายชื่อเจ้าหน้าที่ — ต้องอยู่เหนือ early return เช่นเดียวกับ hook อื่น
-     (ค่าตั้งต้นอ่านครั้งเดียวตอน mount จึงไม่แพงแม้อยู่บนสุด)               */
-  const DEFAULT_OFFICERS = [
-    { id: "O1", name: "น.ต. ธนาธร สุขชัย",   role: T("นักวิเคราะห์ข่าว", "Intel Analyst") },
-    { id: "O2", name: "น.ต. วิมล ศรีรัตน์",   role: T("เจ้าหน้าที่เฝ้าระวัง", "Watch Officer") },
-    { id: "O3", name: "พ.จ.อ. สมชาย บุญมี",   role: T("หัวหน้าชุดปฏิบัติการ", "Ops Team Lead") },
-    { id: "O4", name: "น.ท. กฤษณา พลอยแก้ว", role: T("ผู้บังคับการชุด", "Duty OIC") },
-  ];
-  const [officers, setOfficers] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("mda_officers") || "null");
-      return saved && saved.length ? saved : DEFAULT_OFFICERS;
-    } catch (err) { return DEFAULT_OFFICERS; }
-  });
+
+  /* หน่วยงานกองทัพเรือ — มาจาก navy-units.js (ดึงจาก navy.mi.th/organization)
+     ไม่ใช่รายชื่อที่แก้ในหน้าเว็บได้อีกแล้ว เพราะปลายทางเป็นอีเมลราชการจริง
+     ถ้าให้เพิ่มเองได้ จะมีคนพิมพ์อีเมลผิดแล้วส่งหนังสือราชการไปผิดที่ */
+  const unitGroups = window.MDA_NAVY_UNITS || [];
+  const unitsFlat  = window.MDA_NAVY_UNITS_FLAT || [];
+
+  /* ค้นหาแบบไม่สนตัวพิมพ์ ค้นได้ทั้งชื่อหน่วย ชื่อหมวด และอีเมล
+     ค้นด้วยอีเมลมีประโยชน์จริงเวลารู้ปลายทางแต่จำชื่อหน่วยเต็มไม่ได้ */
+  const visibleGroups = (() => {
+    const q = unitQuery.trim().toLowerCase();
+    if (!q) return unitGroups;
+    return unitGroups
+      .map(g => ({
+        cat: g.cat,
+        units: g.units.filter(u =>
+          (u.name + " " + g.cat + " " + u.email).toLowerCase().indexOf(q) >= 0),
+      }))
+      .filter(g => g.units.length);
+  })();
+
+  const selectedUnit = unitsFlat.find(u => u.email && u.email === assignee) || null;
 
   // ยังไม่มีเหตุการณ์ในฐานข้อมูล → empty state + ปุ่มเพิ่ม
   if (!events) {
@@ -108,37 +115,56 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
     return la + " " + lo;
   };
 
-  const saveOfficers = (list) => {
-    setOfficers(list);
-    try { localStorage.setItem("mda_officers", JSON.stringify(list)); } catch {}
-  };
+  /* ร่างอีเมลมอบหมายแล้วเปิดโปรแกรมเมลของผู้ใช้ — ไม่ได้ส่งเอง
 
-  const handleAddOfficer = () => {
-    const { rank, firstName, lastName, role } = newOfficer;
-    if (!firstName.trim() || !lastName.trim()) return;
-    const fullName = rank + " " + firstName.trim() + " " + lastName.trim();
-    const id = "O" + Date.now();
-    const updated = [...officers, { id, name: fullName, role: role.trim() || T("เจ้าหน้าที่", "Officer") }];
-    saveOfficers(updated);
-    setNewOfficer({ rank: "น.ต.", firstName: "", lastName: "", role: "" });
-    setAddOfficerOpen(false);
-    if (showToast) showToast(T("เพิ่มเจ้าหน้าที่ " + fullName + " แล้ว", "Added officer " + fullName), "ok");
-  };
+     จงใจใช้ mailto: ไม่ใช่การยิง API ส่งเมลจากเซิร์ฟเวอร์ เพราะปลายทาง
+     เป็นตู้จดหมายราชการจริงของกองทัพเรือ การกดผิดหนึ่งครั้งแล้วจดหมาย
+     ออกไปทันทีเรียกคืนไม่ได้ วิธีนี้ผู้ใช้ได้เห็นและกดส่งเองเสมอ
+     และไม่ต้องเก็บคีย์ผู้ให้บริการเมลไว้ที่ไหนเลย */
+  const buildAssignMail = (unit) => {
+    const subject = "[MDA] มอบหมายเหตุการณ์ " + e.id + " — " + tx(e.title, "th");
+    const pos = (e.lat != null && e.lon != null) ? fmtPos(e.lat, e.lon) : "-";
+    const me  = currentUser
+      ? [currentUser.rank, currentUser.name].filter(Boolean).join(" ")
+      : "";
+    const lines = [
+      "เรียน " + unit.name,
+      "",
+      "ขอส่งเหตุการณ์จากระบบเฝ้าระวังทางทะเล (MDA) เพื่อโปรดพิจารณาดำเนินการ",
+      "",
+      "รหัสเหตุการณ์ : " + e.id,
+      "หัวข้อ        : " + tx(e.title, "th"),
+      "ระดับความรุนแรง: " + String(e.sev || "").toUpperCase(),
+      "พื้นที่        : " + [tx(e.area, "th"), tx(e.region, "th")].filter(Boolean).join(" / "),
+      "พิกัด         : " + pos,
+      "เวลา          : " + (e.time || "-"),
+      "",
+      "สรุป:",
+      tx(e.summary, "th") || "-",
+    ];
+    if (e.source && e.source.url) {
+      lines.push("", "แหล่งข่าว: " + (e.source.outlet || "") + " " + e.source.url);
+    }
+    lines.push("", "ส่งจากระบบ MDA · ศูนย์บัญชาการข่าวทางทะเล");
+    if (me) lines.push("ผู้มอบหมาย: " + me);
 
-  const handleRemoveOfficer = (id) => {
-    const updated = officers.filter(o => o.id !== id);
-    saveOfficers(updated);
-    if (assignee === id) setAssignee("");
+    return "mailto:" + encodeURIComponent(unit.email)
+      + "?subject=" + encodeURIComponent(subject)
+      + "&body=" + encodeURIComponent(lines.join("\n"));
   };
 
   const handleAssign = () => {
-    const officer = officers.find(o => o.id === assignee);
-    if (!officer) return;
+    const unit = unitsFlat.find(u => u.email === assignee);
+    if (!unit || !unit.email) return;
+    /* เปิดในแท็บเดียวกันด้วย location.href — window.open() ถูก popup blocker
+       กินบ่อยเมื่อมี await คั่นก่อนหน้า ส่วน mailto: ไม่ทำให้หน้าเว็บถูกทิ้ง
+       เบราว์เซอร์แค่ส่งต่อให้โปรแกรมเมล หน้าเดิมยังอยู่ */
+    window.location.href = buildAssignMail(unit);
     setAssignOpen(false);
     setAssignee("");
     if (showToast) showToast(
-      T("มอบหมาย " + e.id + " ให้ " + officer.name + " แล้ว",
-        "Assigned " + e.id + " to " + officer.name), "ok"
+      T("ร่างอีเมลถึง " + unit.name + " แล้ว — ตรวจแล้วกดส่งในโปรแกรมเมล",
+        "Drafted an email to " + unit.name + " — review and send it in your mail app"), "ok"
     );
   };
 
@@ -183,104 +209,94 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
               {T("มอบหมายเหตุการณ์", "Assign Incident")} — {e.id}
             </div>
             <div style={{ padding: 16, maxHeight: "60vh", overflowY: "auto" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div className="dim" style={{ fontSize: "var(--fs-sm)" }}>
-                  {T("เลือกเจ้าหน้าที่รับผิดชอบ", "Select responsible officer")}
-                </div>
-                <button className="btn btn-ghost btn-sm" style={{ gap: 5 }}
-                  onClick={() => setAddOfficerOpen(o => !o)}>
-                  <Icon name="plus" size={13} />{T("เพิ่มเจ้าหน้าที่", "Add Officer")}
-                </button>
+              <div className="dim" style={{ fontSize: "var(--fs-sm)", marginBottom: 10 }}>
+                {T("เลือกหน่วยงานที่รับผิดชอบ — ระบบจะร่างอีเมลให้ตรวจก่อนส่ง",
+                   "Choose the responsible unit — an email draft opens for you to review")}
               </div>
 
-              {/* Add Officer Form */}
-              {addOfficerOpen && (
-                <div style={{
-                  padding: "12px 14px", marginBottom: 12, borderRadius: 8,
-                  background: "rgba(var(--accent-rgb),0.05)",
-                  border: "1px solid rgba(var(--accent-rgb),0.2)",
-                }}>
-                  <div style={{ fontSize: "var(--fs-xs)", fontWeight: 600, color: "var(--accent)",
-                    textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
-                    {T("เพิ่มเจ้าหน้าที่ใหม่", "New Officer")}
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr", gap: 7, marginBottom: 7 }}>
-                    <select value={newOfficer.rank}
-                      onChange={e => setNewOfficer(o => ({ ...o, rank: e.target.value }))}
-                      style={{
-                        background: "var(--surface)", border: "1px solid var(--border-2)",
-                        borderRadius: 6, padding: "6px 8px", color: "var(--text)",
-                        fontFamily: "var(--font-ui)", fontSize: "var(--fs-xs)",
-                      }}>
-                      {["พล.ร.อ.","พล.ร.ท.","พล.ร.ต.","น.อ.","น.ท.","น.ต.","ร.อ.","ร.ท.","ร.ต.",
-                        "พ.จ.อ.","จ.อ.","จ.ต."].map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <input placeholder={T("ชื่อ", "First name")} value={newOfficer.firstName}
-                      onChange={e => setNewOfficer(o => ({ ...o, firstName: e.target.value }))}
-                      style={{ background: "var(--surface)", border: "1px solid var(--border-2)",
-                        borderRadius: 6, padding: "6px 8px", color: "var(--text)",
-                        fontFamily: "var(--font-ui)", fontSize: "var(--fs-xs)", outline: "none" }} />
-                    <input placeholder={T("นามสกุล", "Last name")} value={newOfficer.lastName}
-                      onChange={e => setNewOfficer(o => ({ ...o, lastName: e.target.value }))}
-                      style={{ background: "var(--surface)", border: "1px solid var(--border-2)",
-                        borderRadius: 6, padding: "6px 8px", color: "var(--text)",
-                        fontFamily: "var(--font-ui)", fontSize: "var(--fs-xs)", outline: "none" }} />
-                  </div>
-                  <div style={{ display: "flex", gap: 7 }}>
-                    <input placeholder={T("ตำแหน่ง เช่น นักวิเคราะห์ข่าว", "Role e.g. Intel Analyst")} value={newOfficer.role}
-                      onChange={e => setNewOfficer(o => ({ ...o, role: e.target.value }))}
-                      style={{ flex: 1, background: "var(--surface)", border: "1px solid var(--border-2)",
-                        borderRadius: 6, padding: "6px 8px", color: "var(--text)",
-                        fontFamily: "var(--font-ui)", fontSize: "var(--fs-xs)", outline: "none" }} />
-                    <button className="btn btn-primary btn-sm"
-                      style={{ opacity: newOfficer.firstName && newOfficer.lastName ? 1 : 0.45 }}
-                      onClick={handleAddOfficer}>
-                      <Icon name="check" size={13} />{T("บันทึก", "Save")}
-                    </button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setAddOfficerOpen(false)}>
-                      {T("ยกเลิก", "Cancel")}
-                    </button>
-                  </div>
+              <input value={unitQuery} onChange={ev => setUnitQuery(ev.target.value)}
+                placeholder={T("ค้นหาหน่วยงาน…", "Search units…")}
+                style={{
+                  width: "100%", boxSizing: "border-box", marginBottom: 12,
+                  background: "var(--surface)", border: "1px solid var(--border-2)",
+                  borderRadius: 7, padding: "8px 11px", color: "var(--text)",
+                  fontFamily: "var(--font-ui)", fontSize: "var(--fs-sm)", outline: "none",
+                }} />
+
+              {visibleGroups.length === 0 && (
+                <div className="empty" style={{ padding: "18px 0" }}>
+                  {T("ไม่พบหน่วยงานที่ตรงกับคำค้น", "No unit matches that search")}
                 </div>
               )}
 
-              {officers.map(o => (
-                <div key={o.id}
-                  style={{
-                    padding: "10px 12px", borderRadius: 8, marginBottom: 7, cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 10,
-                    border: "1px solid " + (assignee === o.id ? "var(--accent)" : "var(--border)"),
-                    background: assignee === o.id ? "rgba(var(--accent-rgb),0.07)" : "var(--surface)",
-                    transition: "all .12s",
-                  }}
-                  onClick={() => setAssignee(o.id)}>
-                  <div className="avatar" style={{ width: 34, height: 34, fontSize: 12, flexShrink: 0 }}>
-                    {o.name.charAt(o.name.lastIndexOf(" ") + 1) || "?"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{o.name}</div>
-                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-dim)" }}>{o.role}</div>
-                  </div>
-                  {assignee === o.id
-                    ? <Icon name="check" size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
-                    : !o.id.startsWith("O") ? null : (
-                      <span style={{ fontSize: 16, cursor: "pointer", color: "var(--text-mute)", flexShrink: 0, lineHeight: 1 }}
-                        onClick={ev => { ev.stopPropagation(); handleRemoveOfficer(o.id); }}
-                        title={T("ลบเจ้าหน้าที่", "Remove officer")}>×</span>
-                    )
-                  }
+              {visibleGroups.map(g => (
+                <div key={g.cat} style={{ marginBottom: 14 }}>
+                  <div style={{
+                    fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em",
+                    color: "var(--text-mute)", fontFamily: "var(--font-mono)",
+                    padding: "0 2px 6px",
+                  }}>{g.cat}</div>
+
+                  {g.units.map(u => {
+                    const selectable = !!u.email;
+                    const on = selectable && assignee === u.email;
+                    return (
+                      <div key={g.cat + "|" + u.name}
+                        title={selectable ? u.email
+                          : T("หน่วยงานนี้ไม่ได้เผยแพร่อีเมลไว้บนเว็บกองทัพเรือ",
+                              "This unit publishes no email address")}
+                        style={{
+                          padding: "9px 11px", borderRadius: 8, marginBottom: 6,
+                          display: "flex", alignItems: "center", gap: 10,
+                          cursor: selectable ? "pointer" : "not-allowed",
+                          opacity: selectable ? 1 : 0.45,
+                          border: "1px solid " + (on ? "var(--accent)" : "var(--border)"),
+                          background: on ? "rgba(var(--accent-rgb),0.07)" : "var(--surface)",
+                          transition: "all .12s",
+                        }}
+                        onClick={() => { if (selectable) setAssignee(u.email); }}>
+                        <Icon name="shield" size={15}
+                          style={{ flexShrink: 0, color: on ? "var(--accent)" : "var(--text-mute)" }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{u.name}</div>
+                          <div style={{
+                            fontSize: "var(--fs-xs)", color: "var(--text-dim)",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {u.email || T("ไม่มีอีเมลเผยแพร่", "no published email")}
+                            {u.suspect && " ⚠"}
+                          </div>
+                        </div>
+                        {on && <Icon name="check" size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
+
+              {selectedUnit && selectedUnit.suspect && (
+                <div style={{
+                  padding: "9px 12px", borderRadius: 7, marginTop: 4,
+                  background: "rgba(var(--crit-rgb),0.1)",
+                  border: "1px solid rgba(var(--crit-rgb),0.3)",
+                  color: "var(--crit)", fontSize: "var(--fs-xs)", lineHeight: 1.6,
+                }}>
+                  {T("อีเมลของหน่วยงานนี้ไม่ใช่โดเมน navy.mi.th และมีลักษณะผิดปกติ " +
+                     "ตามที่เว็บกองทัพเรือเผยแพร่ไว้ — ควรยืนยันกับหน่วยงานก่อนส่ง",
+                     "This address is not on navy.mi.th and looks irregular as published " +
+                     "by the navy site — confirm with the unit before sending")}
+                </div>
+              )}
             </div>
             <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)",
               display: "flex", gap: 9, justifyContent: "flex-end" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setAssignOpen(false); setAddOfficerOpen(false); }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setAssignOpen(false)}>
                 {T("ยกเลิก", "Cancel")}
               </button>
               <button className="btn btn-primary btn-sm"
                 style={{ opacity: assignee ? 1 : 0.5 }}
                 onClick={handleAssign}>
-                <Icon name="check" size={13} />{T("ยืนยันมอบหมาย", "Confirm Assignment")}
+                <Icon name="flag" size={13} />{T("ร่างอีเมลมอบหมาย", "Draft assignment email")}
               </button>
             </div>
           </div>
