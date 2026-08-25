@@ -19,7 +19,7 @@ function StatTile({ k, v, unit, delta, spark, bars, glow, icon, color }) {
   );
 }
 
-function Dashboard({ data, lang, onNav, showToast, addEvent }) {
+function Dashboard({ data, lang, onNav, showToast, addEvent, currentUser }) {
   const { events } = data;
   const T = (th, en) => (lang === "th" ? th : en);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,7 +128,7 @@ function Dashboard({ data, lang, onNav, showToast, addEvent }) {
             <div className="row" style={{ gap: 8, alignItems: "center" }}>
               {window.AddEventButton &&
                 <window.AddEventButton addEvent={addEvent} lang={lang} showToast={showToast}
-                  className="btn btn-ghost btn-sm" />}
+                  currentUser={currentUser} className="btn btn-ghost btn-sm" />}
               <a className="panel-link" onClick={() => onNav("incident")}>
                 {T("ทั้งหมด", "View all")} ({events.length})
               </a>

@@ -89,7 +89,7 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
             <div className="page-title">{T("ยังไม่มีเหตุการณ์", "No events yet")}</div>
             <div className="page-sub">{T("เหตุการณ์จะถูกสร้างอัตโนมัติจากข่าวภัยสูง หรือเพิ่มเองด้านล่าง", "Events are auto-generated from high-severity news, or add one below.")}</div>
           </div>
-          {window.AddEventButton && <window.AddEventButton addEvent={addEvent} lang={lang} showToast={showToast} />}
+          {window.AddEventButton && <window.AddEventButton addEvent={addEvent} lang={lang} showToast={showToast} currentUser={currentUser} />}
         </div>
         <div className="empty" style={{ marginTop: 40 }}>
           <Icon name="alert" size={32} style={{ color: "var(--text-mute)", marginBottom: 10 }} />

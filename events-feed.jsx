@@ -544,6 +544,12 @@ async function addEventToSupabase(obj) {
   if (!SB) return { error: "no_supabase" };
   try {
     const { error } = await SB.from("events").insert(eventObjToRow(obj));
+    /* RLS ปฏิเสธจะได้ code 42501 พร้อมข้อความอังกฤษที่พูดถึง policy
+       ซึ่งผู้ใช้อ่านแล้วไม่รู้ว่าต้องทำอะไร — แปลให้ตรงประเด็น
+       (ปกติปุ่มถูกซ่อนไปแล้ว เส้นนี้จึงเป็นตาข่ายรับกรณีเรียกตรงจาก devtools
+        หรือกรณีสิทธิ์ถูกเปลี่ยนระหว่างที่เปิดฟอร์มค้างไว้) */
+    if (error && (error.code === "42501" || /row-level security|policy/i.test(error.message || "")))
+      return { error: "ไม่มีสิทธิ์เพิ่มเหตุการณ์ — ต้องเป็นผู้บัญชาการ ผู้ดูแลระบบ หรือยศชั้นสัญญาบัตร" };
     if (error) return { error: error.message };
     return { ok: true };
   } catch (e) {
@@ -779,9 +785,16 @@ function AddEventModal({ open, onClose, lang, addEvent, showToast }) {
   );
 }
 
-function AddEventButton({ addEvent, lang, showToast, className }) {
+function AddEventButton({ addEvent, lang, showToast, className, currentUser }) {
   const [open, setOpen] = React.useState(false);
   const T = (th, en) => (lang === "th" ? th : en);
+
+  /* เขียนตาราง events ได้เฉพาะคนที่สั่งการได้ — บังคับจริงที่ RLS ฝั่ง Supabase
+     (policy events_command_insert ใน supabase/permissions.sql)
+     ซ่อนปุ่มตรงนี้ให้ตรงกัน ไม่งั้นผู้ใช้กรอกฟอร์มจนเสร็จแล้วเจอ error ดิบ
+     จากฐานข้อมูล ซึ่งไม่บอกว่าเป็นเรื่องสิทธิ์ */
+  if (!window.can(currentUser, "command")) return null;
+
   return (
     <React.Fragment>
       <button className={className || "btn btn-primary btn-sm"} onClick={() => setOpen(true)}>
