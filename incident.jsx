@@ -356,7 +356,10 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
               ซึ่งพอเหตุการณ์แตะหลักสิบก็ต้องลากหาทีละอัน และพาดหัวถูกตัด
               จนเหลือไม่กี่คำ แยกไม่ออกว่าอันไหนคืออันไหน
               ดรอปดาวน์เห็นทีละหลายบรรทัดและอ่านพาดหัวได้เต็ม */}
-          <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+          {/* กว้างครึ่งแถว ไม่ยืดเต็ม — พาดหัวส่วนใหญ่สั้นกว่านั้นอยู่แล้ว
+              ปุ่มที่ยาวเกินเนื้อหาทำให้ระยะที่ต้องกวาดสายตาไปหาลูกศรไกลขึ้นเปล่า ๆ
+              รายการที่กางลงมาผูก left/right กับกล่องนี้ จึงกว้างครึ่งเดียวตามไปด้วย */}
+          <div style={{ position: "relative", flex: "1 1 0", maxWidth: "50%", minWidth: 0 }}>
             <button className="btn btn-ghost btn-sm"
               onClick={() => setEvListOpen(o => !o)}
               title={T("เลือกเหตุการณ์", "Pick an incident")}
