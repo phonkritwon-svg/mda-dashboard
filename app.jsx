@@ -339,7 +339,20 @@ function App() {
               ในห้องเฝ้าระวังที่ใช้เครื่องร่วมกัน การรู้ว่ากำลังสวมสิทธิ์ของใครอยู่
               ต้องอ่านได้ทันทีโดยไม่ต้องชี้ ไม่งั้นคนถัดไปสั่งการในนามคนก่อนได้ง่าย ๆ
               วงกลมย่อชื่อยังอยู่ที่เดิม เพราะเป็นปุ่มออกจากระบบ ไม่ใช่แค่ป้ายชื่อ */}
-          <div className="topbar-user" title={window.roleLabel(currentUser.role, lang)}>
+          {/* ป้ายตัวตน + ทางออกจากระบบ — รวมสองอย่างไว้ที่เดียว
+              เดิมแยกกัน: ชื่ออยู่ตรงนี้ ส่วนวงกลมย่อชื่อมุมขวาเป็นปุ่มออกจากระบบ
+              ซึ่งแปลว่ามีป้ายบอกตัวตนสองที่ในแถบเดียว และอันที่กดได้กลับเป็น
+              อันที่อ่านชื่อไม่ออก */}
+          <div className="topbar-user"
+            title={[currentUser.rank, currentUser.name].filter(Boolean).join(" ")
+              + "\n" + window.roleLabel(currentUser.role, lang)
+              + "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")"}
+            onClick={async () => {
+              if (window.confirm(T("ออกจากระบบ?", "Sign out?") + " (" + currentUser.name + ")")) {
+                try { if (window.MDA_SB) await window.MDA_SB.auth.signOut(); } catch (e) { /* ignore */ }
+                setCurrentUser(null);   // → เด้งกลับหน้า login
+              }
+            }}>
             <Icon name="shield" size={13} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
             <span className="tu-name">
               {[currentUser.rank, currentUser.name].filter(Boolean).join(" ")}
@@ -379,21 +392,6 @@ function App() {
               title={T("ค้นหา (Ctrl+K)", "Search (Ctrl+K)")}
               onClick={() => { setSearchOpen(true); setNotifOpen(false); }}>
               <Icon name="search" size={16} />
-            </div>
-            {/* ป้ายตัวตน — ตอนนี้ต้องล็อกอินเสมอ จึงกดออกจากระบบได้ทุกกรณี
-                แสดง role เป็นชื่อไทยไม่ใช่ค่าดิบใน DB ("ผู้บัญชาการ" ไม่ใช่ "commander") */}
-            <div className="avatar"
-              title={[currentUser.rank, currentUser.name].filter(Boolean).join(" ")
-                + "\n" + window.roleLabel(currentUser.role, lang)
-                + "\n(" + T("คลิกเพื่อออกจากระบบ", "click to sign out") + ")"}
-              style={{ cursor: "pointer" }}
-              onClick={async () => {
-                if (window.confirm(T("ออกจากระบบ?", "Sign out?") + " (" + currentUser.name + ")")) {
-                  try { if (window.MDA_SB) await window.MDA_SB.auth.signOut(); } catch (e) { /* ignore */ }
-                  setCurrentUser(null);   // → เด้งกลับหน้า login
-                }
-              }}>
-              {currentUser.avatar || currentUser.name.charAt(0)}
             </div>
           </div>
         </div>

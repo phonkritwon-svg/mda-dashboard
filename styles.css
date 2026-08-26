@@ -218,12 +218,17 @@ body {
 /* ชื่อผู้ใช้ที่ล็อกอินอยู่ ต่อท้ายป้ายพื้นที่บนแถบบน
    ไม่ใส่กรอบเหมือน region-pill เพราะสองก้อนติดกันที่มีกรอบทั้งคู่จะอ่านเป็น
    ปุ่มคู่ ทั้งที่ก้อนนี้กดไม่ได้ — ใช้เส้นคั่นบาง ๆ แทน */
+/* กดได้ — เป็นทางออกจากระบบทางเดียวแล้วหลังถอดวงกลมย่อชื่อออก
+   จึงต้องดูเหมือนกดได้จริง ไม่ใช่ป้ายชื่อเฉย ๆ ที่ไม่มีใครคิดจะกด */
 .topbar-user {
   display: flex; align-items: center; gap: 7px;
-  padding-left: 12px; margin-left: 2px;
+  padding: 5px 11px 5px 12px; margin-left: 2px;
   border-left: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
   font-size: var(--fs-sm); min-width: 0;
+  cursor: pointer; transition: background .12s;
 }
+.topbar-user:hover { background: var(--surface-3); }
 .topbar-user .tu-name {
   font-weight: 500; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px;
