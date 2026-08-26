@@ -225,17 +225,20 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
           display: "flex", alignItems: "center", justifyContent: "center",
         }} onClick={() => setAssignOpen(false)}>
           <div style={{
-            width: 400, background: "var(--surface-2)",
+            /* 1.5 เท่าของเดิม (400) — maxWidth กันล้นบนจอแคบกว่า 600
+               ที่เดิมไม่ต้องมีเพราะ 400 แคบพอจะพอดีเกือบทุกจอ */
+            width: 600, maxWidth: "94vw", background: "var(--surface-2)",
             border: "1px solid var(--border-2)", borderRadius: 12,
             overflow: "hidden", boxShadow: "var(--shadow)",
           }} onClick={ev => ev.stopPropagation()}>
-            <div style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)",
-              fontWeight: 600, display: "flex", alignItems: "center", gap: 9 }}>
-              <Icon name="flag" size={15} style={{ color: "var(--accent)" }} />
+            <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--border)",
+              fontWeight: 600, fontSize: "var(--fs-lg)",
+              display: "flex", alignItems: "center", gap: 11 }}>
+              <Icon name="flag" size={19} style={{ color: "var(--accent)" }} />
               {T("มอบหมายเหตุการณ์", "Assign Incident")} — {e.id}
             </div>
-            <div style={{ padding: 16, maxHeight: "60vh", overflowY: "auto" }}>
-              <div className="dim" style={{ fontSize: "var(--fs-sm)", marginBottom: 10 }}>
+            <div style={{ padding: 22, maxHeight: "72vh", overflowY: "auto" }}>
+              <div className="dim" style={{ fontSize: "var(--fs-base)", marginBottom: 14 }}>
                 {T("เลือกหน่วยงานที่รับผิดชอบ — ระบบจะร่างอีเมลให้ตรวจก่อนส่ง",
                    "Choose the responsible unit — an email draft opens for you to review")}
               </div>
@@ -243,24 +246,24 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
               <input value={unitQuery} onChange={ev => setUnitQuery(ev.target.value)}
                 placeholder={T("ค้นหาหน่วยงาน…", "Search units…")}
                 style={{
-                  width: "100%", boxSizing: "border-box", marginBottom: 12,
+                  width: "100%", boxSizing: "border-box", marginBottom: 16,
                   background: "var(--surface)", border: "1px solid var(--border-2)",
-                  borderRadius: 7, padding: "8px 11px", color: "var(--text)",
-                  fontFamily: "var(--font-ui)", fontSize: "var(--fs-sm)", outline: "none",
+                  borderRadius: 8, padding: "11px 15px", color: "var(--text)",
+                  fontFamily: "var(--font-ui)", fontSize: "var(--fs-base)", outline: "none",
                 }} />
 
               {visibleGroups.length === 0 && (
-                <div className="empty" style={{ padding: "18px 0" }}>
+                <div className="empty" style={{ padding: "26px 0", fontSize: "var(--fs-base)" }}>
                   {T("ไม่พบหน่วยงานที่ตรงกับคำค้น", "No unit matches that search")}
                 </div>
               )}
 
               {visibleGroups.map(g => (
-                <div key={g.cat} style={{ marginBottom: 14 }}>
+                <div key={g.cat} style={{ marginBottom: 20 }}>
                   <div style={{
-                    fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em",
+                    fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em",
                     color: "var(--text-mute)", fontFamily: "var(--font-mono)",
-                    padding: "0 2px 6px",
+                    padding: "0 2px 8px",
                   }}>{g.cat}</div>
 
                   {g.units.map(u => {
@@ -276,8 +279,8 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                           : T("หน่วยงานนี้ไม่ได้เผยแพร่อีเมลไว้บนเว็บกองทัพเรือ",
                               "This unit publishes no email address")}
                         style={{
-                          padding: "9px 11px", borderRadius: 8, marginBottom: 6,
-                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "13px 16px", borderRadius: 9, marginBottom: 9,
+                          display: "flex", alignItems: "center", gap: 14,
                           cursor: selectable ? "pointer" : "not-allowed",
                           opacity: selectable ? 1 : 0.45,
                           border: "1px solid " + (on ? "var(--accent)" : "var(--border)"),
@@ -285,19 +288,19 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                           transition: "all .12s",
                         }}
                         onClick={() => { if (selectable) setAssignee(u.email); }}>
-                        <Icon name="shield" size={15}
+                        <Icon name="shield" size={20}
                           style={{ flexShrink: 0, color: on ? "var(--accent)" : "var(--text-mute)" }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, fontSize: "var(--fs-sm)" }}>{u.name}</div>
+                          <div style={{ fontWeight: 500, fontSize: "var(--fs-base)" }}>{u.name}</div>
                           <div style={{
-                            fontSize: "var(--fs-xs)", color: "var(--text-dim)",
+                            fontSize: "var(--fs-sm)", color: "var(--text-dim)", marginTop: 2,
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}>
                             {u.email || T("ไม่มีอีเมลเผยแพร่", "no published email")}
                             {u.suspect && " ⚠"}
                           </div>
                         </div>
-                        {on && <Icon name="check" size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+                        {on && <Icon name="check" size={21} style={{ color: "var(--accent)", flexShrink: 0 }} />}
                       </div>
                     );
                   })}
@@ -306,10 +309,10 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
 
               {selectedUnit && selectedUnit.suspect && (
                 <div style={{
-                  padding: "9px 12px", borderRadius: 7, marginTop: 4,
+                  padding: "13px 17px", borderRadius: 8, marginTop: 6,
                   background: "rgba(var(--crit-rgb),0.1)",
                   border: "1px solid rgba(var(--crit-rgb),0.3)",
-                  color: "var(--crit)", fontSize: "var(--fs-xs)", lineHeight: 1.6,
+                  color: "var(--crit)", fontSize: "var(--fs-sm)", lineHeight: 1.65,
                 }}>
                   {T("อีเมลของหน่วยงานนี้ไม่ใช่โดเมน navy.mi.th และมีลักษณะผิดปกติ " +
                      "ตามที่เว็บกองทัพเรือเผยแพร่ไว้ — ควรยืนยันกับหน่วยงานก่อนส่ง",
@@ -318,15 +321,15 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                 </div>
               )}
             </div>
-            <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)",
-              display: "flex", gap: 9, justifyContent: "flex-end" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setAssignOpen(false)}>
+            <div style={{ padding: "17px 22px", borderTop: "1px solid var(--border)",
+              display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button className="btn btn-ghost" onClick={() => setAssignOpen(false)}>
                 {T("ยกเลิก", "Cancel")}
               </button>
-              <button className="btn btn-primary btn-sm"
+              <button className="btn btn-primary"
                 style={{ opacity: assignee ? 1 : 0.5 }}
                 onClick={handleAssign}>
-                <Icon name="flag" size={13} />{T("ร่างอีเมลมอบหมาย", "Draft assignment email")}
+                <Icon name="flag" size={16} />{T("ร่างอีเมลมอบหมาย", "Draft assignment email")}
               </button>
             </div>
           </div>
