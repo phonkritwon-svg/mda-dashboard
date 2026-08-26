@@ -215,6 +215,28 @@ body {
 }
 .region-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 
+/* ชื่อผู้ใช้ที่ล็อกอินอยู่ ต่อท้ายป้ายพื้นที่บนแถบบน
+   ไม่ใส่กรอบเหมือน region-pill เพราะสองก้อนติดกันที่มีกรอบทั้งคู่จะอ่านเป็น
+   ปุ่มคู่ ทั้งที่ก้อนนี้กดไม่ได้ — ใช้เส้นคั่นบาง ๆ แทน */
+.topbar-user {
+  display: flex; align-items: center; gap: 7px;
+  padding-left: 12px; margin-left: 2px;
+  border-left: 1px solid var(--border);
+  font-size: var(--fs-sm); min-width: 0;
+}
+.topbar-user .tu-name {
+  font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px;
+}
+.topbar-user .tu-role {
+  font-size: var(--fs-xs); color: var(--text-dim);
+  padding: 1px 7px; border-radius: 100px;
+  background: var(--surface-3); white-space: nowrap; flex-shrink: 0;
+}
+/* จอแคบ: ตัดยศ-ชื่อออกก่อน เหลือแค่ป้ายสิทธิ์ซึ่งสั้นและสำคัญกว่าตอนพื้นที่จำกัด */
+@media (max-width: 1180px) { .topbar-user .tu-name { max-width: 120px; } }
+@media (max-width: 980px)  { .topbar-user { display: none; } }
+
 .clock { text-align: right; line-height: 1.15; }
 .clock .t { font-size: 15px; font-weight: 600; letter-spacing: 0.04em; }
 .clock .d { font-size: 10px; color: var(--text-dim); }

@@ -321,6 +321,18 @@ function App() {
             {T("ทั่วโลก · มหาสมุทรและช่องแคบหลัก", "Global · Seas & Chokepoints")}
           </div>
 
+          {/* ชื่อผู้ใช้ที่ล็อกอินอยู่ — เดิมเห็นได้จากการชี้เมาส์ที่วงกลมย่อชื่อเท่านั้น
+              ในห้องเฝ้าระวังที่ใช้เครื่องร่วมกัน การรู้ว่ากำลังสวมสิทธิ์ของใครอยู่
+              ต้องอ่านได้ทันทีโดยไม่ต้องชี้ ไม่งั้นคนถัดไปสั่งการในนามคนก่อนได้ง่าย ๆ
+              วงกลมย่อชื่อยังอยู่ที่เดิม เพราะเป็นปุ่มออกจากระบบ ไม่ใช่แค่ป้ายชื่อ */}
+          <div className="topbar-user" title={window.roleLabel(currentUser.role, lang)}>
+            <Icon name="shield" size={13} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
+            <span className="tu-name">
+              {[currentUser.rank, currentUser.name].filter(Boolean).join(" ")}
+            </span>
+            <span className="tu-role">{window.roleLabel(currentUser.role, lang)}</span>
+          </div>
+
           <div className="topbar-spacer"></div>
 
           <div className="row" style={{ gap: 8 }}>
