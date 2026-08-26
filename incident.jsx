@@ -4,15 +4,15 @@
 function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser }) {
   const T = (th, en) => lang === "th" ? th : en;
 
-  /* สิทธิ์สั่งการ — คุมสามปุ่มพร้อมกัน: มอบหมาย · ยกระดับ · สั่งการปฏิบัติ
+  /* สิทธิ์สั่งการ — คุมสองปุ่มพร้อมกัน: มอบหมาย · ยกระดับ
      ได้แก่ admin, ผู้บัญชาการ และยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป)
 
      ซ่อนปุ่มเฉย ๆ ไม่ใช่การบังคับสิทธิ์ ตัวบังคับจริงอยู่ที่ RLS ฝั่ง Supabase
      (ดู supabase/roles.sql) ที่นี่แค่ไม่ยื่นปุ่มที่กดไปก็ไม่ผ่านให้เกะกะ */
   const canAct = window.can(currentUser, "command");
 
-  /* ป้ายแทนปุ่มเมื่อยศไม่ถึง — ใช้ข้อความเดียวกันทั้งสามจุด
-     ถ้าเขียนแยกกันสามที่ วันที่เงื่อนไขเปลี่ยนจะแก้ไม่ครบแล้วผู้ใช้เจอคำอธิบาย
+  /* ป้ายแทนปุ่มเมื่อยศไม่ถึง — ใช้ข้อความเดียวกันทั้งสองจุด
+     ถ้าเขียนแยกกัน วันที่เงื่อนไขเปลี่ยนจะแก้ไม่ครบแล้วผู้ใช้เจอคำอธิบาย
      ที่ขัดกันเองในหน้าเดียว */
   const RankDenied = ({ icon, block }) => (
     <span className="dim"
@@ -43,7 +43,7 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignee, setAssignee] = useState("");
   const [escalated, setEscalated] = useState(false);
-  const [tasked, setTasked] = useState(false);
+  const [escalatedBy, setEscalatedBy] = useState("");
   const [unitQuery, setUnitQuery] = useState("");
 
   /* สถานะเหล่านี้ผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ
@@ -51,7 +51,7 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
      ป้าย "ยกระดับแล้ว" กับชื่อผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป */
   React.useEffect(() => {
     setEscalated(false);
-    setTasked(false);
+    setEscalatedBy("");
     setAssignee("");
     setAssignOpen(false);
   }, [e && e.id]);
@@ -168,20 +168,28 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
     );
   };
 
-  const handleEscalate = () => {
-    setEscalated(true);
-    if (showToast) showToast(
-      T("ยกระดับ " + e.id + " เป็น CRITICAL — แจ้งเตือนผู้บังคับบัญชาแล้ว",
-        "Escalated " + e.id + " to CRITICAL — command notified"), "warn"
-    );
-  };
+  /* ชื่อผู้กด — ยศนำหน้าชื่อเต็ม เช่น "น.ท. สมชาย ใจดี"
+     ถ้าโปรไฟล์ไม่มีชื่อจริงจะเหลือแค่ยศ หรือว่างเปล่า ต้องทนได้ทั้งสองแบบ */
+  const actorName = currentUser
+    ? [currentUser.rank, currentUser.name].filter(Boolean).join(" ")
+    : "";
 
-  const handleTask = () => {
-    setTasked(true);
+  /* ยกระดับเป็นปุ่มสลับแบบปักหมุด กดซ้ำเพื่อถอนได้
+     เดิมกดแล้วกดกลับไม่ได้เลย ซึ่งแปลว่ากดพลาดครั้งเดียวก็ค้างเป็น CRITICAL
+     ตลอดจนกว่าจะสลับเหตุการณ์ทิ้ง */
+  const handleEscalate = () => {
+    if (escalated) {
+      setEscalated(false);
+      setEscalatedBy("");
+      if (showToast) showToast(
+        T("ถอนการยกระดับ " + e.id + " แล้ว", "Removed the escalation on " + e.id), "info");
+      return;
+    }
+    setEscalated(true);
+    setEscalatedBy(actorName);
     if (showToast) showToast(
-      T("สั่งการปฏิบัติ " + e.id + " ส่งแล้ว — รอการยืนยันจากหน่วย",
-        "Tasking for " + e.id + " sent — awaiting unit confirmation"), "info"
-    );
+      T("ยกระดับแล้วโดย " + (actorName || "ผู้ใช้"),
+        "Escalated by " + (actorName || "user")), "warn");
   };
 
   const score = escalated ? 95 : sevScore;
@@ -403,11 +411,16 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
 
           {canAct ? (
             <button
-              className={"btn btn-sm " + (escalated ? "btn-ghost" : "btn-primary")}
-              onClick={escalated ? null : handleEscalate}
-              style={{ opacity: escalated ? 0.6 : 1 }}>
-              <Icon name="shield" size={14} />
-              {escalated ? T("ยกระดับแล้ว", "Escalated") : T("ยกระดับ", "Escalate")}
+              className={"btn btn-sm " + (escalated ? "btn-primary" : "btn-ghost")}
+              onClick={handleEscalate}
+              title={escalated
+                ? T("กดอีกครั้งเพื่อถอนการยกระดับ", "Click again to remove the escalation")
+                : T("ยกระดับเหตุการณ์เป็น CRITICAL", "Raise this incident to CRITICAL")}>
+              <Icon name="pin" size={14} />
+              {escalated
+                ? T("ยกระดับแล้วโดย " + (escalatedBy || "ผู้ใช้"),
+                    "Escalated by " + (escalatedBy || "user"))
+                : T("ยกระดับ", "Escalate")}
             </button>
           ) : <RankDenied icon="shield" />}
         </div>
@@ -571,15 +584,6 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                 </div>
               ))}
             </div>
-            {canAct ? (
-              <button
-                className={"btn btn-sm " + (tasked ? "btn-ghost" : "btn-primary")}
-                style={{ width: "100%", marginTop: 12, opacity: tasked ? 0.7 : 1 }}
-                onClick={tasked ? null : handleTask}>
-                <Icon name={tasked ? "check" : "target"} size={14} />
-                {tasked ? T("ส่งคำสั่งแล้ว", "Tasking Sent") : T("สั่งการปฏิบัติ", "Task an asset")}
-              </button>
-            ) : <RankDenied icon="target" block />}
           </Panel>
         </div>
       </div>
