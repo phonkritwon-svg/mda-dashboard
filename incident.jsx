@@ -49,6 +49,7 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   const [assignNote, setAssignNote] = useState("");
   const [people, setPeople] = useState(null);   // null = ยังไม่โหลด
   const [sending, setSending] = useState(false);
+  const [evListOpen, setEvListOpen] = useState(false);
 
   /* สถานะผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ — ไม่ตั้งใหม่ทุกครั้งที่สลับ
      ป้าย "ยกระดับแล้ว" กับผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป
@@ -61,6 +62,7 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
     setEscalatedBy((e && e.escalatedBy) || "");
     setAssignee("");
     setAssignOpen(false);
+    setEvListOpen(false);
   }, [e && e.id, e && e.escalatedAt, e && e.escalatedBy]);
 
 
@@ -350,31 +352,74 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
             <Icon name="chevR" size={14} />
           </button>
 
-          {/* รายการทั้งหมด — เรียงตามความรุนแรงเหมือนที่อื่น กดข้ามไปตัวไหนก็ได้ */}
-          <div className="row" style={{ gap: 6, overflowX: "auto", flex: 1, paddingBottom: 2 }}>
-            {events.map((ev, i) => {
-              const active = ev.id === e.id;
-              const col = (window.SEV[ev.sev] || window.SEV.low).color;
-              return (
-                <button key={ev.id} onClick={() => go(i)} title={tx(ev.title, lang)}
-                  className="btn btn-sm"
-                  style={{
-                    flex: "0 0 auto", maxWidth: 190, whiteSpace: "nowrap",
-                    overflow: "hidden", textOverflow: "ellipsis",
-                    borderColor: active ? col : "var(--border-2)",
-                    background: active ? "color-mix(in srgb, " + col + " 14%, transparent)" : "transparent",
-                    color: active ? "var(--text)" : "var(--text-dim)",
-                  }}>
-                  <span style={{
-                    display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                    background: col, marginRight: 6, verticalAlign: "middle",
-                  }} />
-                  {/* ใช้พาดหัว ไม่ใช่ชื่อพื้นที่ — หลายเหตุการณ์อยู่พื้นที่เดียวกัน
-                      ป้ายจะซ้ำจนแยกไม่ออกว่าอันไหนคืออันไหน */}
-                  {tx(ev.title, lang)}
-                </button>
-              );
-            })}
+          {/* รายการทั้งหมดเป็นดรอปดาวน์ — ของเดิมเป็นแถบปุ่มเลื่อนแนวนอน
+              ซึ่งพอเหตุการณ์แตะหลักสิบก็ต้องลากหาทีละอัน และพาดหัวถูกตัด
+              จนเหลือไม่กี่คำ แยกไม่ออกว่าอันไหนคืออันไหน
+              ดรอปดาวน์เห็นทีละหลายบรรทัดและอ่านพาดหัวได้เต็ม */}
+          <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+            <button className="btn btn-ghost btn-sm"
+              onClick={() => setEvListOpen(o => !o)}
+              title={T("เลือกเหตุการณ์", "Pick an incident")}
+              style={{ width: "100%", justifyContent: "flex-start", gap: 8, overflow: "hidden" }}>
+              <span style={{
+                display: "inline-block", width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                background: (window.SEV[e.sev] || window.SEV.low).color,
+              }} />
+              <span style={{ flex: 1, minWidth: 0, textAlign: "left", whiteSpace: "nowrap",
+                overflow: "hidden", textOverflow: "ellipsis" }}>
+                {tx(e.title, lang)}
+              </span>
+              <Icon name="chevR" size={12}
+                style={{ flexShrink: 0, opacity: 0.6, transform: "rotate(90deg)" }} />
+            </button>
+
+            {evListOpen && (
+              <React.Fragment>
+                {/* ฉากหลังรับคลิกนอกรายการ — 930 อยู่เหนือแผนที่เต็มจอ (890)
+                    แต่ต่ำกว่ากล่องมอบหมาย (920)... ต้องสูงกว่า ไม่งั้นคลิกทะลุ */}
+                <div style={{ position: "fixed", inset: 0, zIndex: 930 }}
+                  onClick={() => setEvListOpen(false)} />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 931,
+                  background: "var(--surface-2)", border: "1px solid var(--border-2)",
+                  borderRadius: 10, boxShadow: "var(--shadow)", padding: 5,
+                  maxHeight: "56vh", overflowY: "auto",
+                }}>
+                  {events.map((ev, i) => {
+                    const active = ev.id === e.id;
+                    const col = (window.SEV[ev.sev] || window.SEV.low).color;
+                    return (
+                      <div key={ev.id}
+                        onClick={() => { setEvListOpen(false); go(i); }}
+                        style={{
+                          display: "flex", alignItems: "flex-start", gap: 9,
+                          padding: "8px 10px", borderRadius: 7, cursor: "pointer",
+                          background: active ? "var(--surface-3)" : "transparent",
+                          color: active ? "var(--text)" : "var(--text-dim)",
+                          fontWeight: active ? 600 : 400, fontSize: "var(--fs-sm)",
+                          lineHeight: 1.5,
+                        }}
+                        onMouseEnter={ev2 => { if (!active) ev2.currentTarget.style.background = "var(--surface-3)"; }}
+                        onMouseLeave={ev2 => { if (!active) ev2.currentTarget.style.background = "transparent"; }}>
+                        <span style={{
+                          display: "inline-block", width: 7, height: 7, borderRadius: "50%",
+                          background: col, flexShrink: 0, marginTop: 6,
+                        }} />
+                        <span className="mono" style={{
+                          fontSize: "var(--fs-xs)", color: "var(--text-mute)",
+                          flexShrink: 0, marginTop: 1, minWidth: 26,
+                        }}>{i + 1}</span>
+                        {/* ไม่ตัดข้อความ — เหตุผลเดียวกับที่เลิกใช้แถบแนวนอน
+                            พาดหัวยาวคือสิ่งที่ต้องอ่านให้จบถึงจะรู้ว่าใช่อันที่หาไหม */}
+                        <span style={{ flex: 1, minWidth: 0 }}>{tx(ev.title, lang)}</span>
+                        {active && <Icon name="check" size={14}
+                          style={{ color: "var(--accent)", flexShrink: 0, marginTop: 2 }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </React.Fragment>
+            )}
           </div>
         </div>
       )}
