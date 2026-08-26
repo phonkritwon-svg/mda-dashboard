@@ -110,8 +110,10 @@ create policy "events_command_update"
 -- ── ตรวจผล ─────────────────────────────────────────────────────
 -- ต้องเห็น events_command_insert / events_command_update และไม่เห็นตัว _auth_
 --
--- select polname, cmd from pg_policies
---  where schemaname = 'public' and tablename = 'events' order by polname;
+-- view pg_policies ใช้ชื่อคอลัมน์ policyname — ส่วน polname เป็นของตาราง
+-- catalog pg_policy คนละตัวกัน ใส่สลับกันจะได้ error 42703
+-- select tablename, policyname, cmd from pg_policies
+--  where schemaname = 'public' and tablename = 'events' order by policyname;
 --
 -- เช็คว่าตัวเองสั่งการได้ไหม (รันตอนล็อกอินในแอป ไม่ใช่ใน SQL Editor
 -- เพราะ SQL Editor ไม่มี auth.uid() จะได้ false เสมอ):
