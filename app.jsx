@@ -34,6 +34,9 @@ const NAV_ADMIN = [
   { key: "admin", icon: "settings", th: "จัดการผู้ใช้", en: "Users" },
 ];
 
+// กล่องข้อความ — ทุกคนเห็น เพราะทุกคนถูกมอบหมายงานได้ ไม่ว่ายศใด
+const NAV_INBOX = { key: "inbox", icon: "feed", th: "กล่องข้อความ", en: "Inbox" };
+
 const NAV = [
   { key: "dashboard", icon: "dashboard", th: "ภาพรวม",   en: "Overview" },
   { key: "map",       icon: "radar",     th: "แผนที่",    en: "Map" },
@@ -41,6 +44,7 @@ const NAV = [
   { key: "chat",      icon: "spark",     th: "ถาม-ตอบ",  en: "Ask AI" },
   { key: "incident",  icon: "alert",     th: "เหตุการณ์", en: "Incidents" },
   { key: "brief",     icon: "brief",     th: "รายงาน",   en: "Brief" },
+  NAV_INBOX,
 ];
 
 function Clock({ lang }) {
@@ -105,10 +109,15 @@ async function buildAppUser(session) {
      พังแบบปิดประตูดีกว่าพังแบบเปิดประตู */
   const role     = window.normRole(prof && prof.role);
   const avatar   = initialsOf(name);
-  return { user: username, name, rank, role, avatar, fromSession: true };
+  /* id ของบัญชี — จำเป็นตั้งแต่มีกล่องข้อความ เพราะ policy assignments_send
+     บังคับว่า from_id ต้องเท่ากับ auth.uid() และกล่องขาเข้าคิวรีด้วย to_id
+     ชื่อผู้ใช้ใช้แทนไม่ได้ มันเปลี่ยนได้และไม่ใช่กุญแจของ auth.users */
+  return { id: session.user.id, user: username, name, rank, role, avatar, fromSession: true };
 }
 
-// ย่อชื่อเป็นตัวอักษรสำหรับ avatar — เดิมอยู่ใน login.jsx ที่ถอดออกไปแล้ว
+/* ย่อชื่อเป็นตัวอักษรสำหรับ avatar — เดิมอยู่ใน login.jsx ที่ถอดออกไปแล้ว
+   ประกาศเป็น global ของสคริปต์ธรรมดา จอ/โมดูลอื่นจึงเรียก window.initialsOf ได้
+   (ใช้ในกล่องเลือกผู้รับมอบหมาย) */
 function initialsOf(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "??";
@@ -270,6 +279,10 @@ function App() {
   // ---- การแจ้งเตือนจริง: เด้งเมื่อมีข่าว/เหตุการณ์ใหม่เข้าฟีด ----
   const { notifications, unread: notifUnread, markAllSeen } = window.useNotifications(feedNews);
 
+  /* นับข้อความที่ยังไม่อ่านไว้ติดเมนู — เรียกที่ระดับ App ไม่ใช่ในจอกล่องข้อความ
+     เพราะต้องเห็นตัวเลขจากทุกหน้า ไม่ใช่เฉพาะตอนเปิดกล่องอยู่ */
+  const { unread: inboxUnread } = window.useInbox(currentUser);
+
   const screens = {
     dashboard: <window.Dashboard {...screenProps} />,
     map:       <window.MapScreen  {...screenProps} initial={route.payload} />,
@@ -278,6 +291,7 @@ function App() {
     chat:      <window.ChatScreen {...screenProps} />,
     incident:  <window.Incident   {...screenProps} initial={route.payload} />,
     brief:     <window.DailyBrief {...screenProps} />,
+    inbox:     <window.InboxScreen {...screenProps} />,
     admin:     <window.AdminUsers {...screenProps} />,
   };
 
@@ -395,6 +409,9 @@ function App() {
               <span className="nav-lbl">{T(n.th, n.en)}</span>
               {n.key === "incident" && data.events.filter(e => !e.resolved).length > 0 && (
                 <span className="nav-badge">{data.events.filter(e => !e.resolved).length}</span>
+              )}
+              {n.key === "inbox" && inboxUnread > 0 && (
+                <span className="nav-badge">{inboxUnread}</span>
               )}
             </div>
           ))}

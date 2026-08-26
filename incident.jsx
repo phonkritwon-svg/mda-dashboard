@@ -45,7 +45,10 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   const [escalated, setEscalated] = useState(false);
   const [escalatedBy, setEscalatedBy] = useState("");
   const [escalating, setEscalating] = useState(false);
-  const [unitQuery, setUnitQuery] = useState("");
+  const [assignQuery, setAssignQuery] = useState("");
+  const [assignNote, setAssignNote] = useState("");
+  const [people, setPeople] = useState(null);   // null = ยังไม่โหลด
+  const [sending, setSending] = useState(false);
 
   /* สถานะผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ — ไม่ตั้งใหม่ทุกครั้งที่สลับ
      ป้าย "ยกระดับแล้ว" กับผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป
@@ -61,27 +64,29 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   }, [e && e.id, e && e.escalatedAt, e && e.escalatedBy]);
 
 
-  /* หน่วยงานกองทัพเรือ — มาจาก navy-units.js (ดึงจาก navy.mi.th/organization)
-     ไม่ใช่รายชื่อที่แก้ในหน้าเว็บได้อีกแล้ว เพราะปลายทางเป็นอีเมลราชการจริง
-     ถ้าให้เพิ่มเองได้ จะมีคนพิมพ์อีเมลผิดแล้วส่งหนังสือราชการไปผิดที่ */
-  const unitGroups = window.MDA_NAVY_UNITS || [];
-  const unitsFlat  = window.MDA_NAVY_UNITS_FLAT || [];
+  /* รายชื่อผู้ใช้ที่มอบหมายได้ — โหลดตอนเปิดกล่องเท่านั้น ไม่ใช่ตอนเปิดหน้า
+     คนส่วนใหญ่เข้าหน้าเหตุการณ์เพื่ออ่าน ไม่ได้จะมอบหมายทุกครั้ง */
+  React.useEffect(() => {
+    if (!assignOpen || people !== null) return;
+    let alive = true;
+    window.loadAssignableUsers().then(res => {
+      if (alive) setPeople(res.users || []);
+    });
+    return () => { alive = false; };
+  }, [assignOpen, people]);
 
-  /* ค้นหาแบบไม่สนตัวพิมพ์ ค้นได้ทั้งชื่อหน่วย ชื่อหมวด และอีเมล
-     ค้นด้วยอีเมลมีประโยชน์จริงเวลารู้ปลายทางแต่จำชื่อหน่วยเต็มไม่ได้ */
-  const visibleGroups = (() => {
-    const q = unitQuery.trim().toLowerCase();
-    if (!q) return unitGroups;
-    return unitGroups
-      .map(g => ({
-        cat: g.cat,
-        units: g.units.filter(u =>
-          (u.name + " " + g.cat + " " + u.email).toLowerCase().indexOf(q) >= 0),
-      }))
-      .filter(g => g.units.length);
-  })();
+  /* ค้นได้ทั้งชื่อผู้ใช้ ชื่อจริง ยศ และสิทธิ์
+     ตัวเองไม่อยู่ในรายการ — มอบหมายงานให้ตัวเองไม่ได้บอกอะไรใคร */
+  const visiblePeople = (people || [])
+    .filter(u => !currentUser || u.id !== currentUser.id)
+    .filter(u => {
+      const q = assignQuery.trim().toLowerCase();
+      if (!q) return true;
+      return [u.username, u.full_name, u.rank, window.roleLabel(u.role, "th")]
+        .join(" ").toLowerCase().indexOf(q) >= 0;
+    });
 
-  const selectedUnit = unitsFlat.find(u => u.email && u.email === assignee) || null;
+  const selectedPerson = (people || []).find(u => u.id === assignee) || null;
 
   // ยังไม่มีเหตุการณ์ในฐานข้อมูล → empty state + ปุ่มเพิ่ม
   if (!events) {
@@ -119,57 +124,39 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
     return la + " " + lo;
   };
 
-  /* ร่างอีเมลมอบหมายแล้วเปิดโปรแกรมเมลของผู้ใช้ — ไม่ได้ส่งเอง
+  /* ส่งเข้ากล่องข้อความในระบบ ไม่ใช่ร่างอีเมลออกไปข้างนอกอีกแล้ว
+     ข้อดีที่ได้กลับมาคือรู้ว่าผู้รับอ่านแล้วหรือยัง
 
-     จงใจใช้ mailto: ไม่ใช่การยิง API ส่งเมลจากเซิร์ฟเวอร์ เพราะปลายทาง
-     เป็นตู้จดหมายราชการจริงของกองทัพเรือ การกดผิดหนึ่งครั้งแล้วจดหมาย
-     ออกไปทันทีเรียกคืนไม่ได้ วิธีนี้ผู้ใช้ได้เห็นและกดส่งเองเสมอ
-     และไม่ต้องเก็บคีย์ผู้ให้บริการเมลไว้ที่ไหนเลย */
-  const buildAssignMail = (unit) => {
-    const subject = "[MDA] มอบหมายเหตุการณ์ " + e.id + " — " + tx(e.title, "th");
-    const pos = (e.lat != null && e.lon != null) ? fmtPos(e.lat, e.lon) : "-";
-    const me  = currentUser
-      ? [currentUser.rank, currentUser.name].filter(Boolean).join(" ")
-      : "";
-    const lines = [
-      "เรียน " + unit.name,
-      "",
-      "ขอส่งเหตุการณ์จากระบบเฝ้าระวังทางทะเล (MDA) เพื่อโปรดพิจารณาดำเนินการ",
-      "",
-      "รหัสเหตุการณ์ : " + e.id,
-      "หัวข้อ        : " + tx(e.title, "th"),
-      "ระดับความรุนแรง: " + String(e.sev || "").toUpperCase(),
-      "พื้นที่        : " + [tx(e.area, "th"), tx(e.region, "th")].filter(Boolean).join(" / "),
-      "พิกัด         : " + pos,
-      "เวลา          : " + (e.time || "-"),
-      "",
-      "สรุป:",
-      tx(e.summary, "th") || "-",
-    ];
-    if (e.source && e.source.url) {
-      lines.push("", "แหล่งข่าว: " + (e.source.outlet || "") + " " + e.source.url);
+     เขียนลงฐานข้อมูลก่อนแล้วค่อยปิดกล่อง เหมือนปุ่มยกระดับ — ถ้าส่งไม่ผ่าน
+     กล่องต้องยังเปิดอยู่พร้อมข้อความบอกเหตุผล ไม่ใช่ปิดไปเงียบ ๆ
+     แล้วคนส่งเข้าใจว่าส่งแล้ว */
+  const handleAssign = async () => {
+    if (sending) return;
+    const to = (people || []).find(u => u.id === assignee);
+    if (!to) return;
+    setSending(true);
+    const res = await window.sendAssignment({
+      eventId:    e.id,
+      toId:       to.id,
+      toName:     [to.rank, to.full_name || to.username].filter(Boolean).join(" "),
+      fromId:     currentUser && currentUser.id,
+      fromName:   actorName,
+      eventTitle: tx(e.title, "th"),
+      eventSev:   e.sev,
+      note:       assignNote.trim(),
+    });
+    setSending(false);
+    if (res.error) {
+      if (showToast) showToast(res.error, "error");
+      return;
     }
-    lines.push("", "ส่งจากระบบ MDA · ศูนย์บัญชาการข่าวทางทะเล");
-    if (me) lines.push("ผู้มอบหมาย: " + me);
-
-    return "mailto:" + encodeURIComponent(unit.email)
-      + "?subject=" + encodeURIComponent(subject)
-      + "&body=" + encodeURIComponent(lines.join("\n"));
-  };
-
-  const handleAssign = () => {
-    const unit = unitsFlat.find(u => u.email === assignee);
-    if (!unit || !unit.email) return;
-    /* เปิดในแท็บเดียวกันด้วย location.href — window.open() ถูก popup blocker
-       กินบ่อยเมื่อมี await คั่นก่อนหน้า ส่วน mailto: ไม่ทำให้หน้าเว็บถูกทิ้ง
-       เบราว์เซอร์แค่ส่งต่อให้โปรแกรมเมล หน้าเดิมยังอยู่ */
-    window.location.href = buildAssignMail(unit);
     setAssignOpen(false);
     setAssignee("");
+    setAssignNote("");
+    setAssignQuery("");
     if (showToast) showToast(
-      T("ร่างอีเมลถึง " + unit.name + " แล้ว — ตรวจแล้วกดส่งในโปรแกรมเมล",
-        "Drafted an email to " + unit.name + " — review and send it in your mail app"), "ok"
-    );
+      T("มอบหมาย " + e.id + " ให้ " + (to.full_name || to.username) + " แล้ว",
+        "Assigned " + e.id + " to " + (to.full_name || to.username)), "ok");
   };
 
   /* ชื่อผู้กด — ยศนำหน้าชื่อเต็ม เช่น "น.ท. สมชาย ใจดี"
@@ -239,12 +226,12 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
             </div>
             <div style={{ padding: 22, maxHeight: "72vh", overflowY: "auto" }}>
               <div className="dim" style={{ fontSize: "var(--fs-base)", marginBottom: 14 }}>
-                {T("เลือกหน่วยงานที่รับผิดชอบ — ระบบจะร่างอีเมลให้ตรวจก่อนส่ง",
-                   "Choose the responsible unit — an email draft opens for you to review")}
+                {T("เลือกผู้รับผิดชอบ — ข้อความจะเข้ากล่องของเขาในระบบนี้",
+                   "Choose who is responsible — it lands in their inbox here")}
               </div>
 
-              <input value={unitQuery} onChange={ev => setUnitQuery(ev.target.value)}
-                placeholder={T("ค้นหาหน่วยงาน…", "Search units…")}
+              <input value={assignQuery} onChange={ev => setAssignQuery(ev.target.value)}
+                placeholder={T("ค้นหาชื่อ ยศ หรือสิทธิ์…", "Search name, rank or role…")}
                 style={{
                   width: "100%", boxSizing: "border-box", marginBottom: 16,
                   background: "var(--surface)", border: "1px solid var(--border-2)",
@@ -252,74 +239,72 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                   fontFamily: "var(--font-ui)", fontSize: "var(--fs-base)", outline: "none",
                 }} />
 
-              {visibleGroups.length === 0 && (
+              {people === null && (
                 <div className="empty" style={{ padding: "26px 0", fontSize: "var(--fs-base)" }}>
-                  {T("ไม่พบหน่วยงานที่ตรงกับคำค้น", "No unit matches that search")}
+                  <Icon name="refresh" size={16} style={{ animation: "sweep 0.9s linear infinite" }} />
+                  <span style={{ marginLeft: 8 }}>{T("กำลังโหลดรายชื่อ…", "Loading people…")}</span>
                 </div>
               )}
 
-              {visibleGroups.map(g => (
-                <div key={g.cat} style={{ marginBottom: 20 }}>
-                  <div style={{
-                    fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em",
-                    color: "var(--text-mute)", fontFamily: "var(--font-mono)",
-                    padding: "0 2px 8px",
-                  }}>{g.cat}</div>
+              {people !== null && !visiblePeople.length && (
+                <div className="empty" style={{ padding: "26px 0", fontSize: "var(--fs-base)" }}>
+                  {people.length <= 1
+                    ? T("ยังไม่มีผู้ใช้คนอื่นในระบบให้มอบหมาย",
+                        "There is nobody else in the system to assign to")
+                    : T("ไม่พบผู้ใช้ที่ตรงกับคำค้น", "No one matches that search")}
+                </div>
+              )}
 
-                  {g.units.map(u => {
-                    const selectable = !!u.email;
-                    const on = selectable && assignee === u.email;
-                    return (
-                      <div key={g.cat + "|" + u.name}
-                        /* navy-units.js เก็บเฉพาะหน่วยที่มีอีเมลแล้ว สาขา
-                           selectable=false จึงไม่ควรเกิด — เก็บไว้เป็นตาข่าย
-                           เผื่อมีคนแก้ไฟล์ข้อมูลแล้วใส่หน่วยที่ไม่มีอีเมลเข้ามา
-                           ดีกว่าปล่อยให้สร้าง mailto: ที่ไม่มีผู้รับ */
-                        title={selectable ? u.email
-                          : T("หน่วยงานนี้ไม่ได้เผยแพร่อีเมลไว้บนเว็บกองทัพเรือ",
-                              "This unit publishes no email address")}
-                        style={{
-                          padding: "13px 16px", borderRadius: 9, marginBottom: 9,
-                          display: "flex", alignItems: "center", gap: 14,
-                          cursor: selectable ? "pointer" : "not-allowed",
-                          opacity: selectable ? 1 : 0.45,
-                          border: "1px solid " + (on ? "var(--accent)" : "var(--border)"),
-                          background: on ? "rgba(var(--accent-rgb),0.07)" : "var(--surface)",
-                          transition: "all .12s",
-                        }}
-                        onClick={() => { if (selectable) setAssignee(u.email); }}>
-                        <Icon name="shield" size={20}
-                          style={{ flexShrink: 0, color: on ? "var(--accent)" : "var(--text-mute)" }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, fontSize: "var(--fs-base)" }}>{u.name}</div>
-                          <div style={{
-                            fontSize: "var(--fs-sm)", color: "var(--text-dim)", marginTop: 2,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {u.email || T("ไม่มีอีเมลเผยแพร่", "no published email")}
-                            {u.suspect && " ⚠"}
-                          </div>
-                        </div>
-                        {on && <Icon name="check" size={21} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+              {visiblePeople.map(u => {
+                const on = assignee === u.id;
+                const display = u.full_name || u.username;
+                return (
+                  <div key={u.id}
+                    title={u.username}
+                    style={{
+                      padding: "13px 16px", borderRadius: 9, marginBottom: 9,
+                      display: "flex", alignItems: "center", gap: 14, cursor: "pointer",
+                      border: "1px solid " + (on ? "var(--accent)" : "var(--border)"),
+                      background: on ? "rgba(var(--accent-rgb),0.07)" : "var(--surface)",
+                      transition: "all .12s",
+                    }}
+                    onClick={() => setAssignee(u.id)}>
+                    <div className="avatar" style={{ width: 38, height: 38, fontSize: 13, flexShrink: 0 }}>
+                      {window.initialsOf ? window.initialsOf(display) : display.slice(0, 2)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, fontSize: "var(--fs-base)" }}>
+                        {[u.rank, display].filter(Boolean).join(" ")}
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
+                      <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-dim)", marginTop: 2 }}>
+                        {window.roleLabel(u.role, lang)}
+                        {window.can({ role: u.role, rank: u.rank }, "command") &&
+                          " · " + T("สั่งการได้", "can command")}
+                      </div>
+                    </div>
+                    {on && <Icon name="check" size={21} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+                  </div>
+                );
+              })}
 
-              {selectedUnit && selectedUnit.suspect && (
-                <div style={{
-                  padding: "13px 17px", borderRadius: 8, marginTop: 6,
-                  background: "rgba(var(--crit-rgb),0.1)",
-                  border: "1px solid rgba(var(--crit-rgb),0.3)",
-                  color: "var(--crit)", fontSize: "var(--fs-sm)", lineHeight: 1.65,
-                }}>
-                  {T("อีเมลของหน่วยงานนี้ไม่ใช่โดเมน navy.mi.th และมีลักษณะผิดปกติ " +
-                     "ตามที่เว็บกองทัพเรือเผยแพร่ไว้ — ควรยืนยันกับหน่วยงานก่อนส่ง",
-                     "This address is not on navy.mi.th and looks irregular as published " +
-                     "by the navy site — confirm with the unit before sending")}
-                </div>
-              )}
+              {/* ข้อความแนบ — ไม่บังคับ แต่เกือบทุกครั้งที่มอบหมายมีเจตนา
+                  ที่ตัวเหตุการณ์ไม่ได้บอก เช่น ให้ประสานหน่วยไหนต่อ */}
+              <div style={{ marginTop: 18 }}>
+                <label style={{
+                  fontSize: "var(--fs-xs)", color: "var(--text-dim)", letterSpacing: "0.06em",
+                  textTransform: "uppercase", display: "block", marginBottom: 7, fontWeight: 500,
+                }}>{T("ข้อความถึงผู้รับ (ไม่บังคับ)", "Message to the recipient (optional)")}</label>
+                <textarea value={assignNote} onChange={ev => setAssignNote(ev.target.value)}
+                  rows={3} placeholder={T("เช่น ประสาน ทัพเรือภาคที่ ๒ แล้วรายงานกลับภายใน 6 ชม.",
+                                          "e.g. coordinate with NAC2 and report back within 6 hours")}
+                  style={{
+                    width: "100%", boxSizing: "border-box", resize: "vertical",
+                    background: "var(--surface)", border: "1px solid var(--border-2)",
+                    borderRadius: 8, padding: "11px 15px", color: "var(--text)",
+                    fontFamily: "var(--font-ui)", fontSize: "var(--fs-sm)",
+                    lineHeight: 1.6, outline: "none",
+                  }} />
+              </div>
             </div>
             <div style={{ padding: "17px 22px", borderTop: "1px solid var(--border)",
               display: "flex", gap: 12, justifyContent: "flex-end" }}>
@@ -327,9 +312,12 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                 {T("ยกเลิก", "Cancel")}
               </button>
               <button className="btn btn-primary"
-                style={{ opacity: assignee ? 1 : 0.5 }}
+                style={{ opacity: assignee && !sending ? 1 : 0.5 }}
+                disabled={sending}
                 onClick={handleAssign}>
-                <Icon name="flag" size={16} />{T("ร่างอีเมลมอบหมาย", "Draft assignment email")}
+                <Icon name={sending ? "refresh" : "flag"} size={16}
+                  style={sending ? { animation: "sweep 0.9s linear infinite" } : null} />
+                {sending ? T("กำลังส่ง…", "Sending…") : T("มอบหมาย", "Assign")}
               </button>
             </div>
           </div>
