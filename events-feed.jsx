@@ -472,6 +472,9 @@ function eventRowToObj(r) {
     resolved: !!r.resolved,
     origin:  r.origin || "manual",
     publishedAt: t,
+    /* escalated_at เป็นตัวชี้ขาด ไม่มี flag แยก — ดู supabase/events_escalation.sql */
+    escalatedAt: r.escalated_at || null,
+    escalatedBy: r.escalated_by || "",
   };
 }
 
@@ -497,6 +500,8 @@ function eventObjToRow(o) {
     tags:          o.tags || [],
     source_outlet: o.source.outlet || null,
     source_url:    o.source.url || null,
+    escalated_at:  o.escalatedAt || null,
+    escalated_by:  o.escalatedBy || null,
     resolved:      !!o.resolved,
     origin:        o.origin || "manual",
     published_at:  o.publishedAt || new Date().toISOString(),
@@ -552,6 +557,30 @@ async function addEventToSupabase(obj) {
       return { error: "ไม่มีสิทธิ์เพิ่มเหตุการณ์ — ต้องเป็นผู้บัญชาการ ผู้ดูแลระบบ หรือยศชั้นสัญญาบัตร" };
     if (error) return { error: error.message };
     return { ok: true };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+/* เขียนสถานะยกระดับกลับ Supabase — แตะแค่สองคอลัมน์ ไม่ส่งทั้งแถว
+   ถ้าส่งทั้งแถวจะทับงานที่คนอื่นเพิ่งแก้ในเหตุการณ์เดียวกัน
+
+   ปลด: ส่ง null ทั้งคู่ · ยกระดับ: ส่งเวลาปัจจุบันกับชื่อผู้กด
+   สิทธิ์บังคับที่ policy events_command_update ฝั่ง Supabase ไม่ใช่ที่นี่ */
+async function setEventEscalation(id, by) {
+  const SB = window.MDA_SB;
+  if (!SB) return { error: "no_supabase" };
+  const patch = by
+    ? { escalated_at: new Date().toISOString(), escalated_by: by }
+    : { escalated_at: null, escalated_by: null };
+  try {
+    const { error } = await SB.from("events").update(patch).eq("id", id);
+    if (error) {
+      if (error.code === "42501" || /row-level security|policy/i.test(error.message || ""))
+        return { error: "ไม่มีสิทธิ์ยกระดับ — ต้องเป็นผู้บัญชาการ ผู้ดูแลระบบ หรือยศชั้นสัญญาบัตร" };
+      return { error: error.message };
+    }
+    return { ok: true, patch };
   } catch (e) {
     return { error: String(e) };
   }
@@ -807,7 +836,8 @@ function AddEventButton({ addEvent, lang, showToast, className, currentUser }) {
 }
 
 Object.assign(window, {
-  useEventsUpdater, addEventToSupabase, loadEventsFromSupabase, queryEventsArchive,
+  useEventsUpdater, addEventToSupabase, setEventEscalation,
+  loadEventsFromSupabase, queryEventsArchive,
   AddEventModal, AddEventButton, REGION_PRESETS,
   geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews, extractNewsPointsFromNews,
   extractEventsFromNews, mergeEvents,

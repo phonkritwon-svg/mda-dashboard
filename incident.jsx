@@ -44,17 +44,21 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   const [assignee, setAssignee] = useState("");
   const [escalated, setEscalated] = useState(false);
   const [escalatedBy, setEscalatedBy] = useState("");
+  const [escalating, setEscalating] = useState(false);
   const [unitQuery, setUnitQuery] = useState("");
 
-  /* สถานะเหล่านี้ผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ
-     ก่อนหน้านี้ไม่มีทางสลับเหตุการณ์จึงไม่เคยเห็นปัญหา — พอสลับได้แล้ว
-     ป้าย "ยกระดับแล้ว" กับชื่อผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป */
+  /* สถานะผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ — ไม่ตั้งใหม่ทุกครั้งที่สลับ
+     ป้าย "ยกระดับแล้ว" กับผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป
+
+     ค่าเริ่มต้นมาจากเหตุการณ์ ไม่ใช่ false เสมอ — สถานะยกระดับถูกเก็บใน
+     Supabase แล้ว (escalated_at/escalated_by) จึงต้องอ่านกลับมาแสดง
+     ไม่งั้นรีเฟรชแล้วปุ่มจะขึ้นว่ายังไม่ยกระดับทั้งที่ในฐานข้อมูลยกระดับอยู่ */
   React.useEffect(() => {
-    setEscalated(false);
-    setEscalatedBy("");
+    setEscalated(!!(e && e.escalatedAt));
+    setEscalatedBy((e && e.escalatedBy) || "");
     setAssignee("");
     setAssignOpen(false);
-  }, [e && e.id]);
+  }, [e && e.id, e && e.escalatedAt, e && e.escalatedBy]);
 
 
   /* หน่วยงานกองทัพเรือ — มาจาก navy-units.js (ดึงจาก navy.mi.th/organization)
@@ -177,8 +181,22 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   /* ยกระดับเป็นปุ่มสลับแบบปักหมุด กดซ้ำเพื่อถอนได้
      เดิมกดแล้วกดกลับไม่ได้เลย ซึ่งแปลว่ากดพลาดครั้งเดียวก็ค้างเป็น CRITICAL
      ตลอดจนกว่าจะสลับเหตุการณ์ทิ้ง */
-  const handleEscalate = () => {
-    if (escalated) {
+  /* เขียนลง Supabase ก่อน แล้วค่อยอัปเดตหน้าจอตามผลจริง
+     ไม่ใช้ optimistic update เพราะถ้าเขียนไม่ผ่าน (สิทธิ์ไม่ถึง เน็ตหลุด)
+     ปุ่มจะแสดงว่ายกระดับแล้วทั้งที่ฐานข้อมูลไม่รู้เรื่อง — คนอื่นเปิดมาไม่เห็น
+     แล้วคนกดก็เข้าใจว่าแจ้งไปแล้ว ซึ่งอันตรายกว่าปุ่มที่ช้าไปครึ่งวินาที */
+  const handleEscalate = async () => {
+    if (escalating) return;                 // กันกดรัวจนส่งซ้ำ
+    const turningOff = escalated;
+    setEscalating(true);
+    const res = await window.setEventEscalation(e.id, turningOff ? "" : actorName);
+    setEscalating(false);
+
+    if (res.error) {
+      if (showToast) showToast(res.error, "error");
+      return;
+    }
+    if (turningOff) {
       setEscalated(false);
       setEscalatedBy("");
       if (showToast) showToast(
@@ -413,6 +431,8 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
             <button
               className={"btn btn-sm " + (escalated ? "btn-primary" : "btn-ghost")}
               onClick={handleEscalate}
+              disabled={escalating}
+              style={{ opacity: escalating ? 0.6 : 1 }}
               title={escalated
                 ? T("กดอีกครั้งเพื่อถอนการยกระดับ", "Click again to remove the escalation")
                 : T("ยกระดับเหตุการณ์เป็น CRITICAL", "Raise this incident to CRITICAL")}>
