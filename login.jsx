@@ -133,6 +133,17 @@ function LoginScreen() {
   const SB = window.MDA_SB;
   const isReg = mode === "register";
 
+  /* ช่องทั้งหมดเริ่มต้นเป็นค่าว่างอยู่แล้ว (useState("") ด้านบน)
+     ที่เห็นอีเมล/รหัสผ่านโผล่มาเองคือการเติมอัตโนมัติของเบราว์เซอร์
+
+     autoComplete="off" กับ name ที่ไม่ใช่คำมาตรฐาน ("mda-email" ไม่ใช่ "email")
+     ลดโอกาสที่เบราว์เซอร์จะจับคู่กับรหัสที่บันทึกไว้ ส่วนช่องรหัสผ่านใช้
+     "new-password" ซึ่งเป็นค่าเดียวที่ Chrome ยังเคารพอยู่จริง
+
+     ⚠ กันได้ไม่ 100% — เบราว์เซอร์ตั้งใจเพิกเฉยต่อ autocomplete="off"
+       ในฟอร์มล็อกอิน เพื่อไม่ให้เว็บปิดกั้นตัวจัดการรหัสผ่านของผู้ใช้
+       ถ้าเป็นเครื่องที่ใช้ร่วมกันจริง ๆ ต้องไม่บันทึกรหัสไว้ในเบราว์เซอร์ตั้งแต่แรก */
+
   const inputStyle = {
     width: "100%", boxSizing: "border-box",
     background: "var(--surface)", border: "1px solid var(--border-2)",
@@ -340,7 +351,8 @@ function LoginScreen() {
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>{T("ชื่อ-นามสกุล", "Full Name")}</label>
                 <input type="text" value={fullname} onChange={e => setFullname(e.target.value)}
-                  placeholder={T("กรอกชื่อ-นามสกุล", "Enter full name")} autoFocus style={inputStyle} />
+                  placeholder={T("กรอกชื่อ-นามสกุล", "Enter full name")} autoFocus
+                  autoComplete="off" name="mda-fullname" style={inputStyle} />
               </div>
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>{T("ยศ / ตำแหน่ง", "Rank / Position")}</label>
@@ -366,7 +378,7 @@ function LoginScreen() {
                 <label style={labelStyle}>{T("ชื่อผู้ใช้", "Username")}</label>
                 <input type="text" value={username} onChange={e => setUsername(e.target.value)}
                   placeholder={T("ตั้งชื่อผู้ใช้ (อย่างน้อย 4 ตัวอักษร)", "Set username (min 4 chars)")}
-                  style={inputStyle} />
+                  autoComplete="off" name="mda-username" style={inputStyle} />
               </div>
             </>
           )}
@@ -375,7 +387,7 @@ function LoginScreen() {
             <label style={labelStyle}>{T("อีเมล", "Email")}</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               autoFocus={!isReg} placeholder={T("กรอกอีเมล", "Enter email")}
-              onKeyDown={onEnter} style={inputStyle} />
+              onKeyDown={onEnter} autoComplete="off" name="mda-email" style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: isReg ? 14 : 18 }}>
@@ -383,7 +395,7 @@ function LoginScreen() {
             <div style={{ position: "relative" }}>
               <input type={showPass ? "text" : "password"} value={password}
                 onChange={e => setPassword(e.target.value)}
-                onKeyDown={onEnter}
+                onKeyDown={onEnter} autoComplete="new-password" name="mda-pass"
                 placeholder={isReg ? T("ตั้งรหัสผ่าน (อย่างน้อย 6 ตัวอักษร)", "Set password (min 6 chars)") : "••••••••"}
                 style={{ ...inputStyle, paddingRight: 38 }} />
               <span onClick={() => setShowPass(s => !s)}
@@ -400,6 +412,7 @@ function LoginScreen() {
               <input type="password" value={confirmPass}
                 onChange={e => setConfirmPass(e.target.value)}
                 onKeyDown={onEnter} placeholder="••••••••"
+                autoComplete="new-password" name="mda-pass2"
                 style={{ ...inputStyle,
                   borderColor: confirmPass && confirmPass !== password ? "var(--crit)" : undefined }} />
             </div>

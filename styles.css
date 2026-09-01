@@ -607,3 +607,17 @@ a { color: var(--accent); }
 /* fade-in keyframe kept for opt-in use; no blanket layer promotion on .screen children
    (composited layers were being dropped by headless capture) */
 @keyframes fadeUp { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+
+/* เบราว์เซอร์เติมรหัสอัตโนมัติแล้วทาพื้นช่องเป็นสีขาว/เหลืองอ่อนทับ CSS ของเรา
+   ซึ่งบนธีมมืดกลายเป็นกล่องขาวโพลนกลางหน้า login
+   สีพื้นของ autofill แก้ตรง ๆ ไม่ได้ ต้องหลอกด้วยเงาด้านในที่ทึบแสง
+   และหน่วง transition ให้ยาวมากเพื่อไม่ให้สีเดิมแวบขึ้นมา */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+  caret-color: var(--text);
+  transition: background-color 100000s ease-in-out 0s;
+}
