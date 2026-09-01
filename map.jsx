@@ -6,15 +6,35 @@ const projX = (lon) => (lon + 180) / 360 * 1000;
 const projY = (lat) => (90 - lat)  / 180 * 500;
 const projPt = (lon, lat) => [projX(lon), projY(lat)];
 
-/* แผนที่ฐานตามธีม — ธีมสว่างใช้ CARTO Voyager (สีสันสดใส) */
-const CARTO = (style) => "https://{s}.basemaps.cartocdn.com/" + style + "/{z}/{x}/{y}{r}.png";
+/* แผนที่ฐานตามธีม — ใช้ ArcGIS Online ของ Esri
+
+   ย้ายมาจาก CARTO เพราะ CARTO เริ่มประทับลายน้ำ "API KEY REQUIRED" ทับ tile
+   สำหรับการใช้งานที่ไม่มีคีย์ ภาพแผนที่ยังมาแต่มีตัวอักษรพาดทับเต็มจอ
+   (ตรวจสอบด้วยภาพหน้าจอเมื่อ 2026-08-26 — ขนาดไฟล์ยังปกติ จับด้วยโค้ดไม่ได้
+    ต้องเปิดดูถึงจะเห็น)
+
+   Esri ไม่ต้องใช้คีย์ และมีชุด Ocean ที่แสดงความลึกกับร่องน้ำ ซึ่งตรงกับงาน
+   ทางทะเลมากกว่าแผนที่ถนนที่ใช้อยู่เดิม
+
+   ⚠ ลำดับพิกัดของ Esri เป็น {z}/{y}/{x} สลับกับผู้ให้บริการทั่วไปที่เป็น
+     {z}/{x}/{y} — สลับผิดจะได้แผนที่ที่โหลดขึ้นแต่ตำแหน่งเพี้ยนทั้งหมด
+
+   ⚠ ป้ายชื่อ (ประเทศ/เมือง/มหาสมุทร) อยู่คนละ layer กับพื้นแผนที่ ต้องซ้อนสองชั้น
+     ต่างจาก CARTO ที่รวมมาในภาพเดียว */
+const ESRI = (svc) => "https://server.arcgisonline.com/ArcGIS/rest/services/"
+  + svc + "/MapServer/tile/{z}/{y}/{x}";
+
 const TILE_BY_THEME = {
-  dark:     CARTO("dark_all"),
-  light:    CARTO("light_all"),
-  daylight: CARTO("rastertiles/voyager"),
-  ocean:    CARTO("rastertiles/voyager"),
-  aurora:   CARTO("rastertiles/voyager"),
+  dark:     { base: ESRI("Canvas/World_Dark_Gray_Base"),  ref: ESRI("Canvas/World_Dark_Gray_Reference") },
+  light:    { base: ESRI("Canvas/World_Light_Gray_Base"), ref: ESRI("Canvas/World_Light_Gray_Reference") },
+  daylight: { base: ESRI("Canvas/World_Light_Gray_Base"), ref: ESRI("Canvas/World_Light_Gray_Reference") },
+  ocean:    { base: ESRI("Ocean/World_Ocean_Base"),       ref: ESRI("Ocean/World_Ocean_Reference") },
+  aurora:   { base: ESRI("Canvas/World_Dark_Gray_Base"),  ref: ESRI("Canvas/World_Dark_Gray_Reference") },
 };
+
+/* ชุด Canvas/Ocean ของ Esri มีถึงซูม 16 — ขอเกินกว่านั้นจะได้ tile ว่าง
+   ต้องตั้ง maxZoom ให้ตรง ไม่งั้นซูมลึกแล้วแผนที่หายเป็นสีพื้น */
+const TILE_MAX_ZOOM = 16;
 const tileForTheme = (theme) => TILE_BY_THEME[theme] || TILE_BY_THEME.dark;
 const currentTheme = () => document.documentElement.getAttribute("data-theme") || "dark";
 
@@ -281,6 +301,7 @@ function MapView({
   const containerRef = React.useRef(null);
   const mapRef       = React.useRef(null);
   const tileRef      = React.useRef(null);
+  const tileRefLbl   = React.useRef(null);   // ชั้นป้ายชื่อ แยกจากพื้นแผนที่
   const layersRef    = React.useRef({
     vessels: null, events: null, tracks: null, lanes: null, news: null,
   });
@@ -319,11 +340,24 @@ function MapView({
       fadeAnimation:        true,
     });
 
-    /* basemap ตามธีมปัจจุบัน (สลับได้ภายหลังด้วย setUrl) */
-    tileRef.current = L.tileLayer(
-      tileForTheme(currentTheme()),
-      { subdomains: "abcd", maxZoom: 19, detectRetina: true }
-    ).addTo(map);
+    /* basemap ตามธีมปัจจุบัน — สองชั้น: พื้นแผนที่ + ป้ายชื่อ (สลับด้วย setUrl)
+       ไม่เปิด detectRetina เพราะ Esri ไม่มี endpoint @2x — เปิดไว้จะขอ tile
+       ที่ไม่มีอยู่จริงแล้วได้พื้นว่างบนจอความละเอียดสูง */
+    /* pane ของตัวเองสำหรับป้ายชื่อ — zIndex 250 อยู่เหนือ tilePane (200)
+       แต่ต่ำกว่า overlayPane (400) ป้ายชื่อจึงทับพื้นแผนที่แต่ไม่บังหมุดเรือ
+       เส้นทางเดินเรือ หรือเหตุการณ์ ซึ่งเป็นของที่ต้องเห็นก่อนชื่อประเทศ */
+    map.createPane("labelPane");
+    map.getPane("labelPane").style.zIndex = 250;
+    map.getPane("labelPane").style.pointerEvents = "none";
+
+    /* maxNativeZoom อย่างเดียว ไม่ใส่ maxZoom — ใส่แล้ว Leaflet จะซ่อนชั้นนี้
+       เมื่อซูมเกิน 16 กลายเป็นจอเปล่า ส่วน maxNativeZoom สั่งให้ขยายภาพ
+       ของซูม 16 ขึ้นมาแทน ซึ่งเบลอแต่ยังเห็นว่าอยู่ตรงไหน */
+    const tset = tileForTheme(currentTheme());
+    const tileOpts = { maxNativeZoom: TILE_MAX_ZOOM };
+    tileRef.current    = L.tileLayer(tset.base, tileOpts).addTo(map);
+    tileRefLbl.current = L.tileLayer(tset.ref,
+      Object.assign({ pane: "labelPane" }, tileOpts)).addTo(map);
 
     if (zoomable) {
       L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -377,6 +411,7 @@ function MapView({
       map.remove();
       mapRef.current = null;
       tileRef.current = null;
+      tileRefLbl.current = null;
       layersRef.current = { vessels: null, events: null, tracks: null, lanes: null, news: null };
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -385,7 +420,9 @@ function MapView({
   React.useEffect(() => {
     const el = document.documentElement;
     const apply = () => {
-      if (tileRef.current) tileRef.current.setUrl(tileForTheme(currentTheme()));
+      const t = tileForTheme(currentTheme());
+      if (tileRef.current)    tileRef.current.setUrl(t.base);
+      if (tileRefLbl.current) tileRefLbl.current.setUrl(t.ref);
     };
     const obs = new MutationObserver(apply);
     obs.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
