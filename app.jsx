@@ -112,7 +112,11 @@ async function buildAppUser(session) {
   /* id ของบัญชี — จำเป็นตั้งแต่มีกล่องข้อความ เพราะ policy assignments_send
      บังคับว่า from_id ต้องเท่ากับ auth.uid() และกล่องขาเข้าคิวรีด้วย to_id
      ชื่อผู้ใช้ใช้แทนไม่ได้ มันเปลี่ยนได้และไม่ใช่กุญแจของ auth.users */
-  return { id: session.user.id, user: username, name, rank, role, avatar, fromSession: true };
+  /* rank_verified ต้องพกมาด้วย ไม่งั้น can() ฝั่งหน้าเว็บจะถือว่ายังไม่ยืนยันเสมอ
+     แล้วซ่อนปุ่มจากคนที่ฐานข้อมูลอนุญาตจริง — ปุ่มกับสิทธิ์จะไม่ตรงกัน */
+  const rankVerified = !!(prof && prof.rank_verified);
+  return { id: session.user.id, user: username, name, rank, role, rankVerified,
+           avatar, fromSession: true };
 }
 
 /* ย่อชื่อเป็นตัวอักษรสำหรับ avatar — เดิมอยู่ใน login.jsx ที่ถอดออกไปแล้ว

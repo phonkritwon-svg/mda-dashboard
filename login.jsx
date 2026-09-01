@@ -74,11 +74,26 @@ function isOfficerRank(rank) {
   return OFFICER_RANKS.indexOf(String(rank || "").trim()) >= 0;
 }
 
+/* ยศให้สิทธิ์ก็ต่อเมื่อ admin ยืนยันแล้ว (profiles.rank_verified)
+   ยศเป็นค่าที่ผู้ใช้เลือกเองตอนสมัคร ถ้าไม่มีด่านนี้ ใครเลือก "พล.ร.อ."
+   ก็สั่งการได้ทันที — เส้นทาง role ไม่ต้องยืนยันเพราะ admin เป็นคนตั้งเอง
+
+   บังคับจริงที่ can_command() ฝั่ง SQL ตรงนี้แค่ให้ปุ่มตรงกับความจริง */
 function can(user, action) {
   const perms = ROLE_CAN[normRole(user && user.role)];
   if (perms && perms[action]) return true;
-  if (action === "command" && isOfficerRank(user && user.rank)) return true;
+  if (action === "command"
+      && isOfficerRank(user && user.rank)
+      && !!(user && user.rankVerified)) return true;
   return false;
+}
+
+/* ยศถึงเกณฑ์แล้วแต่ยังไม่ได้รับการยืนยัน — ใช้แยกข้อความที่แสดงให้ผู้ใช้
+   "ยศไม่ถึง" กับ "รออนุมัติ" เป็นคนละเรื่อง คนหลังแก้ได้ด้วยการไปตาม admin */
+function awaitingRankVerify(user) {
+  if (!user) return false;
+  if (ROLE_CAN[normRole(user.role)].command) return false;
+  return isOfficerRank(user.rank) && !user.rankVerified;
 }
 
 
@@ -496,5 +511,9 @@ function LoginScreen() {
   );
 }
 
-Object.assign(window, { LoginScreen, MDA_ROLES, ROLE_LABEL, OFFICER_RANKS,
-                        RANKS, RANK_OTHER, normRole, roleLabel, isOfficerRank, can });
+// role ที่สั่งการได้ด้วยตัวมันเอง — ใช้ในหน้าจัดการผู้ใช้เพื่อซ่อนปุ่มยืนยันยศ
+const ROLE_CAN_COMMAND_ROLES = MDA_ROLES.filter(r => ROLE_CAN[r].command);
+
+Object.assign(window, { LoginScreen, MDA_ROLES, ROLE_LABEL, OFFICER_RANKS, ROLE_CAN_COMMAND_ROLES,
+                        RANKS, RANK_OTHER, normRole, roleLabel, isOfficerRank,
+                        can, awaitingRankVerify });

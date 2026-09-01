@@ -70,6 +70,16 @@ function AdminUsers({ lang, showToast, currentUser }) {
       "เปลี่ยนยศ " + (row.username || "ผู้ใช้") + " เป็น " + (rank || "-") + " แล้ว",
       "Set rank of " + (row.username || "user") + " to " + (rank || "-")));
 
+  /* ยืนยันยศ — ยศที่ผู้ใช้กรอกเองตอนสมัครจะยังไม่ให้สิทธิ์สั่งการจนกว่าจะกดตรงนี้
+     ยศที่ admin เป็นคนแก้ให้เองจะถูกยืนยันอัตโนมัติโดย trigger ฝั่ง Supabase
+     (ดู supabase/rank_verified.sql) — ปุ่มนี้จึงมีไว้สำหรับยศที่ผู้ใช้กรอกมาเอง */
+  const setVerified = (row, on) =>
+    patch(row, { rank_verified: on }, on
+      ? T("ยืนยันยศ " + (row.rank || "") + " ของ " + (row.username || "ผู้ใช้") + " แล้ว",
+          "Verified the rank of " + (row.username || "user"))
+      : T("ถอนการยืนยันยศของ " + (row.username || "ผู้ใช้") + " แล้ว",
+          "Un-verified the rank of " + (row.username || "user")));
+
   const visible = (rows || []).filter(r => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
@@ -198,6 +208,29 @@ function AdminUsers({ lang, showToast, currentUser }) {
                   )}
                 </div>
 
+                /* ยืนยันยศ — แสดงเฉพาะกรณีที่การยืนยันเปลี่ยนอะไรจริง คือ
+                   ยศชั้นสัญญาบัตรของคนที่ role ยังไม่ให้สิทธิ์สั่งการ
+
+                   ซ่อนเมื่อ: ไม่มียศ (ไม่มีอะไรให้ยืนยัน) · role เป็น admin/commander
+                   (สิทธิ์มาจาก role อยู่แล้ว) · ยศชั้นประทวน (ยืนยันไปก็สั่งการไม่ได้
+                   ปุ่มที่กดแล้วไม่เกิดอะไรคือคำสัญญาที่ผิด) */
+                {window.isOfficerRank(rank)
+                  && !window.ROLE_CAN_COMMAND_ROLES.includes(window.normRole(r.role)) && (
+                  <button
+                    className={"btn btn-sm " + (r.rank_verified ? "btn-primary" : "btn-ghost")}
+                    style={{ gap: 6 }}
+                    title={r.rank_verified
+                      ? T("ยศนี้ยืนยันแล้ว — กดเพื่อถอนการยืนยัน",
+                          "Rank verified — click to withdraw")
+                      : T("ผู้ใช้กรอกยศนี้เอง กดเพื่อยืนยันว่าเป็นจริง แล้วเขาจะสั่งการได้",
+                          "Self-declared rank — verify it to let them command")}
+                    onClick={() => setVerified(r, !r.rank_verified)}>
+                    <Icon name={r.rank_verified ? "check" : "shield"} size={13} />
+                    {r.rank_verified ? T("ยศยืนยันแล้ว", "Rank verified")
+                                     : T("ยังไม่ยืนยันยศ", "Rank unverified")}
+                  </button>
+                )}
+
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="dim" style={{ fontSize: "var(--fs-xs)" }}>{T("สิทธิ์", "Role")}</span>
                   <select style={selStyle} value={window.normRole(r.role)}
@@ -217,8 +250,11 @@ function AdminUsers({ lang, showToast, currentUser }) {
         {T("• เปลี่ยนแล้วมีผลทันที ผู้ใช้ต้องโหลดหน้าใหม่จึงจะเห็นสิทธิ์ใหม่",
            "• Changes take effect at once; the user must reload to see them")}
         <br />
-        {T("• ยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป) สั่งการได้เท่ากับผู้บัญชาการ แม้สิทธิ์เป็นผู้ใช้งาน",
-           "• Commissioned ranks (ร.ต. and above) can command even with the operator role")}
+        {T("• ยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป) สั่งการได้เท่ากับผู้บัญชาการ — แต่ต้องกด \"ยืนยันยศ\" ก่อน",
+           "• Commissioned ranks (ร.ต. and above) can command — after you verify the rank")}
+        <br />
+        {T("• ยศที่คุณแก้ให้เองถือว่ายืนยันแล้วอัตโนมัติ ปุ่มยืนยันจึงมีไว้สำหรับยศที่ผู้ใช้กรอกมาเอง",
+           "• A rank you set yourself counts as verified; the button is for self-declared ones")}
         <br />
         {T("• สร้างบัญชีใหม่และลบบัญชี ทำที่ Supabase → Authentication → Users",
            "• Creating and deleting accounts is done in Supabase → Authentication → Users")}

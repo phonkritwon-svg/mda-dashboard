@@ -16,8 +16,11 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
      ที่ขัดกันเองในหน้าเดียว */
   const RankDenied = ({ icon, block }) => (
     <span className="dim"
-      title={T("สั่งการได้เฉพาะผู้ดูแลระบบ ผู้บัญชาการ หรือยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป)",
-               "Limited to administrators, commanders, and commissioned ranks (ร.ต. and above)")}
+      title={window.awaitingRankVerify(currentUser)
+        ? T("ยศของคุณอยู่ในเกณฑ์แล้ว แต่ต้องให้ผู้ดูแลระบบยืนยันก่อนจึงจะสั่งการได้",
+            "Your rank qualifies but an administrator must verify it first")
+        : T("สั่งการได้เฉพาะผู้ดูแลระบบ ผู้บัญชาการ หรือยศชั้นสัญญาบัตร (ร.ต. ขึ้นไป)",
+            "Limited to administrators, commanders, and commissioned ranks (ร.ต. and above)")}
       style={{
         fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 6,
         ...(block ? { justifyContent: "center", width: "100%", marginTop: 12,
@@ -25,7 +28,9 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
                       borderRadius: 7, boxSizing: "border-box" } : {}),
       }}>
       <Icon name={icon} size={13} style={{ opacity: 0.45 }} />
-      {T("ยศของคุณไม่ตรงกับเงื่อนไข", "Your rank does not meet the requirement")}
+      {window.awaitingRankVerify(currentUser)
+        ? T("ยศของคุณรอผู้ดูแลระบบยืนยัน", "Your rank is awaiting verification")
+        : T("ยศของคุณไม่ตรงกับเงื่อนไข", "Your rank does not meet the requirement")}
     </span>
   );
 
