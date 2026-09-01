@@ -127,7 +127,19 @@ function LoginScreen() {
   const [confirmPass, setConfirmPass] = React.useState("");
   const [showPass, setShowPass] = React.useState(false);
   const [error, setError]       = React.useState("");
-  const [notice, setNotice]     = React.useState("");
+  /* ถูกเตะออกเพราะไม่ได้ใช้งาน — app.jsx ฝากธงไว้ใน sessionStorage ก่อน signOut
+     อ่านครั้งเดียวแล้วลบทิ้ง ไม่งั้นข้อความจะค้างทุกครั้งที่กลับมาหน้านี้
+     ใช้ sessionStorage ไม่ใช่ localStorage เพราะเหตุผลนี้ผูกกับการเปิดแท็บครั้งนี้
+     ไม่ควรตามไปโผล่ในแท็บใหม่พรุ่งนี้ */
+  const [notice, setNotice]     = React.useState(() => {
+    try {
+      if (sessionStorage.getItem("MDA_IDLE_LOGOUT")) {
+        sessionStorage.removeItem("MDA_IDLE_LOGOUT");
+        return "ออกจากระบบอัตโนมัติ เพราะไม่มีการใช้งานเกิน 1 ชั่วโมง";
+      }
+    } catch (e) {}
+    return "";
+  });
   const [loading, setLoading]   = React.useState(false);
 
   const SB = window.MDA_SB;

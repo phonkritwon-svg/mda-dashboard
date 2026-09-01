@@ -176,6 +176,74 @@ function ThemeToggle({ lang, theme, setTheme }) {
   );
 }
 
+/* ── ออกจากระบบอัตโนมัติเมื่อไม่ได้ใช้งาน ─────────────────────
+
+   ครอบสองกรณีด้วยกลไกเดียว:
+     1. เปิดแท็บค้างไว้แล้วไม่แตะอะไรเลยเกินหนึ่งชั่วโมง
+     2. ปิดเว็บไปแล้วกลับมาเปิดใหม่หลังจากนั้นเกินหนึ่งชั่วโมง
+
+   เก็บ "เวลาที่ใช้งานล่าสุด" ไว้ใน localStorage ไม่ใช่ตัวแปรในหน่วยความจำ
+   เพราะกรณีที่ 2 ต้องรู้เวลาข้ามการปิด-เปิดเบราว์เซอร์ และ localStorage
+   ใช้ร่วมกันทุกแท็บของโดเมนเดียวกัน ขยับเมาส์ในแท็บหนึ่งจึงนับให้ทุกแท็บ
+
+   ⚠ นี่คือการล็อกหน้าจอฝั่งผู้ใช้ ไม่ใช่การหมดอายุของ token —
+     token ของ Supabase ยังมีอายุตามการตั้งค่าฝั่งเซิร์ฟเวอร์
+     ใครที่ขโมย token ไปแล้วยังใช้ต่อได้ กลไกนี้กันคนที่มานั่งเครื่องต่อ
+     ไม่ได้กันคนที่ดักเอา token ไป */
+const IDLE_LIMIT_MS = 60 * 60 * 1000;   // หนึ่งชั่วโมง
+const IDLE_CHECK_MS = 30 * 1000;        // ตรวจทุกครึ่งนาที
+const IDLE_WRITE_MS = 20 * 1000;        // เขียน localStorage อย่างมากทุก 20 วิ
+const IDLE_KEY      = "MDA_LAST_ACTIVITY";
+const IDLE_NOTICE   = "MDA_IDLE_LOGOUT";   // ให้หน้า login รู้ว่าทำไมถึงหลุด
+
+function useIdleLogout(active, onIdle) {
+  useEffectA(() => {
+    if (!active) return;
+
+    const now = () => Date.now();
+    const read = () => {
+      const v = parseInt(localStorage.getItem(IDLE_KEY) || "", 10);
+      return isFinite(v) ? v : 0;
+    };
+    /* เพิ่งล็อกอินหรือยังไม่เคยมีค่า → เริ่มนับจากตอนนี้
+       ไม่งั้นคนที่เพิ่งล็อกอินจะโดนเตะออกทันทีเพราะค่าเก่าค้างอยู่ */
+    let lastWrite = 0;
+    const touch = (force) => {
+      const t = now();
+      if (!force && t - lastWrite < IDLE_WRITE_MS) return;
+      lastWrite = t;
+      try { localStorage.setItem(IDLE_KEY, String(t)); } catch (e) {}
+    };
+    touch(true);
+
+    /* mousemove ยิงถี่มาก — touch() มี throttle ในตัวจึงไม่เขียนดิสก์รัวตาม
+       passive: true บอกเบราว์เซอร์ว่าไม่เรียก preventDefault จะได้ไม่หน่วงการเลื่อนหน้า */
+    const EVENTS = ["mousemove", "mousedown", "keydown", "wheel", "touchstart", "click"];
+    const onAny = () => touch(false);
+    EVENTS.forEach(e => window.addEventListener(e, onAny, { passive: true }));
+
+    const check = () => {
+      const last = read();
+      if (last && now() - last > IDLE_LIMIT_MS) {
+        try { sessionStorage.setItem(IDLE_NOTICE, "1"); } catch (e) {}
+        onIdle();
+      }
+    };
+    /* ตรวจทันทีตอนกลับมาเห็นหน้าจอด้วย ไม่ใช่รอครบรอบ 30 วิ —
+       คนที่เปิดแท็บทิ้งไว้ข้ามคืนควรเจอหน้า login ตั้งแต่วินาทีที่สลับกลับมา */
+    const onVisible = () => { if (!document.hidden) check(); };
+    document.addEventListener("visibilitychange", onVisible);
+    const id = setInterval(check, IDLE_CHECK_MS);
+    check();
+
+    return () => {
+      EVENTS.forEach(e => window.removeEventListener(e, onAny));
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(id);
+    };
+  }, [active, onIdle]);
+}
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRoute] = useStateA({ screen: "dashboard", payload: null });
@@ -282,6 +350,15 @@ function App() {
   /* นับข้อความที่ยังไม่อ่านไว้ติดเมนู — เรียกที่ระดับ App ไม่ใช่ในจอกล่องข้อความ
      เพราะต้องเห็นตัวเลขจากทุกหน้า ไม่ใช่เฉพาะตอนเปิดกล่องอยู่ */
   const { unread: inboxUnread } = window.useInbox(currentUser);
+
+  /* ออกจากระบบอัตโนมัติเมื่อไม่ได้ใช้งานเกินหนึ่งชั่วโมง
+     useCallback เพื่อไม่ให้ hook ถอด-ใส่ listener ใหม่ทุกครั้งที่ App re-render */
+  const handleIdleLogout = useCallbackA(async () => {
+    try { if (window.MDA_SB) await window.MDA_SB.auth.signOut(); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem(IDLE_KEY); } catch (e) {}
+    setCurrentUser(null);
+  }, []);
+  useIdleLogout(!!currentUser, handleIdleLogout);
 
   const screens = {
     dashboard: <window.Dashboard {...screenProps} />,
