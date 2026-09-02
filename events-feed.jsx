@@ -28,10 +28,24 @@ const REGION_PRESETS = [
    ตรงกับชุดภูมิภาคในฝั่ง cron (api/cron-news.py) */
 const MDA_GEO_REGIONS = [
   { re: /red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen|ทะเลแดง|บับเอล/i,        th: "ทะเลแดง / บับเอลมันเดบ",    en: "Red Sea / Bab el-Mandeb", lat: 13.5, lon: 43.3 },
-  { re: /strait of hormuz|hormuz|fujairah|persian gulf|ช่องแคบฮอร์มุซ/i,      th: "ช่องแคบฮอร์มุซ",            en: "Strait of Hormuz",        lat: 26.5, lon: 56.3 },
+  { re: /strait of hormuz|hormuz|fujairah|ช่องแคบฮอร์มุซ/i,                   th: "ช่องแคบฮอร์มุซ",            en: "Strait of Hormuz",        lat: 26.5, lon: 56.3 },
+  /* อ่าวเปอร์เซียแยกจากช่องแคบฮอร์มุซ — เดิมรวมเป็นกฎเดียวกัน ข่าวเรื่องอ่าว
+     ทั้งอ่าวจึงถูกปักที่ปากช่องแคบซึ่งอยู่คนละมุมห่างกันหลายร้อยกิโลเมตร */
+  { re: /persian gulf|arabian gulf|kharg|saudi|kuwait|bahrain|qatar|\buae\b|emirates|dubai|abu dhabi|อ่าวเปอร์เซีย/i,                           th: "อ่าวเปอร์เซีย",             en: "Persian Gulf",            lat: 26.5, lon: 52.0 },
   { re: /gulf of aden|\baden\b|อ่าวเอเดน/i,                              th: "อ่าวเอเดน",                 en: "Gulf of Aden",            lat: 12.5, lon: 47.0 },
   { re: /south china sea|scarborough|spratly|paracel|second thomas|taiwan strait|ทะเลจีนใต้|สการ์โบโรห์|พารา?เซล|สปร(?:าต|ตลี)|ทะเลจีน/i, th: "ทะเลจีนใต้", en: "South China Sea", lat: 15.0, lon: 117.0 },
   { re: /strait of malacca|malacca|singapore strait|ช่องแคบมะละกา|มะละกา|สิงค์โปร์|singapor/i,         th: "ช่องแคบมะละกา",             en: "Strait of Malacca",       lat: 2.5,  lon: 101.0 },
+  /* ── เพื่อนบ้าน: กัมพูชา / เมียนมา / มาเลเซีย ──────────────────
+     ตารางฝั่งเซิร์ฟเวอร์ (api/cron-news.py) มีสามกฎนี้มาตลอด แต่ฝั่งหน้าเว็บ
+     ไม่มี ข่าวอย่าง "Port of Sihanoukville" จึงไม่ขึ้นหมุดเลยบนแผนที่
+     ทั้งที่เหตุการณ์จาก cron ชุดเดียวกันขึ้นได้ปกติ */
+  { re: /cambodia|cambodian|khmer|sihanoukville|sihanouk|kampong som|ream|kampot|กัมพูชา|เขมร|สีหนุ/i,
+                                                               th: "ชายฝั่งกัมพูชา / อ่าวไทย",  en: "Cambodia Coast",          lat: 10.6,  lon: 103.5 },
+  { re: /myanmar|burma|burmese|rakhine|arakan|sittwe|kyauk ?phyu|kyaukpyu|coco island|great coco|mergui|myeik|tanintharyi|yangon|naypyidaw|irrawaddy|rohingya|เมียนมา|พม่า|โรฮีนจา/i,
+                                                               th: "ชายฝั่งเมียนมา / อันดามัน–เบงกอล", en: "Myanmar Coast",    lat: 15.5,  lon: 94.5 },
+  { re: /malaysia|malaysian|melaka|johor|sabah|sarawak|kota kinabalu|labuan|lumut|langkawi|penang|port klang|kuala lumpur|putrajaya|มาเลเซีย/i,
+                                                               th: "มาเลเซีย / มะละกา–บอร์เนียว", en: "Malaysia Coast",       lat: 4.0,   lon: 109.5 },
+
   /* ── ชายแดนทะเลไทย–กัมพูชา (ต้องตรวจก่อน "อ่าวไทย" ที่กว้างกว่า) ── */
   { re: /ko ?kut|koh ?kood|เกาะกูด/i,                          th: "เกาะกูด",                   en: "Ko Kut",                  lat: 11.65, lon: 102.58 },
   { re: /koh ?kong|เกาะกง/i,                                  th: "เกาะกง",                    en: "Koh Kong",                lat: 11.6,  lon: 103.0 },
@@ -159,6 +173,23 @@ const MDA_GEO_REGIONS = [
   { re: /jones act|\bus navy\b|u\.s\. navy|american|white house|virginia-class|saildrone|สหรัฐ/i,
                                                                 th: "สหรัฐอเมริกา",              en: "United States",           lat: 38.0, lon: -74.0 },
 
+  /* ── พื้นที่ที่พบบ่อยในพาดหัวจริงแต่ตารางเดิมไม่รู้จัก ──────────────
+     วัดจากข่าว 500 ชิ้นในคลัง: ข่าวเหล่านี้เคยถูกปักผิดที่ผ่านคำแปล
+     หรือไม่ถูกปักเลย ทั้งที่พาดหัวบอกสถานที่ชัด
+
+     ตั้งใจไม่ใส่ "Russia" — น่านน้ำรัสเซียมีตั้งแต่บอลติก ทะเลดำ อาร์กติก
+     ถึงแปซิฟิก การปักจุดเดียวให้ทั้งประเทศคือการเดา ซึ่งเป็นสิ่งที่เพิ่งแก้ไป */
+  { re: /english channel|dover strait|pas de calais|ช่องแคบอังกฤษ/i,   th: "ช่องแคบอังกฤษ",   en: "English Channel",  lat: 50.3,  lon: 0.5 },
+  { re: /panama canal|\bpanama\b|คลองปานามา/i,                        th: "คลองปานามา",      en: "Panama Canal",     lat: 9.1,   lon: -79.7 },
+  { re: /suez canal|\bsuez\b|คลองสุเอซ/i,                             th: "คลองสุเอซ",       en: "Suez Canal",       lat: 30.5,  lon: 32.35 },
+  { re: /gibraltar|ยิบรอลตาร์/i,                                      th: "ช่องแคบยิบรอลตาร์", en: "Strait of Gibraltar", lat: 35.95, lon: -5.6 },
+  { re: /philippines?|philippine|manila|luzon|palawan|subic|ฟิลิปปินส์/i, th: "ฟิลิปปินส์",   en: "Philippines",      lat: 13.0,  lon: 122.0 },
+  { re: /indonesia|indonesian|jakarta|surabaya|batam|อินโดนีเซีย/i,    th: "อินโดนีเซีย",     en: "Indonesia",        lat: -2.5,  lon: 118.0 },
+  { re: /vietnam|viet nam|vietnamese|haiphong|da nang|เวียดนาม/i,      th: "เวียดนาม",        en: "Vietnam",          lat: 16.0,  lon: 109.0 },
+  { re: /\btaiwan\b|kaohsiung|ไต้หวัน/i,                              th: "ไต้หวัน",         en: "Taiwan",           lat: 24.0,  lon: 121.5 },
+  { re: /north korea|dprk|pyongyang|เกาหลีเหนือ/i,                     th: "เกาหลีเหนือ",     en: "North Korea",      lat: 39.0,  lon: 127.5 },
+  { re: /sri lanka|colombo|ศรีลังกา/i,                                th: "ศรีลังกา",        en: "Sri Lanka",        lat: 6.9,   lon: 79.8 },
+
   /* ── มหาสมุทร / ทะเลกว้าง (ตัวสุดท้าย — ใช้เมื่อไม่เจอที่เจาะจงกว่า) ── */
   { re: /mediterranean|aegean|libya|gaza|ทะเลเมดิเตอร์/i,       th: "ทะเลเมดิเตอร์เรเนียน",       en: "Mediterranean Sea",       lat: 34.0, lon: 18.0 },
   { re: /north sea|norway|norwegian|denmark|ทะเลเหนือ|นอร์เวย์/i, th: "ทะเลเหนือ",                en: "North Sea",               lat: 56.5, lon: 3.0 },
@@ -169,13 +200,145 @@ const MDA_GEO_REGIONS = [
 ];
 
 // รับข้อความหลายชิ้น (หัวข้อ/สรุป ไทย+อังกฤษ) → {lat, lon, th, en} หรือ null
-function geocodeText() {
-  const text = Array.prototype.slice.call(arguments).filter(Boolean).join("  ");
+/* ============================================================
+   ระบุตำแหน่งเหตุการณ์จากข่าว
+
+   ⚠ กฎเหล็กสองข้อ เกิดจากบั๊กจริงที่เจอ:
+
+   1. ห้ามใช้ "ข้อความที่แปลด้วยเครื่อง" หาพิกัด
+      ข่าว MAREX "Maritime Security: A War Gone Wrong" พูดถึงอ่าวเปอร์เซีย
+      Google แปล "Conflict in the Gulf" เป็น "ความขัดแย้งในอ่าวไทย"
+      แล้วตัวจับคู่เดิมไปเจอคำว่า "อ่าวไทย" ในคำแปล จึงปักหมุดกลางอ่าวไทย
+      ทั้งที่ข้อความอังกฤษต้นฉบับจับคู่ไม่ได้เลยสักกฎ
+      คำแปลจึง "สร้าง" ตำแหน่งขึ้นมาเอง ไม่ใช่พิกัด default ที่ไหน
+
+   2. ห้ามใช้ชื่อสำนักข่าวหาพิกัด
+      สำนักข่าวอยู่ประเทศหนึ่ง ไม่ได้แปลว่าเหตุเกิดที่นั่น
+
+   จับคู่กับ "ข้อความภาษาต้นฉบับ" เท่านั้น — n.raw.en กับ n.ai.en
+   ซึ่งเก็บสิ่งที่สำนักข่าวเผยแพร่จริง ไม่ว่าจะภาษาใด
+   ============================================================ */
+
+/* ความเฉพาะเจาะจงของแต่ละพื้นที่ — กำหนดค่าความมั่นใจและสถานะ
+   ⚠ เพิ่มพื้นที่ใหม่ใน MDA_GEO_REGIONS แล้วต้องมาเพิ่มชื่อที่นี่ด้วย
+     ถ้าลืม จะถูกจัดเป็น "country" ซึ่งได้ความมั่นใจต่ำสุด (พังแบบปลอดภัย) */
+const GEO_SPECIFIC = new Set([
+  "Strait of Hormuz", "Strait of Malacca", "Ko Kut", "Koh Kong", "Trat",
+  "Cambodia Coast", "Myanmar Coast", "Malaysia Coast",
+  "English Channel", "Panama Canal", "Suez Canal", "Strait of Gibraltar",
+  "Rotterdam–Antwerp",
+  "Narathiwat", "Pattani", "Yala", "Songkhla", "Satun", "Tak", "Mae Hong Son",
+  "Chiang Rai", "Chiang Mai", "Kanchanaburi", "Ranong", "Nong Khai",
+  "Nakhon Phanom", "Mukdahan", "Ubon Ratchathani", "Sa Kaeo", "Chanthaburi",
+  "Rayong", "Chon Buri", "Samut Prakan", "Samut Sakhon", "Samut Songkhram",
+  "Phetchaburi", "Prachuap Khiri Khan", "Chumphon", "Surat Thani",
+  "Nakhon Si Thammarat", "Phatthalung", "Phuket", "Krabi", "Phang Nga",
+  "Trang", "Bangkok", "Nonthaburi", "Pathum Thani", "Ayutthaya", "Saraburi",
+  "Nakhon Sawan", "Phitsanulok", "Phichit", "Phetchabun", "Khon Kaen",
+  "Nakhon Ratchasima", "Udon Thani", "Chaiyaphum", "Surin", "Buri Ram",
+]);
+const GEO_WATER = new Set([
+  "Red Sea / Bab el-Mandeb", "Persian Gulf", "Gulf of Aden", "South China Sea",
+  "Gulf of Thailand OCA", "Gulf of Thailand", "Andaman Sea",
+  "North Natuna Sea", "Black Sea", "Baltic Sea", "Gulf of Guinea",
+  "Arabian Sea / Horn", "Caribbean Sea", "East China Coast",
+  "West Pacific (US)", "US East Coast", "Mediterranean Sea", "North Sea",
+  "Arctic Ocean", "Indian Ocean", "Pacific Ocean", "Atlantic Ocean",
+  "United Kingdom / North Sea", "Brazil / S. Atlantic", "Philippines",
+]);
+
+/* ยิ่งเจาะจง ยิ่งเชื่อได้ — และเลือกตัวที่เจาะจงที่สุดเสมอ ไม่ใช่ตัวแรกที่เจอ
+   ของเดิมเลือกตัวแรกในตาราง ลำดับในไฟล์จึงกลายเป็นตัวตัดสินโดยบังเอิญ */
+const GEO_RANK = { specific: 0, water: 1, country: 2 };
+
+function geoKind(en) {
+  if (GEO_SPECIFIC.has(en)) return "specific";
+  if (GEO_WATER.has(en))    return "water";
+  return "country";
+}
+
+/* ไม่มีระดับ "verified" ที่นี่โดยตั้งใจ — การจับคู่คำไม่ใช่การยืนยัน
+   "verified" สงวนไว้ให้เจ้าหน้าที่ยืนยันด้วยตัวเองเท่านั้น */
+const GEO_GRADE = {
+  /* conflictKm — ห่างกันเกินเท่านี้ถือว่าข่าวชี้ไปคนละที่ จนตัดสินไม่ได้
+     ต้องขึ้นกับความเฉพาะเจาะจง: หมุดระดับจังหวัดที่ผิดไป 500 กม. คือผิด
+     แต่ "ทะเลจีนใต้" กับ "ทะเลอันดามัน" ห่างกันเป็นพันกิโลเมตรโดยธรรมชาติ
+     ใช้เกณฑ์เดียวทั้งหมดจะจับผิดฝั่งใดฝั่งหนึ่งเสมอ */
+  specific: { confidence: 0.85, status: "probable",    conflictKm: 400 },
+  water:    { confidence: 0.60, status: "approximate", conflictKm: 2500 },
+  country:  { confidence: 0.35, status: "unverified",  conflictKm: 6000 },
+};
+
+function geoDistanceKm(a, b) {
+  const R = 6371, rad = (d) => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2
+          + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function geoMatchesIn(text) {
+  if (!text) return [];
+  const out = [];
   for (let i = 0; i < MDA_GEO_REGIONS.length; i++) {
     const r = MDA_GEO_REGIONS[i];
-    if (r.re.test(text)) return { lat: r.lat, lon: r.lon, th: r.th, en: r.en };
+    const m = text.match(r.re);
+    if (m) out.push({ rule: r, kind: geoKind(r.en), hit: m[0] });
   }
-  return null;
+  return out;
+}
+
+/* ที่ปรากฏใน "พาดหัว" มีน้ำหนักกว่าที่โผล่กลางเนื้อข่าว — พาดหัวมักบอก
+   ที่เกิดเหตุ ส่วนเนื้อข่าวเอ่ยถึงหลายที่ปนกัน (ข้อ 4 ของโจทย์)
+   ถ้าพาดหัวจับได้ ใช้พาดหัวอย่างเดียว ไม่เอาเนื้อข่าวมาปน */
+function geocodeNews(n) {
+  if (!n) return null;
+  const title = (n.raw && n.raw.en) || "";       // ต้นฉบับ ไม่ใช่คำแปล
+  const body  = (n.ai  && n.ai.en)  || "";       // ต้นฉบับ ไม่ใช่คำแปล
+
+  let field = "title";
+  let ms = geoMatchesIn(title);
+  if (!ms.length) { field = "summary"; ms = geoMatchesIn(body); }
+  if (!ms.length) return null;                    // ระบุไม่ได้ → ไม่ปักหมุด
+
+  const bestRank = Math.min.apply(null, ms.map(m => GEO_RANK[m.kind]));
+  const top = ms.filter(m => GEO_RANK[m.kind] === bestRank);
+
+  /* เจอหลายที่ที่เจาะจงเท่ากันแต่อยู่คนละมุมโลก = ตัดสินไม่ได้
+     ปักไปก็มีโอกาสผิดครึ่งหนึ่ง — บอกว่าขัดแย้งแล้วไม่ปักดีกว่า */
+  const limit = GEO_GRADE[top[0].kind].conflictKm;
+  for (let i = 1; i < top.length; i++) {
+    if (geoDistanceKm(top[0].rule, top[i].rule) > limit) {
+      return {
+        lat: null, lon: null,
+        en: top.map(m => m.rule.en).join(" / "),
+        th: top.map(m => m.rule.th).join(" / "),
+        confidence: 0.2, status: "conflict",
+        evidence: { text: top.map(m => m.hit).join(" / "), field, rule: "multiple" },
+      };
+    }
+  }
+
+  const win = top[0];
+  const g = GEO_GRADE[win.kind];
+  // เจอในเนื้อข่าวไม่ใช่พาดหัว → ลดความมั่นใจลง ยังใช้ได้แต่เชื่อได้น้อยกว่า
+  const conf = field === "title" ? g.confidence : Math.round(g.confidence * 0.8 * 100) / 100;
+  return {
+    lat: win.rule.lat, lon: win.rule.lon, th: win.rule.th, en: win.rule.en,
+    confidence: conf, status: g.status,
+    evidence: { text: win.hit, field, rule: win.rule.en },
+  };
+}
+
+/* ตัวเดิม — เก็บไว้ให้โค้ดเก่าที่ยังเรียกอยู่ไม่พัง แต่ห้ามใช้กับข่าว
+   เพราะไม่มีทางรู้ว่าอาร์กิวเมนต์ไหนเป็นคำแปล ใช้ geocodeNews(n) แทน */
+function geocodeText() {
+  const text = Array.prototype.slice.call(arguments).filter(Boolean).join("  ");
+  const ms = geoMatchesIn(text);
+  if (!ms.length) return null;
+  const bestRank = Math.min.apply(null, ms.map(m => GEO_RANK[m.kind]));
+  const win = ms.filter(m => GEO_RANK[m.kind] === bestRank)[0];
+  return { lat: win.rule.lat, lon: win.rule.lon, th: win.rule.th, en: win.rule.en };
 }
 
 /* ============================================================
@@ -215,8 +378,8 @@ function extractVesselsFromNews(newsArr) {
     const hay = [en, sum, th, sth, n.outlet].join("  ");
     // ข่าวต้องพูดถึงเรือ หรือมีชื่อเรือชัดเจน (MV/MT/USS…)
     if (!VESSEL_MENTION_RE.test(hay) && !VESSEL_NAME_RE.test(en) && !VESSEL_NAME_RE.test(sum)) return;
-    const geo = geocodeText(en, th, sum, sth, n.outlet);
-    if (!geo) return;                                   // ต้องระบุพื้นที่ได้
+    const geo = geocodeNews(n);          // ต้นฉบับเท่านั้น ไม่เอาคำแปล/ชื่อสำนักข่าว
+    if (!geo || geo.lat == null) return;                // ระบุพื้นที่ไม่ได้/ขัดแย้ง → ไม่ปักหมุด
     const m = VESSEL_NAME_RE.exec(en) || VESSEL_NAME_RE.exec(sum);
     const name = m ? (m[1] + " " + m[2]).trim() : null;
     const type = _vesselType(hay);
@@ -327,8 +490,8 @@ function extractEventsFromNews(newsArr) {
        "เกิดอะไรขึ้น" จริง ๆ ส่วนหมวดหมู่ยังดูทั้งชิ้นได้ เพราะเป็นเรื่องหัวข้อ */
     const headline = [en, th].join("  ");
 
-    const geo = geocodeText(en, th, sum, sth, n.outlet);
-    if (!geo) return;                       // ระบุพื้นที่ไม่ได้ = ปักหมุดไม่ได้
+    const geo = geocodeNews(n);          // ต้นฉบับเท่านั้น ไม่เอาคำแปล/ชื่อสำนักข่าว
+    if (!geo || geo.lat == null) return;    // ระบุพื้นที่ไม่ได้/ขัดแย้ง = ปักหมุดไม่ได้
     if (EV_NOT_INCIDENT.test(headline)) return;   // ข่าวจัดซื้อ/ซ้อม/ธุรกิจ
 
     let sev = EV_SEV_CRIT.test(headline) ? "critical"
@@ -411,8 +574,10 @@ function extractNewsPointsFromNews(newsArr) {
     const sum = (n.ai && (n.ai.en || n.ai.th)) || "";
     const sth = (n.ai && n.ai.th) || "";
 
-    const geo = geocodeText(en, th, sum, sth, n.outlet);
-    if (!geo) return;                // ข่าวที่ระบุพื้นที่ไม่ได้ → ไม่ปักหมุด
+    const geo = geocodeNews(n);          // ต้นฉบับเท่านั้น ไม่เอาคำแปล/ชื่อสำนักข่าว
+    /* lat เป็น null ได้เมื่อสถานะเป็น conflict — ต้องเช็คด้วย ไม่ใช่เช็คแค่ว่ามี
+       ออบเจกต์ ไม่งั้น null + rad*cos() กลายเป็น NaN แล้ว Leaflet ปักหมุดเพี้ยน */
+    if (!geo || geo.lat == null) return;   // ระบุพื้นที่ไม่ได้/ขัดแย้ง → ไม่ปักหมุด
 
     // สีจุดตามด้านภัยคุกคามของข่าว (ถ้าจับได้) มิฉะนั้นใช้สีข่าวทั่วไป
     const domKeys = window.classifyThreats ? window.classifyThreats(n) : [];
@@ -839,6 +1004,7 @@ Object.assign(window, {
   useEventsUpdater, addEventToSupabase, setEventEscalation,
   loadEventsFromSupabase, queryEventsArchive,
   AddEventModal, AddEventButton, REGION_PRESETS,
-  geocodeText, MDA_GEO_REGIONS, extractVesselsFromNews, extractNewsPointsFromNews,
+  geocodeText, geocodeNews, geoKind, MDA_GEO_REGIONS,
+  extractVesselsFromNews, extractNewsPointsFromNews,
   extractEventsFromNews, mergeEvents,
 });

@@ -30,8 +30,8 @@ function DailyBrief({ data, lang, onNav, showToast }) {
   // ดัชนีภัยคุกคามรายภูมิภาค = นับข่าวต่อพื้นที่ (geocode)
   const regionCounts = {};
   feedNews.forEach(n => {
-    const g = window.geocodeText
-      ? window.geocodeText(n.raw && n.raw.en, n.raw && n.raw.th, n.ai && n.ai.en, n.ai && n.ai.th, n.outlet)
+    const g = window.geocodeNews
+      ? window.geocodeNews(n)
       : null;
     if (g) { const key = lang === "th" ? g.th : g.en; regionCounts[key] = (regionCounts[key] || 0) + 1; }
   });

@@ -38,10 +38,7 @@ function ChatScreen({ data, lang, onNav, showToast }) {
 
   // แปลงข่าวเป็นรูปแบบที่ฝั่งเซิร์ฟเวอร์ใช้ค้นและอ้างอิง
   const newsPayload = React.useMemo(() => (allNews || []).map(n => {
-    const geo = window.geocodeText
-      ? window.geocodeText(n.raw && n.raw.en, n.raw && n.raw.th,
-          n.ai && n.ai.en, n.ai && n.ai.th, n.outlet)
-      : null;
+    const geo = window.geocodeNews ? window.geocodeNews(n) : null;
     return {
       id:      n.id,
       title:   (n.raw && (n.raw.th || n.raw.en)) || "",

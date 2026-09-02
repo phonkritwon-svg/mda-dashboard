@@ -16,10 +16,7 @@ function NewsRow({ n, lang, onNav }) {
   const domMeta = window.MDA_THREAT_DOMAINS || [];
   const domains = (window.classifyThreats ? window.classifyThreats(n) : [])
     .map(k => domMeta.find(d => d.key === k)).filter(Boolean);
-  const geo = window.geocodeText
-    ? window.geocodeText(n.raw && n.raw.en, n.raw && n.raw.th,
-        n.ai && n.ai.en, n.ai && n.ai.th, n.outlet)
-    : null;
+  const geo = window.geocodeNews ? window.geocodeNews(n) : null;
   const agoStr = n.isLive
     ? window.mdaTimeAgo(n.time, lang)
     : tx(n.ago, lang);
@@ -74,7 +71,9 @@ function NewsRow({ n, lang, onNav }) {
         <span className="row" style={{ gap: 5 }}><Icon name="clock" size={11} />{n.isLive ? new Date(n.time).toLocaleString(lang === "th" ? "th-TH" : "en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : n.time}</span>
         {n.outlet && <span className="row" style={{ gap: 5 }}><Icon name="globe" size={11} />{n.outlet}</span>}
         <span className="topbar-spacer"></span>
-        {geo && (
+        {/* ต้องมีพิกัดจริงถึงจะเสนอปุ่มนี้ — สถานะ conflict มีชื่อพื้นที่แต่ lat เป็น null
+            ถ้าโชว์ปุ่มไว้ กดแล้วแผนที่จะกระโดดไป NaN แล้วค้าง */}
+        {geo && geo.lat != null && (
           <a className="panel-link" style={{ cursor: "pointer" }}
             title={lang === "th" ? geo.th : geo.en}
             onClick={(ev) => {

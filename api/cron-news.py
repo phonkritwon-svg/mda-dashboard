@@ -291,34 +291,45 @@ def upsert(rows):
 
 # ── สร้าง "เหตุการณ์" จากข่าวภัยสูง ─────────────────────────────
 # เลือกเฉพาะข่าวที่ (1) รุนแรงพอ และ (2) ระบุพื้นที่ทางทะเลได้ → ขึ้นหมุดบนแผนที่
+# พื้นที่ที่รู้จัก + "ระดับความเฉพาะเจาะจง" (rank)
+#   0 = จุด/ช่องแคบ/เมือง/ชายฝั่งที่ระบุได้แคบ
+#   1 = ทะเลหรืออ่าวที่มีชื่อเฉพาะ — เป็นพื้นที่ ไม่ใช่จุด
+#   2 = มหาสมุทร — กว้างจนแทบไม่บอกอะไร
+#
+# ใช้ rank เลือกผู้ชนะ ไม่ใช่ลำดับบรรทัด ข่าวที่พูดถึงทั้ง "Strait of Hormuz"
+# และ "Indian Ocean" ต้องลงที่ช่องแคบ ไม่ใช่กลางมหาสมุทร
 REGIONS = [
-    (re.compile(r"red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen", re.I),     ("Red Sea / Bab el-Mandeb", "ทะเลแดง / บับเอลมันเดบ", 13.5, 43.3)),
-    (re.compile(r"strait of hormuz|hormuz|fujairah|persian gulf", re.I),   ("Strait of Hormuz",        "ช่องแคบฮอร์มุซ",        26.5, 56.3)),
-    (re.compile(r"gulf of aden|\baden\b", re.I),                           ("Gulf of Aden",            "อ่าวเอเดน",             12.5, 47.0)),
-    # --- พื้นที่เน้น: เพื่อนบ้านของไทย (กัมพูชา / เมียนมา / มาเลเซีย) — มาก่อนภูมิภาคกว้าง ---
-    (re.compile(r"cambodia|cambodian|khmer|sihanoukville|sihanouk|koh ?kong|kampong som|\bream\b|kampot", re.I),
-                                                                           ("Cambodia Coast / Gulf of Thailand", "ชายฝั่งกัมพูชา / อ่าวไทย", 10.6, 103.5)),
+    (re.compile(r"strait of hormuz|hormuz|fujairah", re.I),               0, ("Strait of Hormuz",        "ช่องแคบฮอร์มุซ",        26.5, 56.3)),
+    (re.compile(r"strait of malacca|malacca|singapore strait", re.I),     0, ("Strait of Malacca",       "ช่องแคบมะละกา",         2.5,  101.0)),
+    (re.compile(r"ko ?kut|koh ?kood|เกาะกูด", re.I),                       0, ("Ko Kut",                  "เกาะกูด",               11.65, 102.58)),
+    (re.compile(r"koh ?kong|เกาะกง", re.I),                               0, ("Koh Kong",                "เกาะกง",                11.6,  103.0)),
+    (re.compile(r"trat|ตราด", re.I),                                   0, ("Trat",                    "ตราด",                  12.0,  102.5)),
+    # --- พื้นที่เน้น: เพื่อนบ้านของไทย (กัมพูชา / เมียนมา / มาเลเซีย) ---
+    (re.compile(r"cambodia|cambodian|khmer|sihanoukville|sihanouk|koh ?kong|kampong som|ream|kampot", re.I),
+                                                                          0, ("Cambodia Coast / Gulf of Thailand", "ชายฝั่งกัมพูชา / อ่าวไทย", 10.6, 103.5)),
     (re.compile(r"myanmar|burma|burmese|rakhine|arakan|sittwe|kyauk ?phyu|kyaukpyu|coco island|great coco|mergui|myeik|tanintharyi|yangon|naypyidaw|irrawaddy|rohingya", re.I),
-                                                                           ("Myanmar Coast / Andaman–Bay of Bengal", "ชายฝั่งเมียนมา / อันดามัน–เบงกอล", 15.5, 94.5)),
+                                                                          0, ("Myanmar Coast / Andaman–Bay of Bengal", "ชายฝั่งเมียนมา / อันดามัน–เบงกอล", 15.5, 94.5)),
     (re.compile(r"malaysia|malaysian|melaka|johor|sabah|sarawak|kota kinabalu|labuan|lumut|langkawi|penang|port klang|kuala lumpur|putrajaya", re.I),
-                                                                           ("Malaysia / Malacca–Borneo", "มาเลเซีย / มะละกา–บอร์เนียว", 4.0, 109.5)),
-    (re.compile(r"south china sea|scarborough|spratly|paracel|second thomas|taiwan strait", re.I), ("South China Sea", "ทะเลจีนใต้",  15.0, 117.0)),
-    (re.compile(r"strait of malacca|malacca|singapore strait", re.I),      ("Strait of Malacca",       "ช่องแคบมะละกา",         2.5,  101.0)),
-    # --- ชายแดนทะเลไทย–กัมพูชา (ตรวจก่อน "อ่าวไทย" กว้าง ๆ) ---
-    (re.compile(r"ko ?kut|koh ?kood|เกาะกูด", re.I),                        ("Ko Kut",                  "เกาะกูด",               11.65, 102.58)),
-    (re.compile(r"koh ?kong|เกาะกง", re.I),                                ("Koh Kong",                "เกาะกง",                11.6,  103.0)),
-    (re.compile(r"\btrat\b|ตราด", re.I),                                    ("Trat",                    "ตราด",                  12.0,  102.5)),
-    (re.compile(r"overlapping claims|\boca\b|พื้นที่อ้างสิทธิทับซ้อน|พื้นที่ทับซ้อน", re.I), ("Gulf of Thailand OCA", "พื้นที่อ้างสิทธิทับซ้อน (อ่าวไทย)", 8.0, 102.5)),
-    (re.compile(r"gulf of thailand|อ่าวไทย", re.I),                        ("Gulf of Thailand",        "อ่าวไทย",               9.5,  101.5)),
-    (re.compile(r"andaman", re.I),                                         ("Andaman Sea",             "ทะเลอันดามัน",          8.0,  97.0)),
-    (re.compile(r"natuna", re.I),                                          ("North Natuna Sea",        "ทะเลนาตูนาเหนือ",       5.0,  109.2)),
-    (re.compile(r"black sea|novorossiysk|odes[as]|crimea", re.I),          ("Black Sea",               "ทะเลดำ",                44.0, 36.0)),
-    (re.compile(r"baltic|gulf of finland|kattegat|gotland", re.I),         ("Baltic Sea",              "ทะเลบอลติก",            59.0, 21.0)),
-    (re.compile(r"gulf of guinea|nigeria|lagos", re.I),                    ("Gulf of Guinea",          "อ่าวกินี",              3.0,  5.0)),
-    (re.compile(r"somali|horn of africa|gulf of oman|arabian sea", re.I),  ("Arabian Sea / Horn",      "ทะเลอาหรับ / จะงอยแอฟริกา", 12.0, 55.0)),
-    (re.compile(r"mediterranean|aegean|libya|gaza", re.I),                 ("Mediterranean Sea",       "ทะเลเมดิเตอร์เรเนียน",   34.0, 18.0)),
-    (re.compile(r"caribbean|venezuela|panama canal", re.I),                ("Caribbean Sea",           "ทะเลแคริบเบียน",        14.0, -72.0)),
-    (re.compile(r"indian ocean", re.I),                                    ("Indian Ocean",            "มหาสมุทรอินเดีย",       5.0,  75.0)),
+                                                                          0, ("Malaysia / Malacca–Borneo", "มาเลเซีย / มะละกา–บอร์เนียว", 4.0, 109.5)),
+
+    (re.compile(r"red sea|bab[- ]?el[- ]?mandeb|hodeida|yemen", re.I),    1, ("Red Sea / Bab el-Mandeb", "ทะเลแดง / บับเอลมันเดบ", 13.5, 43.3)),
+    (re.compile(r"persian gulf|arabian gulf", re.I),                      1, ("Persian Gulf",            "อ่าวเปอร์เซีย",         26.5, 52.0)),
+    (re.compile(r"gulf of aden|aden", re.I),                          1, ("Gulf of Aden",            "อ่าวเอเดน",             12.5, 47.0)),
+    (re.compile(r"south china sea|scarborough|spratly|paracel|second thomas|taiwan strait", re.I),
+                                                                          1, ("South China Sea",         "ทะเลจีนใต้",            15.0, 117.0)),
+    (re.compile(r"overlapping claims|oca|พื้นที่อ้างสิทธิทับซ้อน|พื้นที่ทับซ้อน", re.I),
+                                                                          1, ("Gulf of Thailand OCA",    "พื้นที่อ้างสิทธิทับซ้อน (อ่าวไทย)", 8.0, 102.5)),
+    (re.compile(r"gulf of thailand", re.I),                               1, ("Gulf of Thailand",        "อ่าวไทย",               9.5,  101.5)),
+    (re.compile(r"andaman", re.I),                                        1, ("Andaman Sea",             "ทะเลอันดามัน",          8.0,  97.0)),
+    (re.compile(r"natuna", re.I),                                         1, ("North Natuna Sea",        "ทะเลนาตูนาเหนือ",       5.0,  109.2)),
+    (re.compile(r"black sea|novorossiysk|odes[as]|crimea", re.I),         1, ("Black Sea",               "ทะเลดำ",                44.0, 36.0)),
+    (re.compile(r"baltic|gulf of finland|kattegat|gotland", re.I),        1, ("Baltic Sea",              "ทะเลบอลติก",            59.0, 21.0)),
+    (re.compile(r"gulf of guinea|nigeria|lagos", re.I),                   1, ("Gulf of Guinea",          "อ่าวกินี",              3.0,  5.0)),
+    (re.compile(r"somali|horn of africa|gulf of oman|arabian sea", re.I), 1, ("Arabian Sea / Horn",      "ทะเลอาหรับ / จะงอยแอฟริกา", 12.0, 55.0)),
+    (re.compile(r"mediterranean|aegean|libya|gaza", re.I),                1, ("Mediterranean Sea",       "ทะเลเมดิเตอร์เรเนียน",   34.0, 18.0)),
+    (re.compile(r"caribbean|venezuela|panama canal", re.I),               1, ("Caribbean Sea",           "ทะเลแคริบเบียน",        14.0, -72.0)),
+
+    (re.compile(r"indian ocean", re.I),                                   2, ("Indian Ocean",            "มหาสมุทรอินเดีย",       5.0,  75.0)),
 ]
 
 SEV_CRIT = re.compile(r"\b(attack|attacked|missile|drone strike|explosion|struck|killed|sunk|sinking|hijack|seized|under fire|ballistic)\b", re.I)
@@ -339,25 +350,44 @@ THREAT_CATS = [
 
 
 def _ev_text(a):
+    """ข้อความที่ใช้ "หาพื้นที่" — ภาษาต้นฉบับเท่านั้น
+
+    ⚠ ห้ามใส่ title_th / summary_th ซึ่งเป็นคำแปลจาก Google
+      เคยใส่แล้วเกิดบั๊กจริง: ข่าว MAREX เรื่องอ่าวเปอร์เซียถูกแปลว่า
+      "ความขัดแย้งในอ่าวไทย" แล้วกฎ "อ่าวไทย" จับได้ เหตุการณ์จึงไปโผล่
+      กลางอ่าวไทย ทั้งที่ข้อความอังกฤษต้นฉบับไม่ตรงกับกฎไหนเลย
+      คำแปลไม่ใช่หลักฐานทางภูมิศาสตร์ — มันสร้างสถานที่ขึ้นมาใหม่ได้
+    """
+    return " ".join([a.get("title", ""), a.get("desc", "")])
+
+
+def _sev_text(a):
+    """ข้อความที่ใช้ "จัดระดับความรุนแรง/หมวดภัย" — ใช้คำแปลได้
+
+    ต่างจากพื้นที่ตรงที่คำว่า "โจมตี" หรือ "ระเบิด" ในคำแปลก็ยังหมายถึง
+    สิ่งเดียวกับต้นฉบับ ไม่ได้ย้ายเหตุการณ์ไปไหน
+    """
     return " ".join([a.get("title", ""), a.get("desc", ""),
                      a.get("title_th", "") or "", a.get("summary_th", "") or ""])
 
 
 def to_event_row(a):
-    text = _ev_text(a)
+    geo_text = _ev_text(a)      # ต้นฉบับเท่านั้น — ใช้หาพื้นที่
+    sev_text = _sev_text(a)     # รวมคำแปล — ใช้จัดระดับภัย
+
     # ต้องระบุพื้นที่ทางทะเลได้ (เพื่อขึ้นหมุดบนแผนที่)
-    geo = None
-    for rx, info in REGIONS:
-        if rx.search(text):
-            geo = info
-            break
-    if not geo:
+    # เลือกกฎที่ "เจาะจงที่สุด" ไม่ใช่กฎแรกที่เจอ — ของเดิมให้ลำดับบรรทัด
+    # ในไฟล์เป็นตัวตัดสิน ซึ่งไม่ใช่เหตุผลทางภูมิศาสตร์อะไรเลย
+    hits = [(rank, info) for rx, rank, info in REGIONS if rx.search(geo_text)]
+    if not hits:
         return None
+    geo = min(hits, key=lambda h: h[0])[1]
+
     # ต้องมีสัญญาณภัย: ความรุนแรง หรือ เข้าหมวดภัยคุกคามชัดเจน
-    sev = "critical" if SEV_CRIT.search(text) else ("high" if SEV_HIGH.search(text) else None)
+    sev = "critical" if SEV_CRIT.search(sev_text) else ("high" if SEV_HIGH.search(sev_text) else None)
     cat = None
     for name, rx in THREAT_CATS:
-        if rx.search(text):
+        if rx.search(sev_text):
             cat = name
             break
     if not sev and not cat:

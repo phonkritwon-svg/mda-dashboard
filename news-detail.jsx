@@ -76,8 +76,8 @@ function NewsDetail({ item, lang, onNav, showToast }) {
   const domMeta = window.MDA_THREAT_DOMAINS || [];
   const domains = (window.classifyThreats ? window.classifyThreats(n) : [])
     .map(k => domMeta.find(d => d.key === k)).filter(Boolean);
-  const geo = window.geocodeText
-    ? window.geocodeText(n.raw && n.raw.en, n.raw && n.raw.th, n.ai && n.ai.en, n.ai && n.ai.th, n.outlet)
+  const geo = window.geocodeNews
+    ? window.geocodeNews(n)
     : null;
 
   const timeStr = n.isLive
@@ -91,8 +91,8 @@ function NewsDetail({ item, lang, onNav, showToast }) {
     const myDomains = new Set(domains.map(d => d.key));
     const out = [];
     pool.forEach(x => {
-      const g = window.geocodeText
-        ? window.geocodeText(x.raw && x.raw.en, x.raw && x.raw.th, x.ai && x.ai.en, x.ai && x.ai.th, x.outlet)
+      const g = window.geocodeNews
+        ? window.geocodeNews(x)
         : null;
       const sameArea = geo && g && g.en === geo.en;
       const xd = window.classifyThreats ? window.classifyThreats(x) : [];
@@ -169,7 +169,8 @@ function NewsDetail({ item, lang, onNav, showToast }) {
           </div>
         </div>
         <div className="row">
-          {geo && (
+          {/* conflict มีชื่อพื้นที่แต่ไม่มีพิกัด — ปุ่มดูบนแผนที่จึงต้องไม่ขึ้น */}
+          {geo && geo.lat != null && (
             <button className="btn btn-ghost btn-sm" onClick={() => onNav("map", {
               focus: { lat: geo.lat, lon: geo.lon, label: lang === "th" ? geo.th : geo.en, title: tx(n.raw, lang) } })}>
               <Icon name="pin" size={14} />{T("ดูบนแผนที่", "View on map")}
