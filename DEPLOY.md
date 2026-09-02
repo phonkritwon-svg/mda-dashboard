@@ -1,4 +1,4 @@
-# คู่มือ Deploy — MDA Maritime Domain Awareness
+# คู่มือ Deploy — AI Maritime Intel
 
 ## สถาปัตยกรรมจริง ณ ตอนนี้
 

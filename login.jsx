@@ -359,7 +359,7 @@ function LoginScreen() {
               <Icon name="radar" size={22} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>MDA · Maritime Domain Awareness</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>AI Maritime Intel</div>
               <div style={{ fontSize: 10, color: "var(--text-dim)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
                 ศูนย์บัญชาการข่าวทางทะเล
               </div>
@@ -504,7 +504,7 @@ function LoginScreen() {
           padding: "9px 24px", borderTop: "1px solid var(--border)",
           fontSize: 10, color: "var(--text-mute)", letterSpacing: "0.04em", textAlign: "center",
         }}>
-          THAI NAVAL INTELLIGENCE · MDA v2.0
+          THAI NAVAL INTELLIGENCE · AI MARITIME INTEL v2.0
         </div>
       </div>
     </div>

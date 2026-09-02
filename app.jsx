@@ -405,7 +405,7 @@ function App() {
           <div className="brand">
             <div className="brand-mark"><Icon name="radar" size={18} /></div>
             <div>
-              <div className="brand-title">MDA · Maritime Domain Awareness</div>
+              <div className="brand-title">AI Maritime Intel</div>
               <div className="brand-sub">ศูนย์บัญชาการข่าวทางทะเล · GLOBAL OSINT</div>
             </div>
           </div>

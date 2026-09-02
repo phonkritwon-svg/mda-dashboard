@@ -21,7 +21,7 @@ const MAP_REGIONS = [
     { th: "ทะเลดำ",          en: "Black Sea",           lat: 44.0, lon: 36.0, z: 5 },
     { th: "ทะเลบอลติก",       en: "Baltic Sea",          lat: 59.0, lon: 21.0, z: 5 },
   ]},
-  { gh: "มหาสมุทร (MDA)", ge: "Oceans (MDA)", items: [
+  { gh: "มหาสมุทร", ge: "Oceans", items: [
     { th: "มหาสมุทรแปซิฟิก",   en: "Pacific Ocean",       lat: 0.0,   lon: -160.0, z: 3 },
     { th: "มหาสมุทรแอตแลนติก", en: "Atlantic Ocean",      lat: 10.0,  lon: -40.0,  z: 3 },
     { th: "มหาสมุทรอินเดีย",   en: "Indian Ocean",        lat: -10.0, lon: 75.0,   z: 3 },
