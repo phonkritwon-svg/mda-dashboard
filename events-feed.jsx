@@ -47,10 +47,69 @@ const MDA_GEO_REGIONS = [
                                                                th: "มาเลเซีย / มะละกา–บอร์เนียว", en: "Malaysia Coast",       lat: 4.0,   lon: 109.5 },
 
   /* ── ชายแดนทะเลไทย–กัมพูชา (ต้องตรวจก่อน "อ่าวไทย" ที่กว้างกว่า) ── */
-  { re: /ko ?kut|koh ?kood|เกาะกูด/i,                          th: "เกาะกูด",                   en: "Ko Kut",                  lat: 11.65, lon: 102.58 },
-  { re: /koh ?kong|เกาะกง/i,                                  th: "เกาะกง",                    en: "Koh Kong",                lat: 11.6,  lon: 103.0 },
   { re: /\btrat\b|ตราด/i,                                      th: "ตราด",                      en: "Trat",                    lat: 12.0,  lon: 102.5 },
   { re: /overlapping claims|\boca\b|พื้นที่อ้างสิทธิทับซ้อน|พื้นที่ทับซ้อน/i, th: "พื้นที่อ้างสิทธิทับซ้อน (อ่าวไทย)", en: "Gulf of Thailand OCA", lat: 8.0, lon: 102.5 },
+
+  /* ── จุดเกิดเหตุในไทย: ท่าเรือ · ฐานทัพเรือ · เกาะ · หาด · ปากน้ำ ──────
+     ละเอียดกว่าระดับจังหวัดหนึ่งขั้น และนี่คือขั้นที่ข่าวทางน้ำต้องการจริง ๆ
+     เหตุทางทะเลเกิดที่ "ท่าเรือ/เกาะ/ปากน้ำ" ไม่ได้เกิดที่ศาลากลางจังหวัด
+     ปักที่ใจกลางจังหวัดจึงเพี้ยนได้หลายสิบกิโลเมตร และเพี้ยนลงบนบกด้วย
+     ตัวอย่างที่วัดจริง: "จมน้ำกลางทะเลปากอ่าวแหลมฉบัง" เคยลงที่ตัวเมืองชลบุรี
+     ห่างจากปากอ่าวจริงราว 30 กม. · "เกาะสมุย" เคยลงที่ตัวเมืองสุราษฎร์ธานี
+     ซึ่งอยู่คนละฝั่งอ่าว ห่างราว 80 กม.
+
+     kind: "point" เขียนติดมากับกฎเลย ไม่ต้องไปเติมชื่อใน GEO_SPECIFIC อีกที่
+     (ลืมเติมเมื่อไร กฎนั้นจะกลายเป็น "country" เงียบ ๆ — ดูคอมเมนต์ที่ geoKind) */
+
+  /* ท่าเรือพาณิชย์ / ฐานทัพเรือ */
+  { kind: "point", re: /laem ?chabang|แหลมฉบัง/i,                      th: "ท่าเรือแหลมฉบัง",      en: "Laem Chabang Port",   lat: 13.08, lon: 100.88 },
+  { kind: "point", re: /khlong ?toei|คลองเตย|ท่าเรือกรุงเทพ/i,          th: "ท่าเรือกรุงเทพ (คลองเตย)", en: "Bangkok Port",     lat: 13.70, lon: 100.58 },
+  { kind: "point", re: /map ?ta ?phut|มาบตาพุด/i,                       th: "มาบตาพุด",             en: "Map Ta Phut",         lat: 12.67, lon: 101.15 },
+  { kind: "point", re: /sattahip|สัตหีบ|ฐานทัพเรือสัตหีบ|อู่ตะเภา|u[- ]?tapao/i, th: "สัตหีบ",       en: "Sattahip",            lat: 12.63, lon: 100.90 },
+  { kind: "point", re: /ท่าเรือสงขลา|songkhla ?port/i,                  th: "ท่าเรือสงขลา",         en: "Songkhla Port",       lat: 7.21,  lon: 100.59 },
+  { kind: "point", re: /pak ?bara|ปากบารา/i,                            th: "ปากบารา (สตูล)",       en: "Pak Bara",            lat: 6.86,  lon: 99.72 },
+  { kind: "point", re: /laem ?ngop|แหลมงอบ/i,                           th: "แหลมงอบ (ตราด)",       en: "Laem Ngop",           lat: 12.18, lon: 102.39 },
+  { kind: "point", re: /khlong ?yai|คลองใหญ่|หาดเล็ก/i,                 th: "คลองใหญ่ (ตราด)",      en: "Khlong Yai",          lat: 11.78, lon: 102.88 },
+  { kind: "point", re: /ban ?phe|บ้านเพ/i,                              th: "บ้านเพ (ระยอง)",       en: "Ban Phe",             lat: 12.63, lon: 101.44 },
+  { kind: "point", re: /don ?sak|ดอนสัก/i,                              th: "ดอนสัก (สุราษฎร์ธานี)", en: "Don Sak",            lat: 9.31,  lon: 99.69 },
+  { kind: "point", re: /ท่าเรือระนอง|ranong ?port|เกาะสอง|kawthaung/i,  th: "ท่าเรือระนอง",         en: "Ranong Port",         lat: 9.94,  lon: 98.60 },
+  { kind: "point", re: /ปากน้ำชุมพร|หลังสวน/i,                          th: "ปากน้ำชุมพร",          en: "Pak Nam Chumphon",    lat: 10.47, lon: 99.23 },
+
+  /* เกาะ */
+  { kind: "point", re: /ko ?kut|koh ?kood|เกาะกูด/i,                    th: "เกาะกูด",              en: "Ko Kut",              lat: 11.65, lon: 102.58 },
+  { kind: "point", re: /koh ?kong|เกาะกง/i,                             th: "เกาะกง",               en: "Koh Kong",            lat: 11.60, lon: 103.00 },
+  { kind: "point", re: /ko(?:h)? ?chang|เกาะช้าง/i,                     th: "เกาะช้าง (ตราด)",      en: "Ko Chang",            lat: 12.05, lon: 102.32 },
+  { kind: "point", re: /ko(?:h)? ?samet|เกาะเสม็ด/i,                    th: "เกาะเสม็ด",            en: "Ko Samet",            lat: 12.57, lon: 101.45 },
+  { kind: "point", re: /ko(?:h)? ?larn|เกาะล้าน/i,                      th: "เกาะล้าน",             en: "Ko Larn",             lat: 12.92, lon: 100.79 },
+  { kind: "point", re: /ko(?:h)? ?sichang|เกาะสีชัง/i,                  th: "เกาะสีชัง",            en: "Ko Sichang",          lat: 13.16, lon: 100.81 },
+  { kind: "point", re: /ko(?:h)? ?samui|เกาะสมุย|สมุย/i,                th: "เกาะสมุย",             en: "Ko Samui",            lat: 9.51,  lon: 100.01 },
+  { kind: "point", re: /ko(?:h)? ?pha ?ngan|เกาะพะงัน/i,                th: "เกาะพะงัน",            en: "Ko Pha Ngan",         lat: 9.75,  lon: 100.03 },
+  { kind: "point", re: /ko(?:h)? ?tao|เกาะเต่า/i,                       th: "เกาะเต่า",             en: "Ko Tao",              lat: 10.10, lon: 99.84 },
+  { kind: "point", re: /phi ?phi|เกาะพีพี|พีพี/i,                       th: "เกาะพีพี",             en: "Ko Phi Phi",          lat: 7.74,  lon: 98.78 },
+  { kind: "point", re: /ko(?:h)? ?lanta|เกาะลันตา/i,                    th: "เกาะลันตา",            en: "Ko Lanta",            lat: 7.55,  lon: 99.05 },
+  { kind: "point", re: /tarutao|ตะรุเตา/i,                              th: "เกาะตะรุเตา",          en: "Ko Tarutao",          lat: 6.68,  lon: 99.65 },
+  { kind: "point", re: /lipe|หลีเป๊ะ/i,                                 th: "เกาะหลีเป๊ะ",          en: "Ko Lipe",             lat: 6.49,  lon: 99.30 },
+  { kind: "point", re: /similan|สิมิลัน/i,                              th: "หมู่เกาะสิมิลัน",      en: "Similan Islands",     lat: 8.65,  lon: 97.64 },
+  { kind: "point", re: /surin ?islands|หมู่เกาะสุรินทร์/i,              th: "หมู่เกาะสุรินทร์",     en: "Surin Islands",       lat: 9.42,  lon: 97.87 },
+  { kind: "point", re: /ko(?:h)? ?phayam|เกาะพยาม/i,                    th: "เกาะพยาม (ระนอง)",     en: "Ko Phayam",           lat: 9.75,  lon: 98.42 },
+
+  /* หาด / อ่าว ที่ปรากฏในข่าวบ่อย */
+  { kind: "point", re: /\bpattaya\b|พัทยา/i,                            th: "พัทยา",                en: "Pattaya",             lat: 12.93, lon: 100.88 },
+  { kind: "point", re: /bang ?saen|บางแสน/i,                            th: "บางแสน",               en: "Bang Saen",           lat: 13.28, lon: 100.92 },
+  { kind: "point", re: /hua ?hin|หัวหิน/i,                              th: "หัวหิน",               en: "Hua Hin",             lat: 12.57, lon: 99.96 },
+  { kind: "point", re: /cha[- ]?am|ชะอำ/i,                              th: "ชะอำ",                 en: "Cha-am",              lat: 12.80, lon: 99.97 },
+  { kind: "point", re: /patong|ป่าตอง/i,                                th: "หาดป่าตอง (ภูเก็ต)",   en: "Patong Beach",        lat: 7.89,  lon: 98.30 },
+  { kind: "point", re: /ao ?manao|อ่าวมะนาว/i,                          th: "อ่าวมะนาว (ประจวบฯ)",  en: "Ao Manao",            lat: 11.77, lon: 99.82 },
+  { kind: "point", re: /samae ?san|แสมสาร/i,                            th: "อ่าวแสมสาร (ชลบุรี)",  en: "Samae San",           lat: 12.60, lon: 100.95 },
+
+  /* ปากน้ำ — เหตุเรือส่วนใหญ่เกิดตรงปากแม่น้ำ ไม่ใช่กลางอ่าว */
+  { kind: "point", re: /ปากน้ำเจ้าพระยา|ปากน้ำสมุทรปราการ/i,           th: "ปากน้ำเจ้าพระยา",      en: "Chao Phraya Mouth",   lat: 13.55, lon: 100.59 },
+  { kind: "point", re: /ปากน้ำแม่กลอง/i,                                th: "ปากน้ำแม่กลอง",        en: "Mae Klong Mouth",     lat: 13.38, lon: 100.00 },
+  { kind: "point", re: /ปากน้ำท่าจีน/i,                                 th: "ปากน้ำท่าจีน",         en: "Tha Chin Mouth",      lat: 13.45, lon: 100.28 },
+  { kind: "point", re: /ปากน้ำระยอง/i,                                  th: "ปากน้ำระยอง",          en: "Rayong River Mouth",  lat: 12.66, lon: 101.28 },
+  { kind: "point", re: /ปากน้ำกระบี่/i,                                 th: "ปากน้ำกระบี่",         en: "Krabi River Mouth",   lat: 8.06,  lon: 98.92 },
+  { kind: "point", re: /ปากพนัง/i,                                      th: "ปากพนัง (นครศรีฯ)",    en: "Pak Phanang",         lat: 8.35,  lon: 100.20 },
+  { kind: "point", re: /ปากน้ำปราณ|ปราณบุรี/i,                          th: "ปากน้ำปราณบุรี",       en: "Pran Buri Mouth",     lat: 12.40, lon: 99.98 },
 
   /* ── จังหวัดในประเทศไทย ────────────────────────────────────────────
      วางไว้ "หลัง" ทะเลที่มีชื่อเฉพาะ แต่ "ก่อน" อ่าวไทย/อันดามันที่กว้าง
@@ -128,6 +187,54 @@ const MDA_GEO_REGIONS = [
   { re: /chaiyaphum|ชัยภูมิ|บ้านเล่า/i,                           th: "ชัยภูมิ",          en: "Chaiyaphum",       lat: 15.81, lon: 102.03 },
   { re: /\bsurin\b|สุรินทร์/i,                                    th: "สุรินทร์",         en: "Surin",            lat: 14.88, lon: 103.49 },
   { re: /buri ?ram|บุรีรัมย์/i,                                   th: "บุรีรัมย์",        en: "Buri Ram",         lat: 14.99, lon: 103.10 },
+
+  /* ── จังหวัดที่เหลือ (เติมให้ครบ 77) ────────────────────────────────
+     เดิมมีแค่จังหวัดชายแดน/ชายฝั่ง ข่าวทางน้ำในแผ่นดิน เช่น "เรือล่มแม่น้ำน่าน
+     ที่เวียงสา" จึงตกไปที่กฎท้ายสุด "ประเทศไทย" แล้วปักหมุดลงกรุงเทพฯ
+     ห่างจากที่เกิดเหตุจริงราว 550 กม.
+
+     ⚠ ชื่อจังหวัดที่เป็นคำทั่วไปหรือเป็นส่วนหน้าของคำอื่นต้องบังคับให้มี
+       "จังหวัด/จ." นำหน้าเสมอ (กฎเดียวกับ components.jsx):
+         เลย  → "ไม่ได้เลย"   น่าน → "น่านน้ำ"   แพร่ → "แพร่ระบาด" · "เผยแพร่"
+       ชื่ออำเภอที่ไม่กำกวมใส่ตรง ๆ ได้ ใช้เป็นทางเข้าอีกทางของจังหวัดนั้น */
+
+  /* เหนือ */
+  { kind: "specific", re: /nan ?province|(?:จังหวัด|จ\.\s?)น่าน|เมืองน่าน|เวียงสา|ท่าวังผา|อ\.\s?ปัว/i,
+                                                                  th: "น่าน",            en: "Nan",              lat: 18.78, lon: 100.78 },
+  { kind: "specific", re: /\bphrae\b|(?:จังหวัด|จ\.\s?)แพร่|เมืองแพร่|อ\.\s?เด่นชัย|สูงเม่น/i,
+                                                                  th: "แพร่",            en: "Phrae",            lat: 18.14, lon: 100.14 },
+  { kind: "specific", re: /lampang|ลำปาง|เถิน|แม่เมาะ/i,           th: "ลำปาง",           en: "Lampang",          lat: 18.29, lon: 99.49 },
+  { kind: "specific", re: /lamphun|ลำพูน|ป่าซาง/i,                 th: "ลำพูน",           en: "Lamphun",          lat: 18.58, lon: 99.01 },
+  { kind: "specific", re: /phayao|พะเยา|เชียงคำ|ดอกคำใต้/i,        th: "พะเยา",           en: "Phayao",           lat: 19.17, lon: 99.90 },
+  { kind: "specific", re: /uttaradit|อุตรดิตถ์|ท่าปลา|น้ำปาด/i,    th: "อุตรดิตถ์",       en: "Uttaradit",        lat: 17.62, lon: 100.10 },
+  { kind: "specific", re: /sukhothai|สุโขทัย|ศรีสัชนาลัย|สวรรคโลก/i, th: "สุโขทัย",       en: "Sukhothai",        lat: 17.01, lon: 99.82 },
+  { kind: "specific", re: /kamphaeng ?phet|กำแพงเพชร|คลองลาน/i,    th: "กำแพงเพชร",       en: "Kamphaeng Phet",   lat: 16.48, lon: 99.52 },
+
+  /* กลาง */
+  { kind: "specific", re: /uthai ?thani|อุทัยธานี|ห้วยคต/i,        th: "อุทัยธานี",       en: "Uthai Thani",      lat: 15.38, lon: 100.02 },
+  { kind: "specific", re: /chai ?nat|ชัยนาท|สรรพยา|เขื่อนเจ้าพระยา/i, th: "ชัยนาท",       en: "Chai Nat",         lat: 15.19, lon: 100.13 },
+  { kind: "specific", re: /sing ?buri|สิงห์บุรี|อินทร์บุรี/i,      th: "สิงห์บุรี",       en: "Sing Buri",        lat: 14.89, lon: 100.40 },
+  { kind: "specific", re: /ang ?thong|อ่างทอง|ป่าโมก/i,            th: "อ่างทอง",         en: "Ang Thong",        lat: 14.59, lon: 100.46 },
+  { kind: "specific", re: /lop ?buri|ลพบุรี|บ้านหมี่|ชัยบาดาล/i,   th: "ลพบุรี",          en: "Lop Buri",         lat: 14.80, lon: 100.65 },
+  { kind: "specific", re: /suphan ?buri|สุพรรณบุรี|บางปลาม้า|สองพี่น้อง/i, th: "สุพรรณบุรี", en: "Suphan Buri",   lat: 14.47, lon: 100.12 },
+  { kind: "specific", re: /nakhon ?pathom|นครปฐม|สามพราน|นครชัยศรี/i, th: "นครปฐม",       en: "Nakhon Pathom",    lat: 13.82, lon: 100.06 },
+  { kind: "specific", re: /ratchaburi|ราชบุรี|ดำเนินสะดวก|บ้านโป่ง/i, th: "ราชบุรี",      en: "Ratchaburi",       lat: 13.53, lon: 99.81 },
+  { kind: "specific", re: /nakhon ?nayok|นครนายก|บ้านนา|องครักษ์/i, th: "นครนายก",        en: "Nakhon Nayok",     lat: 14.20, lon: 101.21 },
+  { kind: "specific", re: /prachin ?buri|ปราจีนบุรี|กบินทร์บุรี|ศรีมหาโพธิ/i, th: "ปราจีนบุรี", en: "Prachin Buri", lat: 14.05, lon: 101.37 },
+  { kind: "specific", re: /chachoengsao|ฉะเชิงเทรา|แปดริ้ว|บางปะกง|บางคล้า/i, th: "ฉะเชิงเทรา", en: "Chachoengsao", lat: 13.69, lon: 101.07 },
+
+  /* อีสาน */
+  { kind: "specific", re: /kalasin|กาฬสินธุ์|เขื่อนลำปาว|ยางตลาด/i, th: "กาฬสินธุ์",      en: "Kalasin",          lat: 16.43, lon: 103.51 },
+  { kind: "specific", re: /roi ?et|ร้อยเอ็ด|เสลภูมิ|โพนทอง/i,      th: "ร้อยเอ็ด",        en: "Roi Et",           lat: 16.06, lon: 103.65 },
+  { kind: "specific", re: /maha ?sarakham|มหาสารคาม|โกสุมพิสัย/i,  th: "มหาสารคาม",       en: "Maha Sarakham",    lat: 16.18, lon: 103.30 },
+  { kind: "specific", re: /sakon ?nakhon|สกลนคร|หนองหาร|สว่างแดนดิน/i, th: "สกลนคร",      en: "Sakon Nakhon",     lat: 17.16, lon: 104.15 },
+  { kind: "specific", re: /bueng ?kan|บึงกาฬ|ปากคาด|เซกา/i,        th: "บึงกาฬ",          en: "Bueng Kan",        lat: 18.36, lon: 103.65 },
+  { kind: "specific", re: /nong ?bua ?lam ?phu|หนองบัวลำภู|ศรีบุญเรือง/i, th: "หนองบัวลำภู", en: "Nong Bua Lam Phu", lat: 17.20, lon: 102.44 },
+  { kind: "specific", re: /\bloei\b|(?:จังหวัด|จ\.\s?)เลย|เมืองเลย|เชียงคาน|ภูเรือ|ด่านซ้าย/i,
+                                                                  th: "เลย",             en: "Loei",             lat: 17.49, lon: 101.73 },
+  { kind: "specific", re: /yasothon|ยโสธร|เลิงนกทา|มหาชนะชัย/i,    th: "ยโสธร",           en: "Yasothon",         lat: 15.79, lon: 104.15 },
+  { kind: "specific", re: /amnat ?charoen|อำนาจเจริญ|ชานุมาน/i,    th: "อำนาจเจริญ",      en: "Amnat Charoen",    lat: 15.86, lon: 104.63 },
+  { kind: "specific", re: /si ?sa ?ket|ศรีสะเกษ|กันทรลักษ์|ขุนหาญ/i, th: "ศรีสะเกษ",      en: "Si Sa Ket",        lat: 15.12, lon: 104.32 },
 
   { re: /gulf of thailand|อ่าวไทย|ท้องอ่าว/i,                                   th: "อ่าวไทย",                   en: "Gulf of Thailand",        lat: 9.5,  lon: 101.5 },
   { re: /andaman|ทะเลอันดามัน|อนุดามัน/i,                                            th: "ทะเลอันดามัน",              en: "Andaman Sea",             lat: 8.0,  lon: 97.0 },
@@ -249,9 +356,17 @@ const GEO_WATER = new Set([
 
 /* ยิ่งเจาะจง ยิ่งเชื่อได้ — และเลือกตัวที่เจาะจงที่สุดเสมอ ไม่ใช่ตัวแรกที่เจอ
    ของเดิมเลือกตัวแรกในตาราง ลำดับในไฟล์จึงกลายเป็นตัวตัดสินโดยบังเอิญ */
-const GEO_RANK = { specific: 0, water: 1, country: 2 };
+const GEO_RANK = { point: 0, specific: 1, water: 2, country: 3 };
 
-function geoKind(en) {
+/* กฎที่เขียน kind ติดมากับตัวเองเป็นตัวตัดสินก่อนเสมอ · Set สองชุดด้านบน
+   เหลือไว้ให้กฎชุดเดิมที่ยังไม่ได้ระบุ kind
+
+   เหตุที่เปลี่ยนวิธี: ของเดิมต้องไปเติมชื่อใน GEO_SPECIFIC ทุกครั้งที่เพิ่ม
+   พื้นที่ ลืมเมื่อไรกฎนั้นกลายเป็น "country" เงียบ ๆ (ความมั่นใจต่ำสุด)
+   ไม่มีอะไรเตือน — เขียน kind ไว้ในกฎเลยจึงลืมไม่ได้ */
+function geoKind(rule) {
+  if (rule && rule.kind) return rule.kind;
+  const en = typeof rule === "string" ? rule : (rule && rule.en) || "";
   if (GEO_SPECIFIC.has(en)) return "specific";
   if (GEO_WATER.has(en))    return "water";
   return "country";
@@ -264,6 +379,9 @@ const GEO_GRADE = {
      ต้องขึ้นกับความเฉพาะเจาะจง: หมุดระดับจังหวัดที่ผิดไป 500 กม. คือผิด
      แต่ "ทะเลจีนใต้" กับ "ทะเลอันดามัน" ห่างกันเป็นพันกิโลเมตรโดยธรรมชาติ
      ใช้เกณฑ์เดียวทั้งหมดจะจับผิดฝั่งใดฝั่งหนึ่งเสมอ */
+  /* point = ท่าเรือ/เกาะ/ปากน้ำ ระบุได้ระดับจุด — ข่าวที่ชี้จุดต่างกันเกิน
+     150 กม. คือชี้คนละที่แน่นอน ไม่ใช่ความคลาดเคลื่อนของหมุด */
+  point:    { confidence: 0.90, status: "probable",    conflictKm: 150 },
   specific: { confidence: 0.85, status: "probable",    conflictKm: 400 },
   water:    { confidence: 0.60, status: "approximate", conflictKm: 2500 },
   country:  { confidence: 0.35, status: "unverified",  conflictKm: 6000 },
@@ -283,7 +401,7 @@ function geoMatchesIn(text) {
   for (let i = 0; i < MDA_GEO_REGIONS.length; i++) {
     const r = MDA_GEO_REGIONS[i];
     const m = text.match(r.re);
-    if (m) out.push({ rule: r, kind: geoKind(r.en), hit: m[0] });
+    if (m) out.push({ rule: r, kind: geoKind(r), hit: m[0] });
   }
   return out;
 }
@@ -640,6 +758,13 @@ function eventRowToObj(r) {
     /* escalated_at เป็นตัวชี้ขาด ไม่มี flag แยก — ดู supabase/events_escalation.sql */
     escalatedAt: r.escalated_at || null,
     escalatedBy: r.escalated_by || "",
+    /* ข้อมูลกำกับตำแหน่ง — บอกว่าพิกัดนี้เชื่อได้แค่ไหนและมาจากไหน
+       loc_source = "analyst" คือคนแก้เอง ตัวประมวลผลอัตโนมัติห้ามทับ */
+    locStatus:     r.loc_status || (r.lat == null ? "unknown" : "unverified"),
+    locConfidence: r.loc_confidence == null ? null : Number(r.loc_confidence),
+    locEvidence:   r.loc_evidence || "",
+    locSource:     r.loc_source || "rule",
+    locUpdatedAt:  r.loc_updated_at || null,
   };
 }
 
@@ -667,6 +792,10 @@ function eventObjToRow(o) {
     source_url:    o.source.url || null,
     escalated_at:  o.escalatedAt || null,
     escalated_by:  o.escalatedBy || null,
+    loc_status:     o.locStatus || null,
+    loc_confidence: o.locConfidence == null ? null : o.locConfidence,
+    loc_evidence:   o.locEvidence || null,
+    loc_source:     o.locSource || "rule",
     resolved:      !!o.resolved,
     origin:        o.origin || "manual",
     published_at:  o.publishedAt || new Date().toISOString(),
@@ -749,6 +878,132 @@ async function setEventEscalation(id, by) {
   } catch (e) {
     return { error: String(e) };
   }
+}
+
+/* ============================================================
+   ตำแหน่งเหตุการณ์: ประมวลผลใหม่ · แก้โดยเจ้าหน้าที่ · ประวัติ
+   (ข้อ 17/18/19 ของโจทย์)
+   ============================================================ */
+
+/* หาพื้นที่จาก "ข้อความของเหตุการณ์" ด้วยกฎชุดเดียวกับข่าว
+   ใช้ภาษาต้นฉบับเท่านั้น (title_en/summary_en) ด้วยเหตุผลเดียวกับ geocodeNews */
+function geocodeEvent(ev) {
+  return geocodeNews({
+    raw: { en: (ev.title && ev.title.en) || "", th: "" },
+    ai:  { en: (ev.summary && ev.summary.en) || "", th: "" },
+  });
+}
+
+/* ── ข้อ 17: ประมวลผลตำแหน่งของเหตุการณ์เก่าใหม่ทั้งหมด ──────────
+   ใช้ตัวจับคู่ตัวเดียวกับที่แผนที่ใช้ ผลจึงตรงกันเสมอ ไม่ใช่ตรรกะคู่ขนาน
+
+   ⚠ ข้ามแถวที่ loc_source = "analyst" — ของที่คนตรวจแล้วแก้มือ
+     ห้ามให้ตัวอัตโนมัติทับ ไม่งั้นงานตรวจสอบหายทุกครั้งที่กดปุ่มนี้ */
+async function reprocessEventLocations(opts) {
+  const SB = window.MDA_SB;
+  if (!SB) return { error: "no_supabase" };
+  const dryRun = !!(opts && opts.dryRun);
+  const reason = (opts && opts.reason) || "reprocess: rule update";
+
+  const { data, error } = await SB.from("events").select("*").limit(5000);
+  if (error) return { error: error.message };
+
+  const rows = data || [];
+  const summary = { total: rows.length, skippedAnalyst: 0, unchanged: 0,
+                    updated: 0, cleared: 0, failed: 0, changes: [] };
+
+  for (const r of rows) {
+    if ((r.loc_source || "rule") === "analyst") { summary.skippedAnalyst++; continue; }
+
+    const g = geocodeEvent(eventRowToObj(r));
+    const nextLat  = g ? g.lat : null;
+    const nextLon  = g ? g.lon : null;
+    const nextStat = g ? g.status : "unknown";
+    const nextConf = g ? g.confidence : null;
+    const nextEv   = g && g.evidence ? g.evidence.text : null;
+    const nextName = g ? g.en : null;
+
+    const same = (r.lat == null ? null : Number(r.lat)) === nextLat
+              && (r.lon == null ? null : Number(r.lon)) === nextLon
+              && (r.loc_status || null) === nextStat;
+    if (same) { summary.unchanged++; continue; }
+
+    summary.changes.push({
+      id: r.id,
+      title: (r.title_en || "").slice(0, 60),
+      from: { name: r.area_en || null, lat: r.lat, lon: r.lon, status: r.loc_status || null },
+      to:   { name: nextName, lat: nextLat, lon: nextLon, status: nextStat },
+    });
+    if (nextLat == null && r.lat != null) summary.cleared++; else summary.updated++;
+
+    if (dryRun) continue;
+    const patch = {
+      lat: nextLat, lon: nextLon,
+      loc_status: nextStat, loc_confidence: nextConf, loc_evidence: nextEv,
+      loc_source: "rule", loc_reason: reason,
+    };
+    /* ชื่อพื้นที่ตามไปด้วย ไม่งั้นหมุดย้ายแต่ป้ายยังเป็นที่เดิม
+       ระบุไม่ได้ → ล้างชื่อทิ้ง ดีกว่าค้างชื่อเก่าที่ไม่ตรงกับอะไรแล้ว */
+    patch.area_en = nextName; patch.area_th = g ? g.th : null;
+    const up = await SB.from("events").update(patch).eq("id", r.id).select("id");
+    if (up.error || !(up.data || []).length) summary.failed++;
+  }
+  return { ok: true, dryRun, summary };
+}
+
+/* ── ข้อ 18: เจ้าหน้าที่แก้ตำแหน่งเอง ────────────────────────────
+   บันทึกด้วย loc_source = "analyst" เพื่อแยกจากค่าที่กฎคำนวณ
+   และเพื่อให้ reprocessEventLocations ข้ามแถวนี้ไปตลอด */
+async function saveEventLocationByAnalyst(eventId, loc) {
+  const SB = window.MDA_SB;
+  if (!SB) return { error: "no_supabase" };
+
+  const lat = loc.lat === "" || loc.lat == null ? null : Number(loc.lat);
+  const lon = loc.lon === "" || loc.lon == null ? null : Number(loc.lon);
+  if (lat != null && (!isFinite(lat) || Math.abs(lat) > 90))
+    return { error: "ละติจูดต้องอยู่ระหว่าง -90 ถึง 90" };
+  if (lon != null && (!isFinite(lon) || Math.abs(lon) > 180))
+    return { error: "ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180" };
+  /* มีพิกัดครึ่งเดียวใช้ไม่ได้ — ปักหมุดไม่ได้และคำนวณระยะไม่ได้
+     ต้องบังคับให้ครบคู่หรือไม่มีเลย */
+  if ((lat == null) !== (lon == null))
+    return { error: "ต้องกรอกละติจูดและลองจิจูดให้ครบทั้งคู่ หรือเว้นว่างทั้งคู่" };
+  if (lat == null && loc.status !== "unknown")
+    return { error: "ไม่มีพิกัด สถานะต้องเป็น unknown" };
+
+  const patch = {
+    lat, lon,
+    area_en: loc.nameEn || null, area_th: loc.nameTh || loc.nameEn || null,
+    loc_status: loc.status, loc_source: "analyst",
+    loc_confidence: lat == null ? null : (loc.status === "verified" ? 1 : 0.7),
+    loc_evidence: loc.evidence || null,
+    loc_reason: loc.reason || "analyst correction",
+  };
+  const { data, error } = await SB.from("events").update(patch).eq("id", eventId).select("id");
+  if (error) {
+    if (error.code === "42501" || /row-level security|policy/i.test(error.message || ""))
+      return { error: "ไม่มีสิทธิ์แก้ตำแหน่ง — ต้องเป็นผู้บัญชาการ ผู้ดูแลระบบ หรือยศชั้นสัญญาบัตรที่ยืนยันแล้ว" };
+    if (/loc_status|column .* does not exist|schema cache/i.test(error.message || ""))
+      return { error: "ยังไม่ได้เพิ่มคอลัมน์ตำแหน่ง — ต้องรัน supabase/event_location.sql ก่อน" };
+    return { error: error.message };
+  }
+  if (!(data || []).length) return { error: "ไม่มีสิทธิ์แก้ตำแหน่ง (ไม่มีแถวถูกแก้)" };
+  return { ok: true };
+}
+
+/* ── ข้อ 19: อ่านประวัติการเปลี่ยนตำแหน่ง ────────────────────── */
+async function loadLocationAudit(eventId) {
+  const SB = window.MDA_SB;
+  if (!SB) return { rows: [], error: "no_supabase" };
+  const { data, error } = await SB.from("event_location_audit")
+    .select("*").eq("event_id", eventId)
+    .order("changed_at", { ascending: false }).limit(50);
+  if (error) {
+    if (/does not exist|schema cache/i.test(error.message || ""))
+      return { rows: [], error: "ยังไม่ได้สร้างตารางประวัติ — ต้องรัน supabase/event_location.sql" };
+    return { rows: [], error: error.message };
+  }
+  return { rows: data || [], error: null };
 }
 
 /* ---- localStorage cache (offline fallback) ---- */
@@ -1002,6 +1257,7 @@ function AddEventButton({ addEvent, lang, showToast, className, currentUser }) {
 
 Object.assign(window, {
   useEventsUpdater, addEventToSupabase, setEventEscalation,
+  geocodeEvent, reprocessEventLocations, saveEventLocationByAnalyst, loadLocationAudit,
   loadEventsFromSupabase, queryEventsArchive,
   AddEventModal, AddEventButton, REGION_PRESETS,
   geocodeText, geocodeNews, geoKind, MDA_GEO_REGIONS,

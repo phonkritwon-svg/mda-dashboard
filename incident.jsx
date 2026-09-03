@@ -1,6 +1,58 @@
 /* ============================================================
    Screen: Incident Detail / Threat Assessment
    ============================================================ */
+
+/* ── ตำแหน่งเหตุการณ์: ป้ายสถานะ + ฟอร์มแก้ไข ──────────────────────
+   ค่า status ตรงกับ supabase/event_location.sql:
+   'unknown | conflict | unverified | approximate | probable | verified' */
+const LOC_STATUSES = ["verified", "probable", "approximate", "unverified", "conflict", "unknown"];
+
+function locStatusLabel(status, lang) {
+  const T = (th, en) => lang === "th" ? th : en;
+  switch (status) {
+    case "verified":    return T("ยืนยันแล้ว", "Verified");
+    case "probable":    return T("น่าจะใช่", "Probable");
+    case "approximate": return T("โดยประมาณ", "Approximate");
+    case "unverified":  return T("ยังไม่ยืนยัน", "Unverified");
+    case "conflict":    return T("ขัดแย้งกัน", "Conflicting");
+    default:            return T("ไม่ทราบ", "Unknown");
+  }
+}
+
+function locStatusColor(status) {
+  switch (status) {
+    case "verified":    return "var(--ok)";
+    case "probable":    return "var(--accent)";
+    case "approximate": return "var(--info)";
+    case "conflict":    return "var(--crit)";
+    case "unverified":  return "var(--text-dim)";
+    default:            return "var(--text-mute)";
+  }
+}
+
+const LOC_LABEL_STYLE = {
+  fontSize: "var(--fs-xs)", color: "var(--text-dim)",
+  letterSpacing: "0.06em", textTransform: "uppercase",
+  display: "block", marginBottom: 5, fontWeight: 500,
+};
+const LOC_INPUT_STYLE = {
+  width: "100%", boxSizing: "border-box",
+  background: "var(--bg)", border: "1px solid var(--border-2)",
+  borderRadius: 6, padding: "7px 9px",
+  color: "var(--text)", fontSize: "var(--fs-xs)",
+  fontFamily: "var(--font-ui)", outline: "none",
+};
+
+function LocField({ label, value, placeholder, onChange }) {
+  return (
+    <div>
+      <label style={LOC_LABEL_STYLE}>{label}</label>
+      <input type="text" value={value} placeholder={placeholder} style={LOC_INPUT_STYLE}
+        onChange={e => onChange(e.target.value)} />
+    </div>
+  );
+}
+
 function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser }) {
   const T = (th, en) => lang === "th" ? th : en;
 
@@ -55,6 +107,10 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
   const [people, setPeople] = useState(null);   // null = ยังไม่โหลด
   const [sending, setSending] = useState(false);
   const [evListOpen, setEvListOpen] = useState(false);
+  const [locEdit, setLocEdit] = useState(null);      // null = ไม่ได้แก้อยู่
+  const [locSaving, setLocSaving] = useState(false);
+  const [locAudit, setLocAudit] = useState(null);    // null = ยังไม่โหลด
+  const [locAuditOpen, setLocAuditOpen] = useState(false);
 
   /* สถานะผูกกับเหตุการณ์ที่กำลังดู ไม่ใช่กับหน้าจอ — ไม่ตั้งใหม่ทุกครั้งที่สลับ
      ป้าย "ยกระดับแล้ว" กับผู้รับมอบหมายจะติดค้างไปยังเหตุการณ์ถัดไป
@@ -68,6 +124,9 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
     setAssignee("");
     setAssignOpen(false);
     setEvListOpen(false);
+    setLocEdit(null);
+    setLocAudit(null);
+    setLocAuditOpen(false);
   }, [e && e.id, e && e.escalatedAt, e && e.escalatedBy]);
 
 
@@ -633,6 +692,174 @@ function Incident({ data, lang, onNav, initial, showToast, addEvent, currentUser
               )}
             </Panel>
           )}
+
+          {/* ── ตำแหน่งเหตุการณ์ · แก้ไขโดยเจ้าหน้าที่ · ประวัติ ──────────
+              ตำแหน่งที่มาจากการจับคู่คำไม่ใช่การยืนยัน แผงนี้จึงบอกว่าเชื่อได้แค่ไหน
+              มาจากคำไหนในข่าว และเปิดให้คนที่ตรวจกับต้นฉบับแล้วแก้ให้ถูกได้ */}
+          <Panel title={T("ตำแหน่งเหตุการณ์", "Incident location")} icon="pin"
+            action={<span className="tag mono" style={{
+              color: locStatusColor(e.locStatus), fontSize: "var(--fs-xs)" }}>
+              {locStatusLabel(e.locStatus, lang)}
+              {e.locConfidence != null ? " · " + e.locConfidence : ""}
+            </span>}>
+
+            <div className="kv">
+              <span className="k">{T("พื้นที่", "Place")}</span>
+              <span className="v">{tx(e.area, lang) || T("ระบุไม่ได้", "not determined")}</span>
+              <span className="k">{T("พิกัด", "Coordinates")}</span>
+              <span className="v mono">
+                {e.lat == null || e.lon == null
+                  ? T("— ไม่ปักหมุด —", "— not plotted —")
+                  : Number(e.lat).toFixed(4) + ", " + Number(e.lon).toFixed(4)}
+              </span>
+              <span className="k">{T("ที่มา", "Source")}</span>
+              <span className="v">
+                {e.locSource === "analyst"
+                  ? T("เจ้าหน้าที่แก้เอง", "corrected by an analyst")
+                  : T("กฎจับคู่คำจากข่าว", "matched from the article text")}
+              </span>
+              {e.locEvidence ? (
+                <React.Fragment>
+                  <span className="k">{T("หลักฐาน", "Evidence")}</span>
+                  <span className="v" style={{ fontStyle: "italic" }}>{"\u201C" + e.locEvidence + "\u201D"}</span>
+                </React.Fragment>
+              ) : null}
+            </div>
+
+            {e.lat == null && (
+              <div style={{ marginTop: 10, padding: "9px 11px", borderRadius: 7,
+                background: "rgba(var(--accent-rgb),0.07)",
+                border: "1px dashed rgba(var(--accent-rgb),0.35)",
+                fontSize: "var(--fs-xs)", lineHeight: 1.65 }}>
+                {e.locStatus === "conflict"
+                  ? T("ข่าวชี้ไปหลายพื้นที่ที่ห่างกันมาก จึงไม่ปักหมุด — ปักไปก็มีโอกาสผิด",
+                      "The article points at places too far apart to choose between, so nothing is plotted")
+                  : T("ระบุตำแหน่งจากเนื้อข่าวไม่ได้ จึงไม่ปักหมุด ดีกว่าปักผิดที่",
+                      "No location could be determined from the article, so nothing is plotted")}
+              </div>
+            )}
+
+            <div className="row" style={{ gap: 9, marginTop: 12, flexWrap: "wrap" }}>
+              {canAct ? (
+                <button className="btn btn-ghost btn-sm"
+                  onClick={() => setLocEdit(locEdit ? null : {
+                    nameEn: (e.area && e.area.en) || "", nameTh: (e.area && e.area.th) || "",
+                    lat: e.lat == null ? "" : String(e.lat),
+                    lon: e.lon == null ? "" : String(e.lon),
+                    status: e.lat == null ? "unknown" : "verified",
+                    reason: "", evidence: e.locEvidence || "",
+                  })}>
+                  <Icon name="pin" size={13} />
+                  {locEdit ? T("ยกเลิกการแก้", "Cancel edit") : T("แก้ตำแหน่ง", "Correct location")}
+                </button>
+              ) : <RankDenied icon="pin" />}
+
+              <button className="btn btn-ghost btn-sm"
+                onClick={async () => {
+                  const open = !locAuditOpen; setLocAuditOpen(open);
+                  if (open && locAudit === null) {
+                    const res = await window.loadLocationAudit(e.id);
+                    setLocAudit(res.error ? { error: res.error } : res.rows);
+                  }
+                }}>
+                <Icon name="clock" size={13} />
+                {locAuditOpen ? T("ซ่อนประวัติ", "Hide history") : T("ประวัติการแก้", "Change history")}
+              </button>
+            </div>
+
+            {locEdit && (
+              <div style={{ marginTop: 12, padding: "13px 14px", borderRadius: 9,
+                background: "var(--surface)", border: "1px solid var(--border-2)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
+                  <LocField label={T("ชื่อพื้นที่ (EN)", "Place (EN)")} value={locEdit.nameEn}
+                    onChange={v => setLocEdit(s2 => ({ ...s2, nameEn: v }))} />
+                  <LocField label={T("ชื่อพื้นที่ (ไทย)", "Place (TH)")} value={locEdit.nameTh}
+                    onChange={v => setLocEdit(s2 => ({ ...s2, nameTh: v }))} />
+                  <LocField label={T("ละติจูด", "Latitude")} value={locEdit.lat}
+                    placeholder="26.5" onChange={v => setLocEdit(s2 => ({ ...s2, lat: v }))} />
+                  <LocField label={T("ลองจิจูด", "Longitude")} value={locEdit.lon}
+                    placeholder="56.3" onChange={v => setLocEdit(s2 => ({ ...s2, lon: v }))} />
+                </div>
+
+                <div style={{ marginTop: 9 }}>
+                  <label style={LOC_LABEL_STYLE}>{T("สถานะ", "Status")}</label>
+                  <select value={locEdit.status} style={{ ...LOC_INPUT_STYLE, cursor: "pointer" }}
+                    onChange={ev2 => setLocEdit(s2 => ({ ...s2, status: ev2.target.value }))}>
+                    {LOC_STATUSES.map(k => (
+                      <option key={k} value={k}>{locStatusLabel(k, lang)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginTop: 9 }}>
+                  <label style={LOC_LABEL_STYLE}>{T("เหตุผล (บันทึกในประวัติ)", "Reason (recorded in history)")}</label>
+                  <input value={locEdit.reason} style={LOC_INPUT_STYLE}
+                    placeholder={T("เช่น ตรวจกับข่าวต้นฉบับแล้ว เหตุเกิดที่ช่องแคบฮอร์มุซ",
+                                   "e.g. checked the source; the incident is in the Strait of Hormuz")}
+                    onChange={ev2 => setLocEdit(s2 => ({ ...s2, reason: ev2.target.value }))} />
+                </div>
+
+                <div className="row" style={{ gap: 9, marginTop: 12, justifyContent: "flex-end" }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setLocEdit(null)}>
+                    {T("ยกเลิก", "Cancel")}
+                  </button>
+                  <button className="btn btn-primary btn-sm" disabled={locSaving}
+                    style={{ opacity: locSaving ? 0.6 : 1 }}
+                    onClick={async () => {
+                      setLocSaving(true);
+                      const res = await window.saveEventLocationByAnalyst(e.id, locEdit);
+                      setLocSaving(false);
+                      if (res.error) { if (showToast) showToast(res.error, "error"); return; }
+                      setLocEdit(null); setLocAudit(null);
+                      if (showToast) showToast(
+                        T("บันทึกตำแหน่งแล้ว — โหลดหน้าใหม่เพื่อดูหมุดที่อัปเดต",
+                          "Location saved - reload to see the updated marker"), "ok");
+                    }}>
+                    <Icon name="check" size={13} />{T("บันทึกตำแหน่ง", "Save location")}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {locAuditOpen && (
+              <div style={{ marginTop: 12 }}>
+                {locAudit === null && (
+                  <div className="dim" style={{ fontSize: "var(--fs-xs)" }}>
+                    <Icon name="refresh" size={12} style={{ animation: "sweep 0.9s linear infinite" }} />
+                    <span style={{ marginLeft: 6 }}>{T("กำลังโหลด…", "Loading…")}</span>
+                  </div>
+                )}
+                {locAudit && locAudit.error && (
+                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--crit)" }}>{locAudit.error}</div>
+                )}
+                {Array.isArray(locAudit) && !locAudit.length && (
+                  <div className="dim" style={{ fontSize: "var(--fs-xs)" }}>
+                    {T("ยังไม่เคยมีการเปลี่ยนตำแหน่ง", "This location has never been changed")}
+                  </div>
+                )}
+                {Array.isArray(locAudit) && locAudit.map(a => (
+                  <div key={a.id} style={{ padding: "8px 10px", marginBottom: 6, borderRadius: 7,
+                    background: "var(--surface)", border: "1px solid var(--border)",
+                    fontSize: "var(--fs-xs)", lineHeight: 1.7 }}>
+                    <div>
+                      <span className="mono dim">{a.prev_name || "\u2014"}</span>
+                      <Icon name="chevR" size={11} style={{ verticalAlign: "-1px", margin: "0 5px", opacity: 0.5 }} />
+                      <span className="mono">{a.new_name || "\u2014"}</span>
+                      <span className="tag" style={{ marginLeft: 7, fontSize: 9,
+                        color: locStatusColor(a.new_status) }}>{a.new_status || "\u2014"}</span>
+                    </div>
+                    <div className="dim">
+                      {(a.changed_by_name || T("ระบบ", "system"))}
+                      {" \u00B7 "}{a.changed_source === "analyst" ? T("แก้เอง", "analyst") : T("อัตโนมัติ", "rule")}
+                      {" \u00B7 "}{new Date(a.changed_at).toLocaleString(lang === "th" ? "th-TH" : "en-GB",
+                        { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    {a.reason ? <div style={{ marginTop: 3 }}>{a.reason}</div> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
 
           <Panel title={T("ข้อเสนอแนะการปฏิบัติ", "Recommended Actions")} icon="target">
             <div className="col" style={{ gap: 9 }}>
