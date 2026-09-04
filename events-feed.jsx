@@ -443,9 +443,32 @@ function geocodeNews(n) {
   const conf = field === "title" ? g.confidence : Math.round(g.confidence * 0.8 * 100) / 100;
   return {
     lat: win.rule.lat, lon: win.rule.lon, th: win.rule.th, en: win.rule.en,
+    kind: win.kind,                       // ผู้เรียกต้องรู้ว่าเป็นน้ำหรือบก
     confidence: conf, status: g.status,
     evidence: { text: win.hit, field, rule: win.rule.en },
   };
+}
+
+/* ── พื้นที่นี้เป็น "น้ำ" หรือไม่ ──────────────────────────────────────
+   ใช้ตัดสินว่าจะวางสัญลักษณ์เรือลงตรงนั้นได้ไหม
+
+   ศูนย์กลางระดับจังหวัดคือพิกัดศาลากลาง ซึ่งอยู่บนบกทุกจังหวัด รวมทั้ง
+   จังหวัดชายทะเลด้วย — ตัวเมืองภูเก็ตกับตัวเมืองตราดก็อยู่บนบก
+   ส่วนจังหวัดที่ไม่ติดทะเลเลย (โคราช ขอนแก่น) ยิ่งไม่ต้องพูดถึง
+
+   kind "point" ในตารางเป็นท่าเรือ/เกาะ/หาด/ปากน้ำล้วน จึงติดน้ำทั้งหมด
+   kind "water" เป็นทะเล/อ่าว/มหาสมุทร
+   ส่วน "specific" ปนกันระหว่างช่องแคบ (น้ำ) กับจังหวัด (บก) จึงต้องระบุชื่อ */
+const GEO_WATER_SPECIFIC = new Set([
+  "Strait of Hormuz", "Strait of Malacca", "English Channel",
+  "Panama Canal", "Suez Canal", "Strait of Gibraltar", "Rotterdam–Antwerp",
+  "Cambodia Coast", "Myanmar Coast", "Malaysia Coast",
+]);
+
+function geoIsWater(geo) {
+  if (!geo) return false;
+  if (geo.kind === "water" || geo.kind === "point") return true;
+  return GEO_WATER_SPECIFIC.has(geo.en);
 }
 
 /* ตัวเดิม — เก็บไว้ให้โค้ดเก่าที่ยังเรียกอยู่ไม่พัง แต่ห้ามใช้กับข่าว
@@ -487,6 +510,7 @@ const VESSEL_ALERT_RE = /attack|struck|missile|drone|hijack|seiz|capsiz|sink|sun
 // รับรายการข่าว → คืน array ของเรือที่ปักหมุดได้ (มีชื่อ/ประเภท/พิกัด)
 function extractVesselsFromNews(newsArr) {
   const out = [];
+  const seen = {};
   let idx = 0;
   (newsArr || []).forEach(n => {
     const en  = (n.raw && (n.raw.en || n.raw.th)) || "";
@@ -498,20 +522,36 @@ function extractVesselsFromNews(newsArr) {
     if (!VESSEL_MENTION_RE.test(hay) && !VESSEL_NAME_RE.test(en) && !VESSEL_NAME_RE.test(sum)) return;
     const geo = geocodeNews(n);          // ต้นฉบับเท่านั้น ไม่เอาคำแปล/ชื่อสำนักข่าว
     if (!geo || geo.lat == null) return;                // ระบุพื้นที่ไม่ได้/ขัดแย้ง → ไม่ปักหมุด
+
+    /* ข่าวที่ระบุได้แค่ระดับจังหวัด = รู้แค่ว่า "เกิดแถวจังหวัดนี้" ไม่ใช่พิกัดเรือ
+       ปักสัญลักษณ์เรือลงศูนย์กลางจังหวัดคือวางเรือไว้กลางเมืองบนบก
+       ของเดิมทำแบบนี้จริง — เรือไปโผล่ที่โคราชกับปราจีนบุรี
+       ข่าวยังขึ้นเป็น "จุดข่าว" ตามปกติ แค่ไม่ถูกวาดเป็นเรือ */
+    if (!geoIsWater(geo)) return;
+
     const m = VESSEL_NAME_RE.exec(en) || VESSEL_NAME_RE.exec(sum);
     const name = m ? (m[1] + " " + m[2]).trim() : null;
     const type = _vesselType(hay);
-    // กระจายตำแหน่งรอบจุดศูนย์กลางภูมิภาค ไม่ให้หมุดทับกัน
-    const ang = (idx * 47) % 360, r = 0.5 + (idx % 6) * 0.45;
+
+    /* เรือลำเดียวกันที่หลายสำนักข่ารายงานต้องเป็นหมุดเดียว
+       ของเดิมได้หมุดละข่าว — USS Abraham Lincoln เคยขึ้นสองหมุดคนละที่ */
+    const key = (name || type) + "@" + geo.en;
+    if (seen[key]) return;
+    seen[key] = true;
     idx++;
+
     out.push({
       id:     "nv_" + (n.id || idx),
       name:   name || (type === "navy" ? "Naval unit" : "Vessel") + " · " + geo.en,
       flag:   "??",
       type:   type,
       course: 0, sp: 0,
-      lat:    geo.lat + r * Math.cos(ang * Math.PI / 180),
-      lon:    geo.lon + r * Math.sin(ang * Math.PI / 180),
+      /* ปักตรงจุดที่ข่าวระบุ ไม่กระจายออกไปเอง
+         ของเดิมบวกมุมสุ่ม 0.5–2.75 องศา (55–305 กม.) เพื่อกันหมุดทับกัน
+         ซึ่งเท่ากับแต่งระยะทางขึ้นมาเอง — วัดจริงแล้วเรือที่ข่าวบอกว่าจอด
+         แหลมฉบังถูกวาดห่างออกไป 104 และ 152 กม. เข้าไปในแผ่นดิน */
+      lat:    geo.lat,
+      lon:    geo.lon,
       status: VESSEL_ALERT_RE.test(hay) ? "watch" : "normal",
       fromNews: true,
       url:    n.url,
