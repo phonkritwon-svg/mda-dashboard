@@ -9,6 +9,102 @@ const VERDICT = {
   context:       { kind: "mute", th: "บริบท",        en: "CONTEXT" },
 };
 
+/* ============================================================
+   สรุปรอบชั่วโมง — คำนวณจากข่าวจริงในฟีด ไม่ใช่ข้อความสำเร็จรูป
+
+   ของเดิมเป็นย่อหน้าฮาร์ดโค้ดเรื่องฮูตี/ทะเลแดง/กองเรือเงา พร้อมป้าย
+   "คำสำคัญที่ตรวจพบ" ที่ตายตัวแปดคำ — ไม่เคยเปลี่ยนตามข่าวเลยสักครั้ง
+   แดชบอร์ดข่าวกรองที่รายงานสิ่งที่ไม่ได้ตรวจพบจริงอันตรายกว่าไม่รายงาน
+
+   ใช้กฎชุดเดียวกับที่หน้าอื่นใช้อยู่แล้ว (classifyThreats + geocodeNews)
+   ผลจึงตรงกับตัวกรองด้านซ้ายและหมุดบนแผนที่เสมอ
+   ============================================================ */
+
+/* ถ้าชั่วโมงล่าสุดไม่มีข่าว ให้ถอยหน้าต่างออกทีละขั้นแทนที่จะโชว์แผงว่าง
+   ฟีดรีเฟรชทุก 30 นาที และข่าวทางน้ำของไทยมีวันละไม่กี่ชิ้น ชั่วโมงที่ว่าง
+   จึงเป็นเรื่องปกติ ไม่ใช่ความผิดพลาด — แต่ต้องบอกช่วงเวลาจริงที่ใช้เสมอ */
+const DIGEST_WINDOWS = [
+  { hours: 1,  th: "1 ชั่วโมงล่าสุด",  en: "Past hour" },
+  { hours: 6,  th: "6 ชั่วโมงล่าสุด",  en: "Past 6 hours" },
+  { hours: 24, th: "24 ชั่วโมงล่าสุด", en: "Past 24 hours" },
+];
+const DIGEST_MIN_ITEMS = 3;
+
+function digestWindow(newsArr) {
+  const now = Date.now();
+  const at = (n) => new Date(n.time || 0).getTime();
+  for (const w of DIGEST_WINDOWS) {
+    const since = now - w.hours * 3600 * 1000;
+    const items = newsArr.filter(n => at(n) >= since);
+    if (items.length >= DIGEST_MIN_ITEMS) return { ...w, items };
+  }
+  /* ยังไม่ถึงเกณฑ์แม้ใน 24 ชม. → ใช้ข่าวล่าสุดเท่าที่มี และบอกตามตรงว่า
+     นี่ไม่ใช่ "รอบชั่วโมง" แล้ว */
+  const latest = newsArr.slice(0, 20);
+  return { hours: null, th: "ช่วงล่าสุดเท่าที่มีข้อมูล", en: "Latest available", items: latest };
+}
+
+/* นับแบบ {key: count} แล้วเรียงมาก→น้อย คืนเป็น [[key, count], …] */
+function digestRank(items, keysOf) {
+  const c = {};
+  items.forEach(n => (keysOf(n) || []).forEach(k => { if (k) c[k] = (c[k] || 0) + 1; }));
+  return Object.entries(c).sort((a, b) => b[1] - a[1]);
+}
+
+function buildHourlyDigest(newsArr, lang) {
+  const T = (th, en) => (lang === "th" ? th : en);
+  const win = digestWindow(newsArr || []);
+  const items = win.items;
+  const label = lang === "th" ? win.th : win.en;
+
+  if (!items.length) {
+    return { label, count: 0, entities: [], domains: [], regions: [],
+      text: T("ยังไม่มีข่าวเข้าฟีดในช่วงนี้ — กดรีเฟรชเพื่อดึงรอบใหม่",
+              "No items have reached the feed in this window - refresh to pull a new cycle") };
+  }
+
+  const domMeta = window.MDA_THREAT_DOMAINS || [];
+  const domName = (k) => {
+    const d = domMeta.find(x => x.key === k);
+    return d ? (lang === "th" ? d.th : d.en) : k;
+  };
+  const domains = digestRank(items, n => (window.classifyThreats ? window.classifyThreats(n) : []));
+
+  /* พื้นที่ — ใช้ตัวจับคู่ตัวเดียวกับแผนที่ และเอาเฉพาะที่ระบุได้จริง
+     status "conflict"/ไม่มีพิกัด แปลว่าตัดสินไม่ได้ ไม่ใช่พื้นที่ที่ยืนยันแล้ว */
+  const regions = digestRank(items, n => {
+    const g = window.geocodeNews ? window.geocodeNews(n) : null;
+    return g && g.lat != null ? [lang === "th" ? g.th : g.en] : [];
+  });
+
+  const outlets = digestRank(items, n => [n.outlet]);
+
+  const topDom = domains.slice(0, 3).map(([k, c]) => domName(k) + " (" + c + ")");
+  const topReg = regions.slice(0, 3).map(([k, c]) => k + " (" + c + ")");
+
+  /* ขึ้นต้นด้วยชื่อช่วงเวลาเสมอ แล้วคั่นด้วย "·" — ใช้ได้กับทุกป้ายรวมทั้ง
+     ตัวสำรอง ไม่ต้องพึ่งคำเชื่อมที่เข้ากับบางป้ายเท่านั้น */
+  const text = T(
+    label + " · ข่าวเข้าฟีด " + items.length + " ชิ้น จาก " + outlets.length + " สำนักข่าว"
+      + (topDom.length ? " · ประเด็นเด่น: " + topDom.join(" · ") : " · ยังจัดกลุ่มภัยคุกคามไม่ได้")
+      + (topReg.length ? " · พื้นที่ที่ระบุได้: " + topReg.join(" · ")
+                       : " · ยังระบุพื้นที่จากเนื้อข่าวไม่ได้"),
+    label + " · " + items.length + " items from " + outlets.length + " outlets"
+      + (topDom.length ? ". Leading themes: " + topDom.join(", ") : ". No threat domain matched yet")
+      + (topReg.length ? ". Located: " + topReg.join(", ")
+                       : ". No location could be resolved from the text")
+  );
+
+  /* "คำสำคัญที่ตรวจพบ" ต้องเป็นสิ่งที่ตรวจพบจริงในรอบนี้ — ชื่อด้านภัยคุกคาม
+     ที่กฎจับได้ บวกชื่อพื้นที่ที่ระบุพิกัดได้ ไม่ใช่รายการคงที่ */
+  const entities = [].concat(
+    domains.slice(0, 4).map(([k]) => domName(k)),
+    regions.slice(0, 4).map(([k]) => k)
+  );
+
+  return { label, count: items.length, entities, domains, regions, outlets, text };
+}
+
 function NewsRow({ n, lang, onNav }) {
   const T   = (th, en) => (lang === "th" ? th : en);
   const src = window.MDA_DATA.sources[n.srcKey];
@@ -200,6 +296,35 @@ function Osint({ data, lang, onNav }) {
     n.ai && n.ai.th, n.ai && n.ai.en, n.outlet].filter(Boolean).join(" ");
   const grouped = window.focusPartition(news, newsHay, focusOn);
 
+  /* สรุปรอบชั่วโมง + แนวโน้ม 6 ชม. — คิดจาก allNews (ทั้งฟีด) ไม่ใช่ news
+     ที่ถูกตัวกรองด้านซ้ายหั่นไปแล้ว มิฉะนั้นการติ๊กกรองแหล่งข่าวหนึ่งแหล่ง
+     จะทำให้ "สรุปรอบชั่วโมง" เปลี่ยนตาม ทั้งที่มันควรสรุปสถานการณ์ทั้งหมด */
+  const digest = React.useMemo(() => buildHourlyDigest(allNews, lang), [allNews, lang]);
+  const trend6h = React.useMemo(() => {
+    const since = Date.now() - 6 * 3600 * 1000;
+    const recent = allNews.filter(n => new Date(n.time || 0).getTime() >= since);
+    const domMeta = window.MDA_THREAT_DOMAINS || [];
+    return digestRank(recent, n => (window.classifyThreats ? window.classifyThreats(n) : []))
+      .slice(0, 4)
+      .map(([k, c]) => {
+        const d = domMeta.find(x => x.key === k);
+        return { t: d ? (lang === "th" ? d.th : d.en) : k, n: c, c: (d && d.color) || "var(--text-dim)" };
+      });
+  }, [allNews, lang]);
+
+  /* คุณภาพข่าวกรอง — นับ verdict จริงของข่าวในฟีด */
+  const quality = React.useMemo(() => {
+    const c = { ok: 0, pending: 0, context: 0 };
+    allNews.forEach(n => {
+      const kind = (VERDICT[n.verdict] || VERDICT.unverified).kind;
+      if (kind === "ok") c.ok++;
+      else if (kind === "mute") c.context++;
+      else c.pending++;
+    });
+    const total = allNews.length || 1;
+    return { ...c, pct: Math.round(c.ok / total * 100) };
+  }, [allNews]);
+
   const lastFetchStr = lastFetch
     ? lastFetch.toLocaleTimeString(lang === "th" ? "th-TH" : "en-GB", { hour: "2-digit", minute: "2-digit" })
     : null;
@@ -322,33 +447,34 @@ function Osint({ data, lang, onNav }) {
 
         {/* right AI digest */}
         <div className="col" style={{ gap: 12, minHeight: 0, overflow: "auto" }}>
-          <Panel icon="spark" title={T("AI สรุปประจำชั่วโมง", "AI Hourly Synthesis")}
-            action={<span className="ai-chip"><Icon name="cpu" size={12} />auto</span>}>
+          <Panel icon="spark" title={T("สรุปรอบล่าสุด", "Latest Cycle Synthesis")}
+            action={<span className="ai-chip"><Icon name="cpu" size={12} />{digest.label}</span>}>
             <div className="nsum" style={{ color: "var(--text)", lineHeight: 1.6 }}>
-              {T(
-                "ในรอบชั่วโมงที่ผ่านมา สัญญาณเด่นคือกลุ่มฮูตีส่งสัญญาณรื้อฟื้นการโจมตีในทะเลแดง (ยืนยันโดย UKMTO และ BIMCO) ขณะที่การโจมตีกองเรือเงาในทะเลดำ-บอลติกยังต่อเนื่อง และความตึงเครียดเกรย์โซนในทะเลจีนใต้ แนะนำยกระดับเฝ้าระวังสูงต่อเนื่องในจุดร้อนหลัก",
-                "Over the past hour the dominant signals are the Houthis' threat to resume Red Sea attacks (UKMTO + BIMCO advisories), continued shadow-fleet strikes in the Black/Baltic Seas, and grey-zone tension in the South China Sea. Recommend sustaining elevated watch across the main chokepoints."
-              )}
+              {digest.text}
             </div>
-            <div className="divider"></div>
-            <div className="dim up" style={{ fontSize: 10, marginBottom: 8 }}>{T("คำสำคัญที่ตรวจพบ", "Detected entities")}</div>
-            <div className="row wrap" style={{ gap: 6 }}>
-              {["Houthi", "Bab el-Mandeb", "Shadow fleet", "Scarborough Shoal", "Novorossiysk", "Subsea cable", "UKMTO", "Strait of Hormuz"].map(e => (
-                <span key={e} className="tag">{e}</span>
-              ))}
-            </div>
+            {digest.entities.length > 0 && (
+              <React.Fragment>
+                <div className="divider"></div>
+                <div className="dim up" style={{ fontSize: 10, marginBottom: 8 }}>{T("คำสำคัญที่ตรวจพบ", "Detected entities")}</div>
+                <div className="row wrap" style={{ gap: 6 }}>
+                  {digest.entities.map(e => (
+                    <span key={e} className="tag">{e}</span>
+                  ))}
+                </div>
+              </React.Fragment>
+            )}
           </Panel>
 
           <Panel title={T("แนวโน้มหัวข้อ (6 ชม.)", "Trending Topics (6h)")} icon="feed">
-            {[
-              { t: T("ภัยคุกคามทะเลแดง", "Red Sea threat"), n: 47, c: "var(--crit)" },
-              { t: T("กองเรือเงา", "Shadow fleet"),          n: 34, c: "var(--accent)" },
-              { t: T("สายเคเบิลใต้ทะเล", "Subsea cables"),  n: 19, c: "var(--info)" },
-              { t: T("ทะเลจีนใต้", "South China Sea"),       n: 15, c: "var(--text-dim)" },
-            ].map((r, i) => (
+            {!trend6h.length && (
+              <div className="empty">{T("ไม่มีข่าวเข้าฟีดใน 6 ชั่วโมงที่ผ่านมา", "Nothing reached the feed in the past 6 hours")}</div>
+            )}
+            {trend6h.map((r, i) => (
               <div className="srcbar" key={i}>
                 <div className="nm" style={{ width: 120 }}>{r.t}</div>
-                <div className="track"><div className="fill" style={{ width: (r.n / 47 * 100) + "%", background: r.c }}></div></div>
+                <div className="track">
+                  <div className="fill" style={{ width: (r.n / trend6h[0].n * 100) + "%", background: r.c }}></div>
+                </div>
                 <div className="ct">{r.n}</div>
               </div>
             ))}
@@ -356,11 +482,11 @@ function Osint({ data, lang, onNav }) {
 
           <Panel title={T("คุณภาพข่าวกรอง", "Feed Quality")} icon="shield">
             <div className="row" style={{ gap: 14, alignItems: "center" }}>
-              <Gauge value={74} size={84} label={T("เชื่อถือได้", "VERIFIED")} color="var(--ok)" />
+              <Gauge value={quality.pct} size={84} label={T("เชื่อถือได้", "VERIFIED")} color="var(--ok)" />
               <div className="col" style={{ gap: 6, fontSize: "var(--fs-sm)", flex: 1 }}>
-                <div className="row between"><span className="dim">{T("ยืนยัน/สอดคล้อง", "Corroborated")}</span><span className="mono">5</span></div>
-                <div className="row between"><span className="dim">{T("รอตรวจสอบ", "Pending")}</span><span className="mono" style={{ color: "var(--accent)" }}>1</span></div>
-                <div className="row between"><span className="dim">{T("บริบท", "Context")}</span><span className="mono">1</span></div>
+                <div className="row between"><span className="dim">{T("ยืนยัน/สอดคล้อง", "Corroborated")}</span><span className="mono">{quality.ok}</span></div>
+                <div className="row between"><span className="dim">{T("รอตรวจสอบ", "Pending")}</span><span className="mono" style={{ color: "var(--accent)" }}>{quality.pending}</span></div>
+                <div className="row between"><span className="dim">{T("บริบท", "Context")}</span><span className="mono">{quality.context}</span></div>
               </div>
             </div>
           </Panel>
